@@ -1,0 +1,199 @@
+<?php
+
+namespace App\Http\Controllers\Crm;
+
+use App\Enums\ContactType;
+use App\Enums\LeadSource;
+use App\Enums\ToothConditionType;
+use App\Http\Controllers\Clinical\ClinicalNoteController;
+use App\Http\Controllers\Controller;
+use App\Models\Branch;
+use App\Models\Employee;
+use App\Models\Patient;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+use Inertia\Response;
+
+class PatientController extends Controller
+{
+    public function index(Request $request): Response
+    {
+        $this->authorize('patients.view');
+
+        $query = Patient::with('branch')
+            ->when($request->search, fn ($q, $v) => $q->where('full_name', 'ilike', "%{$v}%")
+                ->orWhere('phone', 'ilike', "%{$v}%")
+                ->orWhere('code', 'ilike', "%{$v}%"))
+            ->when($request->branch_id, fn ($q, $v) => $q->where('branch_id', $v))
+            ->when($request->source, fn ($q, $v) => $q->where('source', $v))
+            ->orderByDesc('id');
+
+        return Inertia::render('Crm/Patients/Index', [
+            'patients' => $query->paginate(20)->through(fn ($p) => [
+                'id' => $p->id,
+                'code' => $p->code,
+                'full_name' => $p->full_name,
+                'phone' => $p->phone,
+                'gender' => $p->gender,
+                'source' => $p->source,
+                'branch' => $p->branch?->name,
+                'is_active' => $p->is_active,
+                'created_at' => $p->created_at->format('d/m/Y'),
+            ]),
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get()
+                ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            'filters' => $request->only(['search', 'branch_id', 'source']),
+        ]);
+    }
+
+    public function create(): Response
+    {
+        $this->authorize('patients.create');
+
+        return $this->form();
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $this->authorize('patients.create');
+
+        $data = $this->validated($request);
+        Patient::create([...$data, 'code' => Patient::generateCode()]);
+
+        return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
+    }
+
+    public function show(Patient $patient): Response
+    {
+        $this->authorize('patients.view');
+
+        $activities = $patient->contactActivities()->with('creator')->take(20)->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'type' => $a->type->value,
+                'type_label' => $a->type->label(),
+                'type_color' => $a->type->color(),
+                'content' => $a->content,
+                'creator' => $a->creator->name,
+                'created_at' => $a->created_at->format('d/m/Y H:i'),
+            ]);
+
+        $clinicalNotes = $patient->clinicalNotes()->with(['doctor', 'creator'])->take(30)->get()
+            ->map(fn ($n) => ClinicalNoteController::mapDto($n));
+
+        $toothConditions = $patient->toothConditions()->get()
+            ->map(fn ($tc) => [
+                'id' => $tc->id,
+                'tooth_number' => $tc->tooth_number,
+                'condition' => $tc->condition->value,
+                'condition_label' => $tc->condition->label(),
+                'condition_color' => $tc->condition->color(),
+                'svg_fill' => $tc->condition->svgFill(),
+                'svg_stroke' => $tc->condition->svgStroke(),
+                'note' => $tc->note,
+            ]);
+
+        $doctors = Employee::doctors()->orderBy('full_name')->get()
+            ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]);
+
+        $conditionTypes = collect(ToothConditionType::cases())
+            ->map(fn ($c) => ['value' => $c->value, 'label' => $c->label(), 'color' => $c->color()]);
+
+        return Inertia::render('Crm/Patients/Show', [
+            'patient' => [
+                'id' => $patient->id,
+                'code' => $patient->code,
+                'full_name' => $patient->full_name,
+                'phone' => $patient->phone,
+                'email' => $patient->email,
+                'dob' => $patient->dob?->format('d/m/Y'),
+                'gender' => $patient->gender,
+                'address' => $patient->address,
+                'source' => $patient->source,
+                'allergies' => $patient->allergies,
+                'medical_history' => $patient->medical_history,
+                'emergency_contact' => $patient->emergency_contact,
+                'notes' => $patient->notes,
+                'is_active' => $patient->is_active,
+                'branch_id' => $patient->branch_id,
+            ],
+            'activities' => $activities,
+            'clinicalNotes' => $clinicalNotes,
+            'toothConditions' => $toothConditions,
+            'doctors' => $doctors,
+            'conditionTypes' => $conditionTypes,
+            'contactTypes' => collect(ContactType::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
+        ]);
+    }
+
+    public function edit(Patient $patient): Response
+    {
+        $this->authorize('patients.edit');
+
+        return $this->form($patient);
+    }
+
+    public function update(Request $request, Patient $patient): RedirectResponse
+    {
+        $this->authorize('patients.edit');
+
+        $data = $this->validated($request, $patient->id);
+        $patient->update($data);
+
+        return redirect()->route('patients.show', $patient)->with('success', 'Đã cập nhật bệnh nhân.');
+    }
+
+    public function destroy(Patient $patient): RedirectResponse
+    {
+        $this->authorize('patients.delete');
+        $patient->delete();
+
+        return redirect()->route('patients.index')->with('success', 'Đã xóa bệnh nhân.');
+    }
+
+    private function form(?Patient $patient = null): Response
+    {
+        return Inertia::render('Crm/Patients/Form', [
+            'patient' => $patient ? [
+                'id' => $patient->id,
+                'full_name' => $patient->full_name,
+                'phone' => $patient->phone,
+                'email' => $patient->email,
+                'dob' => $patient->dob?->format('Y-m-d'),
+                'gender' => $patient->gender,
+                'address' => $patient->address,
+                'source' => $patient->source,
+                'allergies' => $patient->allergies,
+                'medical_history' => $patient->medical_history,
+                'emergency_contact' => $patient->emergency_contact,
+                'branch_id' => $patient->branch_id,
+                'notes' => $patient->notes,
+                'is_active' => $patient->is_active,
+            ] : null,
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get()
+                ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+        ]);
+    }
+
+    private function validated(Request $request, ?int $ignore = null): array
+    {
+        return $request->validate([
+            'full_name' => 'required|string|max:255',
+            'phone' => 'required|string|max:20',
+            'email' => 'nullable|email|max:255',
+            'dob' => 'nullable|date',
+            'gender' => 'nullable|in:male,female,other',
+            'address' => 'nullable|string|max:500',
+            'source' => 'nullable|string',
+            'allergies' => 'nullable|string',
+            'medical_history' => 'nullable|string',
+            'emergency_contact' => 'nullable|string|max:255',
+            'branch_id' => 'nullable|exists:branches,id',
+            'notes' => 'nullable|string',
+            'is_active' => 'boolean',
+        ]);
+    }
+}
