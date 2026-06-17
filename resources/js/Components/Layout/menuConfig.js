@@ -78,12 +78,99 @@ export const menuConfig = [
     {
         label: 'KẾ TOÁN',
         items: [
-            { label: 'Bảng lương', route: 'accounting.payrolls.index', icon: 'payroll', permission: 'accounting.view' },
-            { label: 'Nhà cung cấp', route: 'accounting.suppliers.index', icon: 'supplier', permission: 'accounting.view' },
-            { label: 'Hóa đơn mua', route: 'accounting.purchase-invoices.index', icon: 'purchase-invoice', permission: 'accounting.view' },
-            { label: 'Chuyển quỹ', route: 'accounting.fund-transfers.index', icon: 'fund-transfer', permission: 'accounting.view' },
-            { label: 'Báo cáo thuế', route: 'reports.vat', icon: 'report-tax', permission: 'accounting.view' },
-            { label: 'Sổ cái', route: 'reports.general-ledger', icon: 'general-ledger', permission: 'accounting.view' }
+            {
+                label: 'Quỹ',
+                icon: 'expense',
+                children: [
+                    { label: 'Quản lý quỹ', route: 'core.fund-accounts.index', permission: 'branches.manage' },
+                    { label: 'Phiếu thu / chi', route: 'accounting.transactions.index', permission: 'accounting.view' },
+                    { label: 'Luân chuyển quỹ', route: 'accounting.fund-transfers.index', permission: 'accounting.view' },
+                    { label: 'Tài khoản ngân hàng', route: 'accounting.bank-accounts.index', permission: 'accounting.view' },
+                    { label: 'Điều khoản TT', route: 'accounting.payment-terms.index', permission: 'accounting.view' },
+                    { label: 'TK nội bộ', route: 'accounting.internal-accounts.index', permission: 'accounting.view' },
+                    { label: 'CK nội bộ', route: 'accounting.internal-transfers.index', permission: 'accounting.view' }
+                ]
+            },
+            {
+                label: 'Công nợ phải thu (AR)',
+                icon: 'debt',
+                children: [
+                    { label: 'Thu nợ KH (TK 131)', route: 'cashier.debts.collect', permission: 'cashier.manage' },
+                    { label: 'Công nợ đầu kỳ', route: 'cashier.debts.opening', permission: 'cashier.view' },
+                    { label: 'Công nợ phải thu (AR)', route: 'cashier.debts.index', permission: 'cashier.view' },
+                    { label: 'Sổ chi tiết CN phải thu', route: 'reports.debt', permission: 'reports.financial' }
+                ]
+            },
+            {
+                label: 'Công nợ phải trả (AP)',
+                icon: 'users',
+                children: [
+                    { label: 'Trả NCC (TK 331)', route: 'accounting.suppliers.index', permission: 'accounting.view' },
+                    { label: 'Công nợ đầu kỳ', route: 'accounting.suppliers.opening', permission: 'accounting.view' },
+                    { label: 'Công nợ phải trả (AP)', route: 'accounting.purchase-invoices.index', permission: 'accounting.view' },
+                    { label: 'Sổ chi tiết CN phải trả', route: 'accounting.suppliers.ledger', permission: 'accounting.view' }
+                ]
+            },
+            {
+                label: 'Tiền lương',
+                icon: 'invoice',
+                children: [
+                    { label: 'Bảng lương', route: 'accounting.payrolls.index', permission: 'accounting.view' }
+                ]
+            },
+            {
+                label: 'Thuế',
+                icon: 'salary-slip',
+                children: [
+                    { label: 'Kê khai thuế', route: 'reports.tax-filing', permission: 'accounting.view' },
+                    { label: 'Báo cáo VAT', route: 'reports.vat', permission: 'accounting.view' }
+                ]
+            },
+            {
+                label: 'Chi phí & Giá vốn',
+                icon: 'hkd-expense',
+                children: [
+                    { label: 'Chi phí trả trước', route: 'cashier.expenses.prepaid', permission: 'expenses.view' },
+                    { label: 'Chi tiết chi phí', route: 'cashier.expenses.index', permission: 'expenses.view' },
+                    { label: 'Lợi nhuận đơn hàng', route: 'reports.order-profit', permission: 'reports.financial' },
+                    { label: 'Lợi nhuận dự án', route: 'reports.project-profit', permission: 'reports.financial' }
+                ]
+            },
+            {
+                label: 'Tài sản cố định',
+                icon: 'fixed-asset',
+                children: [
+                    { label: 'Tài sản cố định', route: 'hr.fixed-assets.index', permission: 'fixed_assets.view' },
+                    { label: 'Tính khấu hao', route: 'hr.fixed-assets.depreciate-view', permission: 'fixed_assets.manage' },
+                    { label: 'Sổ TSCĐ', route: 'hr.fixed-assets.ledger', permission: 'fixed_assets.view' },
+                    { label: 'Báo cáo TSCĐ', route: 'hr.fixed-assets.report', permission: 'fixed_assets.view' }
+                ]
+            },
+            {
+                label: 'Kế toán tổng hợp',
+                icon: 'general-ledger',
+                children: [
+                    { label: 'Số dư đầu kỳ (TK)', route: 'accounting.opening-balances', permission: 'accounting.view' },
+                    { label: 'Phiếu kế toán', route: 'accounting.journal-vouchers.index', permission: 'accounting.view' },
+                    { label: 'Hệ thống tài khoản', route: 'accounting.chart-of-accounts.index', permission: 'accounting.view' },
+                    { label: 'Kỳ kế toán', route: 'accounting.periods.index', permission: 'accounting.view' },
+                    { label: 'Kết chuyển cuối kỳ', route: 'accounting.period-closing.index', permission: 'accounting.view' },
+                    { label: 'Sổ nhật ký chung', route: 'reports.general-journal', permission: 'accounting.view' },
+                    { label: 'Sổ chi tiết TK', route: 'reports.general-ledger', permission: 'accounting.view' },
+                    { label: 'Bảng kê chứng từ', route: 'reports.vouchers-list', permission: 'accounting.view' },
+                    { label: 'Tất cả chứng từ', route: 'reports.all-documents', permission: 'accounting.view' }
+                ]
+            },
+            {
+                label: 'Báo cáo',
+                icon: 'report-debt',
+                children: [
+                    { label: 'Lưu chuyển tiền tệ', route: 'reports.cashflow', permission: 'reports.financial' },
+                    { label: 'Kết quả HĐKD', route: 'reports.profit-loss', permission: 'reports.financial' },
+                    { label: 'Cân đối kế toán', route: 'reports.balance-sheet', permission: 'reports.financial' },
+                    { label: 'Cân đối phát sinh', route: 'reports.trial-balance', permission: 'reports.financial' }
+                ]
+            }
         ]
     },
     {

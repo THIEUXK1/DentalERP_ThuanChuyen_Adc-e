@@ -17,7 +17,7 @@
                     {{ group.label }}
                 </p>
                 <div class="space-y-0.5">
-                    <NavItem v-for="item in group.items" :key="item.route" :item="item" :collapsed="collapsed" />
+                    <NavItem v-for="item in group.items" :key="item.label" :item="item" :collapsed="collapsed" />
                 </div>
             </template>
         </nav>
@@ -49,12 +49,32 @@ const navGroups = computed(() => {
         // Lọc các items dựa trên permission hoặc role
         const items = group.items.map(item => {
             let showItem = true;
-            if (item.permission) {
-                showItem = can(item.permission);
-            } else if (item.roles) {
-                showItem = hasAnyRole(...item.roles);
+
+            if (item.children) {
+                // Nếu có con, duyệt qua các con và gán quyền hiển thị cho từng con
+                const children = item.children.map(child => {
+                    let showChild = true;
+                    if (child.permission) {
+                        showChild = can(child.permission);
+                    } else if (child.roles) {
+                        showChild = hasAnyRole(...child.roles);
+                    }
+                    return { ...child, show: showChild };
+                });
+
+                // Chỉ hiển thị menu cha nếu có ít nhất 1 menu con được phép hiển thị
+                const visibleChildren = children.filter(c => c.show !== false);
+                showItem = visibleChildren.length > 0;
+                return { ...item, children, show: showItem };
+            } else {
+                // Logic thông thường cho item phẳng
+                if (item.permission) {
+                    showItem = can(item.permission);
+                } else if (item.roles) {
+                    showItem = hasAnyRole(...item.roles);
+                }
+                return { ...item, show: showItem };
             }
-            return { ...item, show: showItem };
         });
 
         return { ...group, items, show: showGroup };

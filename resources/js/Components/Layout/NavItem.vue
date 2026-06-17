@@ -1,22 +1,65 @@
 <template>
-    <Link
-        v-if="item.show !== false"
-        :href="safeRoute"
-        :class="[
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
-            isActive
-                ? 'bg-primary-600 text-white font-medium shadow-sm shadow-primary-900/30'
-                : 'text-gray-400 hover:text-white hover:bg-gray-800',
-        ]"
-        :title="collapsed ? item.label : undefined"
-    >
-        <component :is="iconComponent" class="w-5 h-5 flex-shrink-0" stroke-width="2" />
-        <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
-    </Link>
+    <div v-if="item.show !== false" class="w-full">
+        <!-- 1. Menu Item KHÔNG CÓ children -->
+        <Link
+            v-if="!item.children"
+            :href="safeRoute"
+            :class="[
+                'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
+                isActive
+                    ? 'bg-primary-600 text-white font-medium shadow-sm shadow-primary-900/30'
+                    : 'text-gray-400 hover:text-white hover:bg-gray-800',
+            ]"
+            :title="collapsed ? item.label : undefined"
+        >
+            <component :is="iconComponent" class="w-5 h-5 flex-shrink-0" stroke-width="2" />
+            <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+        </Link>
+
+        <!-- 2. Menu Item CÓ children (Submenu) -->
+        <div v-else class="space-y-0.5">
+            <button
+                @click="toggleOpen"
+                :class="[
+                    'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-all duration-150 select-none text-left',
+                    isChildActive
+                        ? 'text-white font-semibold'
+                        : 'text-gray-400 hover:text-white hover:bg-gray-800',
+                ]"
+                :title="collapsed ? item.label : undefined"
+            >
+                <div class="flex items-center gap-3">
+                    <component :is="iconComponent" class="w-5 h-5 flex-shrink-0" stroke-width="2" />
+                    <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
+                </div>
+                <ChevronDownIcon
+                    v-if="!collapsed && filteredChildren.length"
+                    :class="['w-4 h-4 transition-transform duration-200 text-gray-500', isOpen ? 'rotate-180 text-white' : '']"
+                />
+            </button>
+
+            <!-- Submenu list -->
+            <div v-if="isOpen && !collapsed && filteredChildren.length" class="pl-5 pr-1 py-1 space-y-0.5 border-l border-gray-800 ml-5 my-1">
+                <Link
+                    v-for="child in filteredChildren"
+                    :key="child.route"
+                    :href="getSafeRoute(child.route)"
+                    :class="[
+                        'block py-1.5 px-3 rounded-md text-[12px] transition-all duration-150 truncate',
+                        isRouteActive(child.route)
+                            ? 'bg-primary-500/10 text-primary-400 font-semibold border-l-2 border-primary-500 rounded-l-none'
+                            : 'text-gray-500 hover:text-gray-200 hover:bg-gray-800/50',
+                    ]"
+                >
+                    {{ child.label }}
+                </Link>
+            </div>
+        </div>
+    </div>
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
 import {
     HomeIcon,
@@ -63,7 +106,8 @@ import {
     Cog6ToothIcon,
     ArrowTrendingDownIcon,
     SparklesIcon,
-    TagIcon
+    TagIcon,
+    ChevronDownIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -73,20 +117,62 @@ const props = defineProps({
 
 const page = usePage();
 
+const isOpen = ref(false);
+
+const toggleOpen = () => {
+    isOpen.value = !isOpen.value;
+};
+
+// Check if a child route is active
+const isRouteActive = (routeName) => {
+    try {
+        const routePath = new URL(route(routeName), window.location.origin).pathname;
+        return page.url.startsWith(routePath);
+    } catch {
+        return false;
+    }
+};
+
 const safeRoute = computed(() => {
     try { return route(props.item.route); } catch { return '#'; }
 });
+
+const getSafeRoute = (routeName) => {
+    try { return route(routeName); } catch { return '#'; }
+};
 
 const isActive = computed(() => {
     try { return page.url.startsWith(new URL(route(props.item.route), window.location.origin).pathname); }
     catch { return false; }
 });
 
-const icons = {
-    'home': homeIconMap(), // wait, we can just map to component directly
-};
+// Filter child items based on pre-calculated permissions
+const filteredChildren = computed(() => {
+    if (!props.item.children) return [];
+    return props.item.children.filter(child => child.show !== false);
+});
 
-// Map icon string identifier to Vue component
+const isChildActive = computed(() => {
+    if (!filteredChildren.value.length) return false;
+    return filteredChildren.value.some(child => isRouteActive(child.route));
+});
+
+// Auto-expand if a child item is active
+watch(isChildActive, (active) => {
+    if (active) {
+        isOpen.value = true;
+    }
+}, { immediate: true });
+
+// Auto-close submenus when sidebar collapses
+watch(() => props.collapsed, (collapsed) => {
+    if (collapsed) {
+        isOpen.value = false;
+    } else if (isChildActive.value) {
+        isOpen.value = true;
+    }
+});
+
 const iconMap = {
     'home': HomeIcon,
     'users': UsersIcon,
