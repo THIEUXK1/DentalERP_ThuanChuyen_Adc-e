@@ -71,8 +71,7 @@ export const menuConfig = [
             { label: 'Phiếu lương', route: 'hr.salary-slips.index', icon: 'salary-slip', permission: 'employees.manage' },
             { label: 'Hoa hồng', route: 'hr.commissions.index', icon: 'commission', permission: 'commissions.view' },
             { label: 'Đánh giá NV', route: 'hr.reviews.index', icon: 'review', permission: 'employees.manage' },
-            { label: 'KPI nhân viên', route: 'hr.kpis.index', icon: 'kpi-employee', permission: 'employees.manage' },
-            { label: 'Tài sản cố định', route: 'hr.fixed-assets.index', icon: 'fixed-asset', permission: 'fixed_assets.view' }
+            { label: 'KPI nhân viên', route: 'hr.kpis.index', icon: 'kpi-employee', permission: 'employees.manage' }
         ]
     },
     {
