@@ -3,15 +3,14 @@
         v-if="item.show !== false"
         :href="safeRoute"
         :class="[
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
+            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
             isActive
-                ? 'bg-primary-600 text-white'
+                ? 'bg-primary-600 text-white font-medium shadow-sm shadow-primary-900/30'
                 : 'text-gray-400 hover:text-white hover:bg-gray-800',
         ]"
+        :title="collapsed ? item.label : undefined"
     >
-        <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="iconPath" />
-        </svg>
+        <component :is="iconComponent" class="w-5 h-5 flex-shrink-0" stroke-width="2" />
         <span v-if="!collapsed" class="truncate">{{ item.label }}</span>
     </Link>
 </template>
@@ -19,6 +18,53 @@
 <script setup>
 import { computed } from 'vue';
 import { Link, usePage } from '@inertiajs/vue3';
+import {
+    HomeIcon,
+    UsersIcon,
+    UserPlusIcon,
+    ClipboardDocumentCheckIcon,
+    ChatBubbleBottomCenterTextIcon,
+    ChatBubbleLeftRightIcon,
+    ArrowPathIcon,
+    CalendarDaysIcon,
+    ClipboardDocumentListIcon,
+    PencilSquareIcon,
+    HeartIcon,
+    PresentationChartLineIcon,
+    BookOpenIcon,
+    DocumentTextIcon,
+    CreditCardIcon,
+    BanknotesIcon,
+    ArrowTrendingUpIcon,
+    CalendarIcon,
+    DocumentChartBarIcon,
+    FunnelIcon,
+    PresentationChartBarIcon,
+    ArrowsRightLeftIcon,
+    ChartBarIcon,
+    IdentificationIcon,
+    BriefcaseIcon,
+    FingerPrintIcon,
+    ClockIcon,
+    TableCellsIcon,
+    ClipboardDocumentIcon,
+    ArrowRightOnRectangleIcon,
+    ReceiptPercentIcon,
+    GiftIcon,
+    StarIcon,
+    CubeIcon,
+    ArrowDownTrayIcon,
+    LockClosedIcon,
+    BuildingOffice2Icon,
+    UserGroupIcon,
+    WrenchIcon,
+    BeakerIcon,
+    ShieldCheckIcon,
+    Cog6ToothIcon,
+    ArrowTrendingDownIcon,
+    SparklesIcon,
+    TagIcon
+} from '@heroicons/vue/24/outline';
 
 const props = defineProps({
     item:      { type: Object, required: true },
@@ -37,18 +83,77 @@ const isActive = computed(() => {
 });
 
 const icons = {
-    home:      'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6',
-    users:     'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z',
-    funnel:    'M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4-2A1 1 0 018 17v-3.586L3.293 6.707A1 1 0 013 6V4z',
-    calendar:  'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
-    clipboard: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2',
-    receipt:   'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
-    'id-card': 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0',
-    building:  'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4',
-    tooth:     'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01',
-    chart:     'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z',
-    settings:  'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z',
+    'home': homeIconMap(), // wait, we can just map to component directly
 };
 
-const iconPath = computed(() => icons[props.item.icon] ?? icons.home);
+// Map icon string identifier to Vue component
+const iconMap = {
+    'home': HomeIcon,
+    'users': UsersIcon,
+    'lead': UserPlusIcon,
+    'follow-up': ClipboardDocumentCheckIcon,
+    'message-template': ChatBubbleBottomCenterTextIcon,
+    'message-log': ChatBubbleLeftRightIcon,
+    'care-rules': ArrowPathIcon,
+    'appointment': CalendarDaysIcon,
+    'treatment-plan': ClipboardDocumentListIcon,
+    'clinical-template': PencilSquareIcon,
+    'examination': HeartIcon,
+    'workflow-step': ArrowPathIcon,
+    'kpi': PresentationChartLineIcon,
+    'conditions': BookOpenIcon,
+    'invoice': DocumentTextIcon,
+    'debt': CreditCardIcon,
+    'expense': BanknotesIcon,
+    'report-revenue': ArrowTrendingUpIcon,
+    'report-appointment': CalendarIcon,
+    'report-debt': DocumentChartBarIcon,
+    'report-crm': FunnelIcon,
+    'report-profit-loss': PresentationChartBarIcon,
+    'report-cashflow': ArrowsRightLeftIcon,
+    'report-performance': ChartBarIcon,
+    'employee': IdentificationIcon,
+    'contract': BriefcaseIcon,
+    'attendance-device': FingerPrintIcon,
+    'work-shift': ClockIcon,
+    'attendance-table': TableCellsIcon,
+    'timesheet': ClipboardDocumentIcon,
+    'leave': ArrowRightOnRectangleIcon,
+    'salary-slip': ReceiptPercentIcon,
+    'commission': GiftIcon,
+    'review': StarIcon,
+    'kpi-employee': PresentationChartLineIcon,
+    'fixed-asset': CubeIcon,
+    'payroll': BanknotesIcon,
+    'supplier': UsersIcon,
+    'purchase-invoice': ReceiptPercentIcon,
+    'fund-transfer': ArrowsRightLeftIcon,
+    'report-tax': ReceiptPercentIcon,
+    'general-ledger': TableCellsIcon,
+    'hkd-profile': IdentificationIcon,
+    'hkd-revenue': ArrowTrendingUpIcon,
+    'hkd-expense': ArrowTrendingDownIcon,
+    'hkd-inventory': CubeIcon,
+    'hkd-cash': CreditCardIcon,
+    'hkd-tax': ReceiptPercentIcon,
+    'hkd-period': LockClosedIcon,
+    'hkd-report': ArrowDownTrayIcon,
+    'branch': BuildingOffice2Icon,
+    'department': UserGroupIcon,
+    'fund': BanknotesIcon,
+    'service': SparklesIcon,
+    'price-list': TagIcon,
+    'dental-chair': WrenchIcon,
+    'lab': BeakerIcon,
+    'lab-order': ClipboardDocumentIcon,
+    'warranty': ShieldCheckIcon,
+    'lab-payable': CreditCardIcon,
+    'role': ShieldCheckIcon,
+    'settings': Cog6ToothIcon,
+    'audit-log': ClockIcon
+};
+
+const iconComponent = computed(() => {
+    return iconMap[props.item.icon] || HomeIcon;
+});
 </script>
