@@ -134,9 +134,24 @@ function closeTab(url) {
     save(tabs.value);
 }
 
+function pinTab(url) {
+    const pathname = new URL(url, 'http://x').pathname;
+    tabs.value = tabs.value.map(t => ({
+        ...t,
+        pinned: new URL(t.url, 'http://x').pathname === pathname ? !t.pinned : t.pinned,
+    }));
+    save(tabs.value);
+}
+
+function closeAllTabs() {
+    // Giữ lại: tab đang ghim + tab đang active (đang hiển thị)
+    tabs.value = tabs.value.filter(t => t.pinned || t.active);
+    save(tabs.value);
+}
+
 // Single listener — registered once at module scope, never re-registered
 router.on('navigate', e => openTab(e.detail.page.url));
 
 export function useTabs() {
-    return { tabs, closeTab };
+    return { tabs, closeTab, pinTab, closeAllTabs };
 }
