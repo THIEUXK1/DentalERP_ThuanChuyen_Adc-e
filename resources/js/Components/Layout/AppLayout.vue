@@ -1,4 +1,6 @@
 <template>
+    <Head :title="pageTitle" />
+
     <div class="min-h-screen bg-gray-50">
         <Sidebar :collapsed="collapsed" @toggle="collapsed = !collapsed" />
 
@@ -17,15 +19,20 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
+import { Head } from '@inertiajs/vue3';
 import Sidebar from './Sidebar.vue';
 import TopBar from './TopBar.vue';
 import TabBar from './TabBar.vue';
 import FlashMessage from './FlashMessage.vue';
 
-defineProps({
+const props = defineProps({
     title: { type: String, default: '' },
 });
+
+const pageTitle = computed(() =>
+    props.title ? `${props.title} · Dental ERP` : 'Dental ERP'
+);
 
 const collapsed = ref(false);
 </script>
