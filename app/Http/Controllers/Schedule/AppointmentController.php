@@ -20,23 +20,15 @@ class AppointmentController extends Controller
 {
     public function __construct(private AppointmentService $svc) {}
 
-    public function index(Request $request): Response
+    public function index(): Response
     {
         $this->authorize('appointments.view');
 
-        $date     = $request->filled('date') ? $request->date : null;
-        $branchId = $request->branch_id;
-
-        $query = Appointment::with(['patient', 'doctor', 'chair', 'service'])
-            ->when($branchId, fn ($q) => $q->forBranch($branchId))
-            ->when($request->doctor_id, fn ($q) => $q->forDoctor($request->doctor_id))
-            ->when($request->status, fn ($q, $v) => $q->where('status', $v))
-            ->when($date, fn ($q) => $q->forDate($date))
-            ->orderBy('scheduled_at');
-
         return Inertia::render('Schedule/Appointments/Index', [
-            'appointments' => $query->get()->map(fn ($a) => $this->dto($a)),
-            'date' => $date ?? today()->toDateString(),
+            'all_appointments' => Appointment::with(['patient', 'doctor', 'chair', 'service'])
+                ->orderBy('scheduled_at')
+                ->get()
+                ->map(fn ($a) => $this->dto($a)),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'doctors' => Employee::doctors()->where('is_active', true)->get()
@@ -48,7 +40,6 @@ class AppointmentController extends Controller
             'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
                 ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code, 'branch_id' => $p->branch_id]),
             'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
-            'filters' => $request->only(['date', 'branch_id', 'doctor_id', 'status']),
         ]);
     }
 

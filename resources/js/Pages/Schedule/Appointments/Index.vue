@@ -1,9 +1,11 @@
 <template>
     <AppLayout title="Lịch hẹn">
         <div class="space-y-4">
+            <!-- Header -->
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold text-gray-800">
                     {{ todayOnly ? `Lịch hẹn ngày ${formattedDate}` : 'Tất cả lịch hẹn' }}
+                    <span class="ml-2 text-sm font-normal text-gray-400">({{ filteredAppointments.length }})</span>
                 </h2>
                 <button v-if="can('appointments.create')" @click="openCreate"
                     class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
@@ -11,11 +13,24 @@
                 </button>
             </div>
 
-            <!-- Date navigation + filters -->
+            <!-- Filter bar -->
             <div class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-3">
 
-                <!-- Checkbox Hôm nay -->
-                <label class="flex items-center gap-2 cursor-pointer select-none">
+                <!-- Search -->
+                <div class="relative flex-1 min-w-[200px]">
+                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
+                    </svg>
+                    <input v-model="search" type="text" placeholder="Tìm tên, SĐT, mã, dịch vụ, bác sĩ, ghi chú..."
+                        class="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
+                    <button v-if="search" @click="search = ''"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <!-- Toggle Hôm nay -->
+                <label class="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
                     <div @click="toggleTodayOnly"
                         :class="['w-10 h-5 rounded-full relative transition-colors flex-shrink-0 cursor-pointer',
                             todayOnly ? 'bg-primary-600' : 'bg-gray-300']">
@@ -27,48 +42,79 @@
 
                 <!-- Date navigation (chỉ hiện khi bật Hôm nay) -->
                 <template v-if="todayOnly">
-                    <div class="w-px h-5 bg-gray-200"></div>
-                    <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    <div class="w-px h-5 bg-gray-200 flex-shrink-0"></div>
+                    <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                     </button>
-                    <input type="date" v-model="date" @change="applyFilters"
-                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
-                    <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    <input type="date" v-model="date"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none flex-shrink-0" />
+                    <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 flex-shrink-0">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                     </button>
-                    <button @click="goToday" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Hôm nay</button>
+                    <button @click="goToday" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex-shrink-0">Hôm nay</button>
                 </template>
 
-                <select v-model="branchId" @change="applyFilters"
+                <select v-model="branchId"
                     class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
                     <option value="">Tất cả chi nhánh</option>
                     <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                 </select>
-                <select v-model="doctorId" @change="applyFilters"
+                <select v-model="doctorId"
                     class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
                     <option value="">Tất cả bác sĩ</option>
                     <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
                 </select>
-                <select v-model="filterStatus" @change="applyFilters"
+                <select v-model="filterStatus"
                     class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
                     <option value="">Tất cả trạng thái</option>
                     <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
+
+                <!-- Per page -->
+                <select v-model="perPage"
+                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    <option :value="10">10/trang</option>
+                    <option :value="20">20/trang</option>
+                    <option :value="50">50/trang</option>
+                    <option :value="100">100/trang</option>
+                    <option value="all">Tất cả</option>
+                </select>
+
+                <!-- Clear filters -->
+                <button v-if="hasActiveFilters" @click="clearFilters"
+                    class="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 flex-shrink-0 flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Xóa lọc
+                </button>
+            </div>
+
+            <!-- Results info -->
+            <div class="flex items-center justify-between text-xs text-gray-500 px-1">
+                <span>
+                    Hiển thị <strong class="text-gray-700">{{ paginatedAppointments.length }}</strong>
+                    / {{ filteredAppointments.length }} lịch hẹn
+                    <span v-if="filteredAppointments.length < all_appointments.length" class="text-gray-400">
+                        (tổng {{ all_appointments.length }})
+                    </span>
+                </span>
+                <span v-if="totalPages > 1">Trang {{ currentPage }}/{{ totalPages }}</span>
             </div>
 
             <!-- Appointments list -->
             <div class="space-y-2">
-                <div v-if="appointments.length === 0" class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                    {{ todayOnly ? 'Không có lịch hẹn nào trong ngày này' : 'Không có lịch hẹn nào' }}
+                <div v-if="filteredAppointments.length === 0"
+                    class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+                    {{ hasActiveFilters ? 'Không tìm thấy lịch hẹn phù hợp' : 'Chưa có lịch hẹn nào' }}
                 </div>
 
-                <div v-for="a in appointments" :key="a.id"
+                <div v-for="a in paginatedAppointments" :key="a.id"
                     class="flex items-center gap-4 bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-sm transition-all">
 
                     <!-- Clickable main area -->
                     <Link :href="route('schedule.appointments.show', a.id)" class="flex flex-1 items-center gap-4 p-4 min-w-0">
-                        <!-- Time block -->
+                        <!-- Date + Time block -->
                         <div class="w-20 text-center flex-shrink-0">
+                            <p class="text-xs text-gray-400 font-medium">{{ displayDate(a.scheduled_at) }}</p>
                             <p class="text-sm font-bold text-gray-800">{{ a.scheduled_at.split(' ')[1] }}</p>
                             <p class="text-xs text-gray-400">→ {{ a.ends_at }}</p>
                         </div>
@@ -78,7 +124,8 @@
                                 <p class="font-semibold text-gray-900 truncate">{{ a.patient }}</p>
                                 <span class="text-xs text-gray-400">{{ a.patient_phone }}</span>
                             </div>
-                            <p class="text-sm text-gray-500">{{ a.service }} · {{ a.doctor }} · {{ a.chair }}</p>
+                            <p class="text-sm text-gray-500 truncate">{{ a.service }} · {{ a.doctor }} · {{ a.chair }}</p>
+                            <p class="text-xs text-gray-400">{{ a.branch }}</p>
                             <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 inline-block max-w-xs truncate">
                                 📝 {{ a.notes }}
                             </p>
@@ -103,6 +150,28 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Pagination -->
+            <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 py-2">
+                <button @click="currentPage = 1" :disabled="currentPage === 1"
+                    class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">«</button>
+                <button @click="currentPage--" :disabled="currentPage === 1"
+                    class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">‹</button>
+                <template v-for="p in pageNumbers" :key="p">
+                    <span v-if="p === '...'" class="px-2 py-1.5 text-xs text-gray-400">…</span>
+                    <button v-else @click="currentPage = p"
+                        :class="['px-3 py-1.5 text-xs border rounded-lg',
+                            p === currentPage
+                                ? 'bg-primary-600 text-white border-primary-600'
+                                : 'border-gray-300 hover:bg-gray-50']">
+                        {{ p }}
+                    </button>
+                </template>
+                <button @click="currentPage++" :disabled="currentPage === totalPages"
+                    class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">›</button>
+                <button @click="currentPage = totalPages" :disabled="currentPage === totalPages"
+                    class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">»</button>
+            </div>
         </div>
 
         <!-- ═══════════════════════════════════════════════════════════
@@ -110,12 +179,8 @@
         ═══════════════════════════════════════════════════════════ -->
         <Teleport to="body">
             <div v-if="showCreate" class="fixed inset-0 z-50 flex justify-end">
-                <!-- Backdrop -->
                 <div class="absolute inset-0 bg-black/40" @click="showCreate = false"></div>
-
-                <!-- Panel -->
                 <div class="relative bg-white w-full max-w-lg h-full flex flex-col shadow-2xl overflow-hidden">
-                    <!-- Header -->
                     <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
                         <h3 class="text-base font-semibold text-gray-900">Đặt lịch hẹn mới</h3>
                         <button @click="showCreate = false" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
@@ -124,15 +189,11 @@
                             </svg>
                         </button>
                     </div>
-
-                    <!-- Body -->
                     <div class="flex-1 overflow-y-auto px-5 py-4">
                         <div v-if="createForm.errors.conflict" class="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
                             ⚠ {{ createForm.errors.conflict }}
                         </div>
-
                         <form @submit.prevent="submitCreate" class="space-y-4">
-                            <!-- Khách hàng -->
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 mb-1.5">
                                     Khách hàng <span class="text-red-500">*</span>
@@ -145,8 +206,6 @@
                                 />
                                 <p v-if="createForm.errors.patient_id" class="text-red-500 text-xs mt-1">{{ createForm.errors.patient_id }}</p>
                             </div>
-
-                            <!-- Chi nhánh -->
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 mb-1.5">
                                     Chi nhánh <span class="text-red-500">*</span>
@@ -158,8 +217,6 @@
                                 </select>
                                 <p v-if="createForm.errors.branch_id" class="text-red-500 text-xs mt-1">{{ createForm.errors.branch_id }}</p>
                             </div>
-
-                            <!-- Bác sĩ + Ghế nha (2 cột) -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-600 mb-1.5">Bác sĩ</label>
@@ -178,8 +235,6 @@
                                     </select>
                                 </div>
                             </div>
-
-                            <!-- Dịch vụ -->
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Dịch vụ</label>
                                 <select v-model="createForm.service_id" @change="onServiceChange"
@@ -188,8 +243,6 @@
                                     <option v-for="s in services" :key="s.id" :value="s.id">{{ s.name }}</option>
                                 </select>
                             </div>
-
-                            <!-- Ngày giờ + Thời lượng (2 cột) -->
                             <div class="grid grid-cols-2 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-600 mb-1.5">
@@ -213,8 +266,6 @@
                                     </select>
                                 </div>
                             </div>
-
-                            <!-- Ghi chú -->
                             <div>
                                 <label class="block text-xs font-medium text-gray-600 mb-1.5">Ghi chú</label>
                                 <textarea v-model="createForm.notes" rows="3" placeholder="Ghi chú thêm về lịch hẹn..."
@@ -222,13 +273,9 @@
                             </div>
                         </form>
                     </div>
-
-                    <!-- Footer -->
                     <div class="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex justify-end gap-2 bg-gray-50">
                         <button @click="showCreate = false"
-                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100">
-                            Hủy
-                        </button>
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100">Hủy</button>
                         <button @click="submitCreate" :disabled="createForm.processing"
                             class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-1.5">
                             <svg v-if="createForm.processing" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -256,7 +303,6 @@
                             <span class="font-mono text-xs text-gray-400 ml-1">{{ rescheduleTarget.code }}</span>
                         </p>
                     </div>
-
                     <div class="px-5 py-4 space-y-4">
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1.5">Ngày & giờ mới</label>
@@ -286,7 +332,6 @@
                             {{ rsErrors.conflict }}
                         </p>
                     </div>
-
                     <div class="px-5 pb-5 flex justify-end gap-2">
                         <button @click="rescheduleTarget = null"
                             class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Hủy</button>
@@ -306,7 +351,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, Link, useForm } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
@@ -315,63 +360,123 @@ import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
 import { usePermission } from '@/composables/usePermission';
 
 const { hasPermission: can } = usePermission();
+
 const props = defineProps({
-    appointments: Array,
-    date: String,
+    all_appointments: Array,
     branches: Array,
     doctors: Array,
     chairs: Array,
     services: Array,
     patients: Array,
     statuses: Array,
-    filters: Object,
 });
 
-// ── Filters ──────────────────────────────────────────────────
-const date        = ref(props.date);
-const branchId    = ref(props.filters.branch_id ?? '');
-const doctorId    = ref(props.filters.doctor_id ?? '');
-const filterStatus = ref(props.filters.status ?? '');
-const todayOnly   = ref(localStorage.getItem('apt_today_only') === '1');
+// ── Filter state ──────────────────────────────────────────────
+const search       = ref('');
+const todayOnly    = ref(localStorage.getItem('apt_today_only') === '1');
+const date         = ref(dayjs().format('YYYY-MM-DD'));
+const branchId     = ref('');
+const doctorId     = ref('');
+const filterStatus = ref('');
+const perPage      = ref(20);
+const currentPage  = ref(1);
 
+// ── Computed ──────────────────────────────────────────────────
 const formattedDate = computed(() => dayjs(date.value).format('DD/MM/YYYY'));
 
-function toggleTodayOnly() {
-    todayOnly.value = !todayOnly.value;
-}
+const filteredAppointments = computed(() => {
+    let list = props.all_appointments;
+
+    if (todayOnly.value) {
+        list = list.filter(a => a.scheduled_at.startsWith(date.value));
+    }
+    if (branchId.value) {
+        list = list.filter(a => String(a.branch_id) === String(branchId.value));
+    }
+    if (doctorId.value) {
+        list = list.filter(a => String(a.doctor_id) === String(doctorId.value));
+    }
+    if (filterStatus.value) {
+        list = list.filter(a => a.status === filterStatus.value);
+    }
+    if (search.value.trim()) {
+        const q = search.value.toLowerCase().trim();
+        list = list.filter(a =>
+            (a.patient        ?? '').toLowerCase().includes(q) ||
+            (a.patient_phone  ?? '').toLowerCase().includes(q) ||
+            (a.doctor         ?? '').toLowerCase().includes(q) ||
+            (a.service        ?? '').toLowerCase().includes(q) ||
+            (a.chair          ?? '').toLowerCase().includes(q) ||
+            (a.branch         ?? '').toLowerCase().includes(q) ||
+            (a.code           ?? '').toLowerCase().includes(q) ||
+            (a.notes          ?? '').toLowerCase().includes(q) ||
+            a.scheduled_at.includes(q)
+        );
+    }
+    return list;
+});
+
+const totalPages = computed(() => {
+    if (perPage.value === 'all') return 1;
+    return Math.max(1, Math.ceil(filteredAppointments.value.length / Number(perPage.value)));
+});
+
+const paginatedAppointments = computed(() => {
+    if (perPage.value === 'all') return filteredAppointments.value;
+    const pp = Number(perPage.value);
+    const start = (currentPage.value - 1) * pp;
+    return filteredAppointments.value.slice(start, start + pp);
+});
+
+const pageNumbers = computed(() => {
+    const total = totalPages.value;
+    const cur = currentPage.value;
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = [1];
+    if (cur > 3) pages.push('...');
+    for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) pages.push(i);
+    if (cur < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
+});
+
+const hasActiveFilters = computed(() =>
+    !!search.value || !!branchId.value || !!doctorId.value || !!filterStatus.value
+);
+
+// ── Watchers ──────────────────────────────────────────────────
+watch([search, branchId, doctorId, filterStatus, todayOnly, date, perPage], () => {
+    currentPage.value = 1;
+});
 
 watch(todayOnly, (val) => {
     localStorage.setItem('apt_today_only', val ? '1' : '0');
-    if (val && !date.value) date.value = dayjs().format('YYYY-MM-DD');
-    applyFilters();
 });
 
-onMounted(() => {
-    // Nếu đang bật todayOnly nhưng URL chưa có date → tự load
-    if (todayOnly.value && !props.filters.date) {
-        date.value = dayjs().format('YYYY-MM-DD');
-        applyFilters();
-    }
-});
+// ── Actions ───────────────────────────────────────────────────
+function toggleTodayOnly() { todayOnly.value = !todayOnly.value; }
 
-function applyFilters() {
-    router.get(route('schedule.appointments.index'), {
-        ...(todayOnly.value ? { date: date.value } : {}),
-        branch_id: branchId.value,
-        doctor_id: doctorId.value,
-        status: filterStatus.value,
-    }, { preserveState: true });
-}
 function changeDate(delta) {
     date.value = dayjs(date.value).add(delta, 'day').format('YYYY-MM-DD');
-    applyFilters();
-}
-function goToday() {
-    date.value = dayjs().format('YYYY-MM-DD');
-    applyFilters();
 }
 
-// ── Create slide-over ────────────────────────────────────────
+function goToday() {
+    date.value = dayjs().format('YYYY-MM-DD');
+}
+
+function clearFilters() {
+    search.value = '';
+    branchId.value = '';
+    doctorId.value = '';
+    filterStatus.value = '';
+    currentPage.value = 1;
+}
+
+function displayDate(scheduledAt) {
+    return dayjs(scheduledAt.split(' ')[0]).format('DD/MM');
+}
+
+// ── Create slide-over ─────────────────────────────────────────
 const showCreate = ref(false);
 
 const createForm = useForm({
@@ -380,7 +485,7 @@ const createForm = useForm({
     doctor_id:        null,
     dental_chair_id:  null,
     service_id:       null,
-    scheduled_at:     dayjs(date.value).format('YYYY-MM-DD') + 'T08:00',
+    scheduled_at:     dayjs().format('YYYY-MM-DD') + 'T08:00',
     duration_minutes: 30,
     notes:            '',
 });
@@ -418,15 +523,15 @@ function submitCreate() {
     });
 }
 
-// ── Quick reschedule ─────────────────────────────────────────
+// ── Quick reschedule ──────────────────────────────────────────
 const rescheduleTarget = ref(null);
-const rsForm    = ref({ scheduled_at: '', duration_minutes: 30, notes: '' });
-const rsErrors  = ref({});
-const rsSaving  = ref(false);
+const rsForm   = ref({ scheduled_at: '', duration_minutes: 30, notes: '' });
+const rsErrors = ref({});
+const rsSaving = ref(false);
 
 function openReschedule(a) {
     rescheduleTarget.value = a;
-    rsForm.value.scheduled_at    = a.scheduled_at.replace(' ', 'T');
+    rsForm.value.scheduled_at     = a.scheduled_at.replace(' ', 'T');
     rsForm.value.duration_minutes = a.duration_minutes;
     rsForm.value.notes            = a.notes ?? '';
     rsErrors.value = {};
@@ -436,7 +541,6 @@ function submitReschedule() {
     if (!rescheduleTarget.value) return;
     rsSaving.value = true;
     rsErrors.value = {};
-
     router.patch(
         route('schedule.appointments.quick-reschedule', rescheduleTarget.value.id),
         {
