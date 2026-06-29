@@ -2,7 +2,9 @@
     <AppLayout title="Lịch hẹn">
         <div class="space-y-4">
             <div class="flex items-center justify-between">
-                <h2 class="text-lg font-semibold text-gray-800">Lịch hẹn ngày {{ formattedDate }}</h2>
+                <h2 class="text-lg font-semibold text-gray-800">
+                    {{ todayOnly ? `Lịch hẹn ngày ${formattedDate}` : 'Tất cả lịch hẹn' }}
+                </h2>
                 <button v-if="can('appointments.create')" @click="openCreate"
                     class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
                     + Đặt lịch hẹn
@@ -11,15 +13,31 @@
 
             <!-- Date navigation + filters -->
             <div class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-3">
-                <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
-                </button>
-                <input type="date" v-model="date" @change="applyFilters"
-                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
-                <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
-                </button>
-                <button @click="goToday" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Hôm nay</button>
+
+                <!-- Checkbox Hôm nay -->
+                <label class="flex items-center gap-2 cursor-pointer select-none">
+                    <div @click="toggleTodayOnly"
+                        :class="['w-10 h-5 rounded-full relative transition-colors flex-shrink-0 cursor-pointer',
+                            todayOnly ? 'bg-primary-600' : 'bg-gray-300']">
+                        <div :class="['absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform',
+                            todayOnly ? 'translate-x-5' : 'translate-x-0.5']"></div>
+                    </div>
+                    <span class="text-sm text-gray-700 font-medium">Hôm nay</span>
+                </label>
+
+                <!-- Date navigation (chỉ hiện khi bật Hôm nay) -->
+                <template v-if="todayOnly">
+                    <div class="w-px h-5 bg-gray-200"></div>
+                    <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+                    </button>
+                    <input type="date" v-model="date" @change="applyFilters"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
+                    <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                    <button @click="goToday" class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50">Hôm nay</button>
+                </template>
 
                 <select v-model="branchId" @change="applyFilters"
                     class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
@@ -41,7 +59,7 @@
             <!-- Appointments list -->
             <div class="space-y-2">
                 <div v-if="appointments.length === 0" class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                    Không có lịch hẹn nào trong ngày này
+                    {{ todayOnly ? 'Không có lịch hẹn nào trong ngày này' : 'Không có lịch hẹn nào' }}
                 </div>
 
                 <div v-for="a in appointments" :key="a.id"
@@ -288,7 +306,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { router, Link, useForm } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
@@ -314,13 +332,34 @@ const date        = ref(props.date);
 const branchId    = ref(props.filters.branch_id ?? '');
 const doctorId    = ref(props.filters.doctor_id ?? '');
 const filterStatus = ref(props.filters.status ?? '');
+const todayOnly   = ref(localStorage.getItem('apt_today_only') === '1');
 
 const formattedDate = computed(() => dayjs(date.value).format('DD/MM/YYYY'));
 
+function toggleTodayOnly() {
+    todayOnly.value = !todayOnly.value;
+}
+
+watch(todayOnly, (val) => {
+    localStorage.setItem('apt_today_only', val ? '1' : '0');
+    if (val && !date.value) date.value = dayjs().format('YYYY-MM-DD');
+    applyFilters();
+});
+
+onMounted(() => {
+    // Nếu đang bật todayOnly nhưng URL chưa có date → tự load
+    if (todayOnly.value && !props.filters.date) {
+        date.value = dayjs().format('YYYY-MM-DD');
+        applyFilters();
+    }
+});
+
 function applyFilters() {
     router.get(route('schedule.appointments.index'), {
-        date: date.value, branch_id: branchId.value,
-        doctor_id: doctorId.value, status: filterStatus.value,
+        ...(todayOnly.value ? { date: date.value } : {}),
+        branch_id: branchId.value,
+        doctor_id: doctorId.value,
+        status: filterStatus.value,
     }, { preserveState: true });
 }
 function changeDate(delta) {

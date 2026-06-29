@@ -24,19 +24,19 @@ class AppointmentController extends Controller
     {
         $this->authorize('appointments.view');
 
-        $date = $request->date ?? today()->toDateString();
+        $date     = $request->filled('date') ? $request->date : null;
         $branchId = $request->branch_id;
 
         $query = Appointment::with(['patient', 'doctor', 'chair', 'service'])
             ->when($branchId, fn ($q) => $q->forBranch($branchId))
             ->when($request->doctor_id, fn ($q) => $q->forDoctor($request->doctor_id))
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
-            ->forDate($date)
+            ->when($date, fn ($q) => $q->forDate($date))
             ->orderBy('scheduled_at');
 
         return Inertia::render('Schedule/Appointments/Index', [
             'appointments' => $query->get()->map(fn ($a) => $this->dto($a)),
-            'date' => $date,
+            'date' => $date ?? today()->toDateString(),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'doctors' => Employee::doctors()->where('is_active', true)->get()
