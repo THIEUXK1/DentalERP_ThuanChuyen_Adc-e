@@ -25,34 +25,32 @@ class TreatmentPlanController extends Controller
         private InvoiceService $invoiceSvc
     ) {}
 
-    public function index(Request $request): \Inertia\Response
+    public function index(): \Inertia\Response
     {
         $this->authorize('treatment_plans.view');
 
-        $query = TreatmentPlan::with(['patient', 'doctor', 'branch'])
-            ->when($request->search, fn ($q, $v) => $q->whereHas('patient', fn ($pq) => $pq->where('full_name', 'ilike', "%{$v}%")))
-            ->when($request->status, fn ($q, $v) => $q->where('status', $v))
-            ->when($request->branch_id, fn ($q, $v) => $q->where('branch_id', $v))
-            ->orderByDesc('id');
-
         return Inertia::render('Clinical/TreatmentPlans/Index', [
-            'plans' => $query->paginate(20)->through(fn ($p) => [
-                'id' => $p->id,
-                'code' => $p->code,
-                'patient' => $p->patient->full_name,
-                'patient_id' => $p->patient_id,
-                'doctor' => $p->doctor?->full_name ?? '—',
-                'branch' => $p->branch->name,
-                'status' => $p->status->value,
-                'status_label' => $p->status->label(),
-                'status_color' => $p->status->color(),
-                'total_amount' => $p->total_amount,
-                'net_total' => $p->net_total,
-                'created_at' => $p->created_at->format('d/m/Y'),
-            ]),
+            'all_plans' => TreatmentPlan::with(['patient', 'doctor', 'branch'])
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn ($p) => [
+                    'id'           => $p->id,
+                    'code'         => $p->code,
+                    'patient'      => $p->patient->full_name,
+                    'patient_id'   => $p->patient_id,
+                    'doctor'       => $p->doctor?->full_name ?? '—',
+                    'branch'       => $p->branch->name,
+                    'branch_id'    => $p->branch_id,
+                    'status'       => $p->status->value,
+                    'status_label' => $p->status->label(),
+                    'status_color' => $p->status->color(),
+                    'total_amount' => $p->total_amount,
+                    'net_total'    => $p->net_total,
+                    'notes'        => $p->notes ?? '',
+                    'created_at'   => $p->created_at->format('d/m/Y'),
+                ]),
             'statuses' => collect(TreatmentPlanStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
             'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
-            'filters' => $request->only(['search', 'status', 'branch_id']),
         ]);
     }
 
@@ -357,7 +355,7 @@ class TreatmentPlanController extends Controller
             'selected_patient_id' => $plan ? $plan->patient_id : $patientId,
             'selected_branch_id' => $plan ? $plan->branch_id : ($selectedPatient ? $selectedPatient->branch_id : null),
             'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
-                ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code]),
+                ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code, 'branch_id' => $p->branch_id]),
             'doctors' => Employee::doctors()->where('is_active', true)->get()
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name, 'branch_id' => $e->branch_id]),
             'consultants' => Employee::where('role_type', 'consultant')->where('is_active', true)->get()

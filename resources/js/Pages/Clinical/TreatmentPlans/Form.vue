@@ -3,7 +3,8 @@
         <div class="max-w-7xl mx-auto space-y-4">
             <!-- Breadcrumb -->
             <div class="flex items-center gap-2 text-sm text-gray-500">
-                <Link :href="route('patients.show', patientId)" class="hover:text-indigo-600 font-medium">← Quay lại hồ sơ bệnh nhân</Link>
+                <Link v-if="patientId" :href="route('patients.show', patientId)" class="hover:text-indigo-600 font-medium">← Quay lại hồ sơ bệnh nhân</Link>
+                <Link v-else :href="route('clinical.treatment-plans.index')" class="hover:text-indigo-600 font-medium">← Quay lại danh sách kế hoạch</Link>
             </div>
 
             <!-- Page Title -->
@@ -26,10 +27,49 @@
                             Thông tin hành chính
                         </h3>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <FormInput label="Khách hàng điều trị" required>
-                                <div class="bg-gray-50 border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center justify-between">
-                                    <span>{{ activePatientName }}</span>
-                                    <span class="font-mono text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">{{ activePatientCode }}</span>
+                            <FormInput label="Khách hàng điều trị" required :error="form.errors.patient_id">
+                                <!-- Đã chọn → hiển thị thông tin + nút đổi -->
+                                <div v-if="currentPatient" class="flex items-center gap-2">
+                                    <div class="flex-1 min-w-0 bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 flex items-center justify-between gap-2">
+                                        <span class="truncate">{{ activePatientName }}</span>
+                                        <span class="flex-shrink-0 font-mono text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded">{{ activePatientCode }}</span>
+                                    </div>
+                                    <button type="button" @click="clearPatient"
+                                        title="Đổi bệnh nhân"
+                                        class="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-2 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg border border-indigo-200 transition-colors">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                                        </svg>
+                                        Đổi
+                                    </button>
+                                </div>
+                                <!-- Chưa chọn → combobox tìm kiếm -->
+                                <div v-else class="relative" ref="patientComboRef">
+                                    <div class="relative">
+                                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                        </svg>
+                                        <input
+                                            v-model="patientSearch"
+                                            type="text"
+                                            placeholder="Tìm tên hoặc mã bệnh nhân..."
+                                            @focus="patientDropdownOpen = true"
+                                            @input="patientDropdownOpen = true"
+                                            class="block w-full rounded-lg border border-gray-300 pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                                    </div>
+                                    <div v-if="patientDropdownOpen && filteredPatients.length > 0"
+                                        class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+                                        <button v-for="p in filteredPatients" :key="p.id" type="button"
+                                            @mousedown.prevent="selectPatient(p)"
+                                            class="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center justify-between gap-2 transition-colors">
+                                            <span class="truncate">{{ p.full_name }}</span>
+                                            <span class="flex-shrink-0 text-xs font-mono text-gray-400">{{ p.code }}</span>
+                                        </button>
+                                    </div>
+                                    <div v-if="patientDropdownOpen && patientSearch && filteredPatients.length === 0"
+                                        class="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg px-3 py-2 text-sm text-gray-400">
+                                        Không tìm thấy bệnh nhân
+                                    </div>
                                 </div>
                             </FormInput>
 
@@ -316,7 +356,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, watch, ref, onMounted, onUnmounted } from 'vue';
 import { Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import FormInput from '@/Components/Shared/FormInput.vue';
@@ -332,15 +372,51 @@ const props = defineProps({
     selected_branch_id: Number
 });
 
-// Resolve current patient details
+// Resolve current patient — reactive to form.patient_id so dropdown selection updates display
 const currentPatient = computed(() => {
-    const pId = props.plan?.patient_id ?? props.selected_patient_id;
-    return props.patients.find(p => p.id === pId) || null;
+    const pId = form.patient_id || props.plan?.patient_id || props.selected_patient_id;
+    return pId ? (props.patients.find(p => p.id == pId) || null) : null;
 });
 
 const activePatientName = computed(() => currentPatient.value ? currentPatient.value.full_name : 'Bệnh nhân chưa chọn');
 const activePatientCode = computed(() => currentPatient.value ? currentPatient.value.code : 'BN-XXXX');
 const patientId = computed(() => currentPatient.value ? currentPatient.value.id : null);
+
+// Patient searchable combobox
+const patientSearch = ref('');
+const patientDropdownOpen = ref(false);
+const patientComboRef = ref(null);
+
+const filteredPatients = computed(() => {
+    const q = patientSearch.value.toLowerCase().trim();
+    if (!q) return props.patients.slice(0, 20);
+    return props.patients.filter(p =>
+        p.full_name.toLowerCase().includes(q) ||
+        p.code.toLowerCase().includes(q) ||
+        (p.phone && p.phone.includes(q))
+    ).slice(0, 30);
+});
+
+function selectPatient(p) {
+    form.patient_id = p.id;
+    patientSearch.value = '';
+    patientDropdownOpen.value = false;
+}
+
+function clearPatient() {
+    form.patient_id = '';
+    patientSearch.value = '';
+    patientDropdownOpen.value = false;
+}
+
+function handlePatientOutsideClick(e) {
+    if (patientComboRef.value && !patientComboRef.value.contains(e.target)) {
+        patientDropdownOpen.value = false;
+    }
+}
+
+onMounted(() => document.addEventListener('click', handlePatientOutsideClick));
+onUnmounted(() => document.removeEventListener('click', handlePatientOutsideClick));
 
 // Initial form state
 const form = useForm({
@@ -363,6 +439,13 @@ const form = useForm({
     discount_amount:    props.plan?.discount_amount ?? 0,
     action:             'show',
     items:              props.plan?.items ?? []
+});
+
+// Auto-fill branch when patient is selected from dropdown
+watch(() => form.patient_id, (pId) => {
+    if (!pId || form.branch_id) return;
+    const p = props.patients.find(x => x.id == pId);
+    if (p?.branch_id) form.branch_id = p.branch_id;
 });
 
 // Live net total calculation
