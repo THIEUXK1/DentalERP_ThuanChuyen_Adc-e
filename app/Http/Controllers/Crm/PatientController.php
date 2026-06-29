@@ -64,11 +64,41 @@ class PatientController extends Controller
         return $this->form();
     }
 
+    public function checkDuplicate(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('patients.create');
+
+        $name  = trim($request->input('full_name', ''));
+        $phone = trim($request->input('phone', ''));
+
+        $warnings = [
+            'phone_empty'    => $phone === '',
+            'name_duplicate' => null,
+            'full_duplicate' => null,
+        ];
+
+        if ($name !== '') {
+            $byName = Patient::whereRaw('lower(full_name) = ?', [mb_strtolower($name)])->first();
+            if ($byName) {
+                $warnings['name_duplicate'] = [
+                    'id' => $byName->id, 'code' => $byName->code,
+                    'name' => $byName->full_name, 'phone' => $byName->phone,
+                ];
+                if ($phone !== '' && $byName->phone === $phone) {
+                    $warnings['full_duplicate'] = $warnings['name_duplicate'];
+                }
+            }
+        }
+
+        return response()->json(['warnings' => $warnings]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $this->authorize('patients.create');
 
-        $data = $this->validated($request);
+        $forceSave = (bool) $request->input('force_save', false);
+        $data = $this->validated($request, null, $forceSave);
         Patient::create([...$data, 'code' => Patient::generateCode()]);
 
         return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
@@ -327,11 +357,11 @@ class PatientController extends Controller
         return back()->with('success', 'Đã cập nhật ảnh đại diện.');
     }
 
-    private function validated(Request $request, ?int $ignore = null): array
+    private function validated(Request $request, ?int $ignore = null, bool $forceSave = false): array
     {
         return $request->validate([
             'full_name'         => 'required|string|max:255',
-            'phone'             => 'required|string|max:20',
+            'phone'             => ($forceSave ? 'nullable' : 'required').'|string|max:20',
             'email'             => 'nullable|email|max:255',
             'dob'               => 'nullable|date',
             'gender'            => 'nullable|in:male,female,other',

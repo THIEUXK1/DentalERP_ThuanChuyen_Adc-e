@@ -39,10 +39,14 @@ class AppointmentController extends Controller
             'date' => $date,
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
-            'doctors' => Employee::doctors()
-                ->when($branchId, fn ($q) => $q->byBranch($branchId))
-                ->where('is_active', true)->get()
-                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+            'doctors' => Employee::doctors()->where('is_active', true)->get()
+                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name, 'branch_id' => $e->branch_id]),
+            'chairs' => DentalChair::where('is_active', true)->get()
+                ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
+            'services' => DentalService::where('is_active', true)->orderBy('name')->get()
+                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'duration_minutes' => $s->duration_minutes]),
+            'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
+                ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code, 'branch_id' => $p->branch_id]),
             'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
             'filters' => $request->only(['date', 'branch_id', 'doctor_id', 'status']),
         ]);
@@ -111,6 +115,30 @@ class AppointmentController extends Controller
         }
 
         return redirect()->route('schedule.appointments.show', $appointment)->with('success', 'Đã cập nhật lịch hẹn.');
+    }
+
+    public function quickReschedule(Request $request, Appointment $appointment): RedirectResponse
+    {
+        $this->authorize('appointments.manage');
+
+        $data = $request->validate([
+            'scheduled_at'     => 'required|date',
+            'duration_minutes' => 'nullable|integer|min:5|max:480',
+            'notes'            => 'nullable|string|max:1000',
+        ]);
+
+        try {
+            $this->svc->reschedule(
+                $appointment,
+                $data['scheduled_at'],
+                (int) ($data['duration_minutes'] ?? $appointment->duration_minutes)
+            );
+            $appointment->update(['notes' => $data['notes'] ?? $appointment->notes]);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Đã rời lịch hẹn {$appointment->code}.");
     }
 
     public function transition(Request $request, Appointment $appointment): RedirectResponse
