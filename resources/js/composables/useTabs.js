@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { restorePage } from './usePageCache';
 
 const STORAGE_KEY = 'dental_tabs';
 const MAX_TABS    = 10;
@@ -129,7 +130,7 @@ function closeTab(url) {
     if (wasActive && tabs.value.length) {
         const next = tabs.value[Math.max(0, idx - 1)];
         next.active = true;
-        router.visit(next.url);
+        if (!restorePage(next.url)) router.visit(next.url);
     }
     save(tabs.value);
 }
