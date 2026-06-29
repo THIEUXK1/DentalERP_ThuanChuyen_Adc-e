@@ -30,30 +30,25 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
-        $query = Patient::with('branch')
-            ->when($request->search, fn ($q, $v) => $q->where('full_name', 'ilike', "%{$v}%")
-                ->orWhere('phone', 'ilike', "%{$v}%")
-                ->orWhere('code', 'ilike', "%{$v}%"))
-            ->when($request->branch_id, fn ($q, $v) => $q->where('branch_id', $v))
-            ->when($request->source, fn ($q, $v) => $q->where('source', $v))
-            ->orderByDesc('id');
-
         return Inertia::render('Crm/Patients/Index', [
-            'patients' => $query->paginate(20)->through(fn ($p) => [
-                'id' => $p->id,
-                'code' => $p->code,
-                'full_name' => $p->full_name,
-                'phone' => $p->phone,
-                'gender' => $p->gender,
-                'source' => $p->source,
-                'branch' => $p->branch?->name,
-                'is_active' => $p->is_active,
-                'created_at' => $p->created_at->format('d/m/Y'),
-            ]),
+            'all_patients' => Patient::with('branch')
+                ->orderByDesc('id')
+                ->get()
+                ->map(fn ($p) => [
+                    'id'         => $p->id,
+                    'code'       => $p->code,
+                    'full_name'  => $p->full_name,
+                    'phone'      => $p->phone ?? '',
+                    'gender'     => $p->gender,
+                    'source'     => $p->source,
+                    'branch'     => $p->branch?->name,
+                    'branch_id'  => $p->branch_id,
+                    'is_active'  => $p->is_active,
+                    'created_at' => $p->created_at->format('d/m/Y'),
+                ]),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-            'filters' => $request->only(['search', 'branch_id', 'source']),
         ]);
     }
 

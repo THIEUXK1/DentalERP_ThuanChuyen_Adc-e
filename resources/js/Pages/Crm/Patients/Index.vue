@@ -17,16 +17,21 @@
                 </Link>
             </div>
 
-            <!-- ── View toggle + stats bar ─────────────────────────────── -->
+            <!-- ── Stats bar ───────────────────────────────────────────── -->
             <div class="bg-slate-800 rounded-xl px-5 py-3 flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-2">
                     <span class="text-slate-400 text-xs">Tổng KH</span>
-                    <span class="font-bold text-white text-lg">{{ patients.meta?.total ?? patients.data.length }}</span>
+                    <span class="font-bold text-white text-lg">{{ all_patients.length }}</span>
                 </div>
                 <div class="h-4 w-px bg-slate-600"></div>
                 <div class="flex items-center gap-2">
                     <span class="text-slate-400 text-xs">Kết quả lọc</span>
-                    <span class="font-bold text-indigo-300">{{ patients.data.length }}</span>
+                    <span class="font-bold text-indigo-300">{{ filteredPatients.length }}</span>
+                </div>
+                <div v-if="filteredPatients.length > 0" class="h-4 w-px bg-slate-600"></div>
+                <div v-if="filteredPatients.length > 0" class="flex items-center gap-2">
+                    <span class="text-slate-400 text-xs">Đang xem</span>
+                    <span class="text-slate-300 text-xs">{{ fromRecord }}–{{ toRecord }}</span>
                 </div>
                 <div class="ml-auto flex items-center gap-1">
                     <button @click="viewMode = 'table'"
@@ -52,43 +57,49 @@
                         <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                        <input v-model="search" @keyup.enter="applyFilters" placeholder="Tên, SĐT, mã KH..."
+                        <input v-model="search" placeholder="Tên, SĐT, mã KH..."
                             class="border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm w-60 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                     </div>
                 </div>
                 <div>
                     <label class="text-xs text-gray-500 mb-1 block">Chi nhánh</label>
-                    <select v-model="branchId" @change="applyFilters"
+                    <select v-model="branchId"
                         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="">Tất cả</option>
+                        <option :value="''">Tất cả</option>
                         <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                     </select>
                 </div>
                 <div>
                     <label class="text-xs text-gray-500 mb-1 block">Nguồn</label>
-                    <select v-model="source" @change="applyFilters"
+                    <select v-model="source"
                         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                         <option value="">Tất cả nguồn</option>
                         <option v-for="s in sources" :key="s.value" :value="s.value">{{ s.label }}</option>
                     </select>
                 </div>
-                <button @click="applyFilters"
-                    class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium self-end">
-                    Lọc
-                </button>
-                <button v-if="search || branchId || source" @click="clearFilters"
-                    class="px-3 py-2 text-gray-500 text-sm rounded-lg border border-gray-200 hover:bg-gray-50 self-end">
-                    Xóa lọc
+                <div>
+                    <label class="text-xs text-gray-500 mb-1 block">Hiển thị</label>
+                    <select v-model="perPage"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option v-for="opt in perPageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                </div>
+                <button v-if="hasActiveFilters" @click="clearFilters"
+                    class="px-3 py-2 text-indigo-600 text-sm rounded-lg border border-indigo-200 hover:bg-indigo-50 self-end font-medium flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                    Xóa bộ lọc
                 </button>
             </div>
 
             <!-- ── TABLE VIEW ──────────────────────────────────────────── -->
             <div v-if="viewMode === 'table'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div v-if="patients.data.length === 0" class="flex flex-col items-center py-14 text-gray-400">
+                <div v-if="paginatedPatients.length === 0" class="flex flex-col items-center py-14 text-gray-400">
                     <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
-                    <p class="text-sm font-medium">Chưa có khách hàng</p>
+                    <p class="text-sm font-medium">Không tìm thấy khách hàng</p>
                 </div>
                 <div v-else class="overflow-x-auto">
                     <table class="w-full text-sm">
@@ -103,7 +114,7 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
-                            <tr v-for="p in patients.data" :key="p.id" class="hover:bg-blue-50/20 transition-colors">
+                            <tr v-for="p in paginatedPatients" :key="p.id" class="hover:bg-blue-50/20 transition-colors">
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
                                         <div :class="['w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0', avatarColor(p.full_name)]">
@@ -146,10 +157,10 @@
 
             <!-- ── CARD VIEW ───────────────────────────────────────────── -->
             <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                <div v-if="patients.data.length === 0" class="col-span-full text-center py-14 text-gray-400">
-                    Chưa có khách hàng
+                <div v-if="paginatedPatients.length === 0" class="col-span-full text-center py-14 text-gray-400">
+                    Không tìm thấy khách hàng
                 </div>
-                <Link v-for="p in patients.data" :key="p.id"
+                <Link v-for="p in paginatedPatients" :key="p.id"
                     :href="route('patients.show', p.id)"
                     class="bg-white rounded-xl border border-gray-200 p-4 hover:border-indigo-200 hover:shadow-md transition-all group">
                     <div class="flex items-start gap-3 mb-3">
@@ -185,40 +196,140 @@
                 </Link>
             </div>
 
-            <Pagination :links="patients.links" :meta="patients.meta" @navigate="url => router.get(url)" />
+            <!-- ── Pagination ──────────────────────────────────────────── -->
+            <div v-if="totalPages > 1 || filteredPatients.length > 0" class="flex items-center justify-between flex-wrap gap-3">
+                <p class="text-sm text-gray-500">
+                    Hiển thị
+                    <span class="font-medium text-gray-700">{{ fromRecord }}–{{ toRecord }}</span>
+                    / <span class="font-medium text-gray-700">{{ filteredPatients.length }}</span> bản ghi
+                </p>
+
+                <div v-if="totalPages > 1" class="flex items-center gap-1">
+                    <button @click="currentPage--" :disabled="currentPage === 1"
+                        class="px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        ‹
+                    </button>
+                    <template v-for="pg in pageNumbers" :key="pg">
+                        <span v-if="pg === '...'" class="px-1 text-gray-400 text-sm">…</span>
+                        <button v-else @click="currentPage = pg"
+                            :class="['px-2.5 py-1.5 text-sm rounded-lg border transition-colors',
+                                pg === currentPage
+                                    ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
+                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50']">
+                            {{ pg }}
+                        </button>
+                    </template>
+                    <button @click="currentPage++" :disabled="currentPage === totalPages"
+                        class="px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
+                        ›
+                    </button>
+                </div>
+            </div>
+
         </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { ref, computed, watch } from 'vue';
+import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
-import Pagination from '@/Components/Shared/Pagination.vue';
 import { usePermission } from '@/composables/usePermission';
 
 const { hasPermission: can } = usePermission();
-const props = defineProps({ patients: Object, branches: Array, sources: Array, filters: Object });
+const props = defineProps({ all_patients: Array, branches: Array, sources: Array });
 
-const search   = ref(props.filters.search ?? '');
-const branchId = ref(props.filters.branch_id ?? '');
-const source   = ref(props.filters.source ?? '');
-const viewMode = ref('table'); // 'table' | 'card'
+// ── Restore state from URL on load ──────────────────────────────
+const _q = new URLSearchParams(window.location.search);
+const search      = ref(_q.get('search') ?? '');
+const branchId    = ref(_q.get('branch_id') ? Number(_q.get('branch_id')) : '');
+const source      = ref(_q.get('source') ?? '');
+const perPage     = ref(_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page') ?? 20));
+const currentPage = ref(Number(_q.get('page') ?? 1));
+const viewMode    = ref('table');
 
-function applyFilters() {
-    router.get(route('patients.index'), {
-        search:    search.value   || undefined,
-        branch_id: branchId.value || undefined,
-        source:    source.value   || undefined,
-    }, { preserveState: true });
-}
+const perPageOptions = [
+    { value: 10,    label: '10 / trang' },
+    { value: 20,    label: '20 / trang' },
+    { value: 50,    label: '50 / trang' },
+    { value: 100,   label: '100 / trang' },
+    { value: 'all', label: 'Tất cả' },
+];
+
+// ── Filtering ────────────────────────────────────────────────────
+const filteredPatients = computed(() => {
+    const q = search.value.trim().toLowerCase();
+    return props.all_patients.filter(p => {
+        if (q && !p.full_name.toLowerCase().includes(q)
+              && !(p.phone ?? '').toLowerCase().includes(q)
+              && !(p.code  ?? '').toLowerCase().includes(q)) return false;
+        if (branchId.value !== '' && p.branch_id !== branchId.value) return false;
+        if (source.value && p.source !== source.value) return false;
+        return true;
+    });
+});
+
+// ── Pagination ───────────────────────────────────────────────────
+const totalPages = computed(() =>
+    perPage.value === 'all' ? 1 : Math.max(1, Math.ceil(filteredPatients.value.length / Number(perPage.value)))
+);
+
+// Reset to page 1 when filter/per_page changes
+watch([search, branchId, source, perPage], () => { currentPage.value = 1; });
+
+// Clamp page if it goes out of range
+watch(totalPages, (n) => { if (currentPage.value > n) currentPage.value = n; });
+
+const fromRecord = computed(() => {
+    if (!filteredPatients.value.length) return 0;
+    if (perPage.value === 'all') return 1;
+    return (currentPage.value - 1) * Number(perPage.value) + 1;
+});
+const toRecord = computed(() => {
+    if (perPage.value === 'all') return filteredPatients.value.length;
+    return Math.min(currentPage.value * Number(perPage.value), filteredPatients.value.length);
+});
+const paginatedPatients = computed(() => {
+    if (perPage.value === 'all') return filteredPatients.value;
+    const size  = Number(perPage.value);
+    const start = (currentPage.value - 1) * size;
+    return filteredPatients.value.slice(start, start + size);
+});
+
+// Page number list with ellipsis
+const pageNumbers = computed(() => {
+    const total = totalPages.value;
+    const cur   = currentPage.value;
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = [1];
+    if (cur > 3) pages.push('...');
+    for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) pages.push(i);
+    if (cur < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
+});
+
+// ── Sync URL without reload ──────────────────────────────────────
+watch([search, branchId, source, perPage, currentPage], () => {
+    const p = new URLSearchParams();
+    if (search.value)              p.set('search',    search.value);
+    if (branchId.value !== '')     p.set('branch_id', String(branchId.value));
+    if (source.value)              p.set('source',    source.value);
+    if (String(perPage.value) !== '20') p.set('per_page', String(perPage.value));
+    if (currentPage.value > 1)     p.set('page',      String(currentPage.value));
+    const qs = p.toString();
+    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+});
+
+// ── Helpers ───────────────────────────────────────────────────────
+const hasActiveFilters = computed(() =>
+    !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== '20')
+);
 
 function clearFilters() {
-    search.value = ''; branchId.value = ''; source.value = '';
-    applyFilters();
+    search.value = ''; branchId.value = ''; source.value = ''; perPage.value = 20;
 }
 
-// Avatar color based on name initial
 const AVATAR_COLORS = [
     'bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-blue-500',
     'bg-rose-500', 'bg-amber-500', 'bg-teal-500', 'bg-pink-500',
