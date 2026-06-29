@@ -7,10 +7,21 @@
                     {{ todayOnly ? `Lịch hẹn ngày ${formattedDate}` : 'Tất cả lịch hẹn' }}
                     <span class="ml-2 text-sm font-normal text-gray-400">({{ filteredAppointments.length }})</span>
                 </h2>
-                <button v-if="can('appointments.create')" @click="openCreate"
-                    class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
-                    + Đặt lịch hẹn
-                </button>
+                <div class="flex items-center gap-2">
+                    <!-- View toggle -->
+                    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                        <button @click="viewMode = 'list'" :class="['p-2 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600']" title="Dạng danh sách">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
+                        </button>
+                        <button @click="viewMode = 'grid'" :class="['p-2 transition-colors', viewMode === 'grid' ? 'bg-primary-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600']" title="Dạng hộp">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                        </button>
+                    </div>
+                    <button v-if="can('appointments.create')" @click="openCreate"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
+                        + Đặt lịch hẹn
+                    </button>
+                </div>
             </div>
 
             <!-- Filter bar -->
@@ -100,25 +111,22 @@
                 <span v-if="totalPages > 1">Trang {{ currentPage }}/{{ totalPages }}</span>
             </div>
 
-            <!-- Appointments list -->
-            <div class="space-y-2">
-                <div v-if="filteredAppointments.length === 0"
-                    class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                    {{ hasActiveFilters ? 'Không tìm thấy lịch hẹn phù hợp' : 'Chưa có lịch hẹn nào' }}
-                </div>
+            <!-- Empty state -->
+            <div v-if="filteredAppointments.length === 0"
+                class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
+                {{ hasActiveFilters ? 'Không tìm thấy lịch hẹn phù hợp' : 'Chưa có lịch hẹn nào' }}
+            </div>
 
+            <!-- ── LIST VIEW ── -->
+            <div v-else-if="viewMode === 'list'" class="space-y-2">
                 <div v-for="a in paginatedAppointments" :key="a.id"
                     class="flex items-center gap-4 bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-sm transition-all">
-
-                    <!-- Clickable main area -->
                     <Link :href="route('schedule.appointments.show', a.id)" class="flex flex-1 items-center gap-4 p-4 min-w-0">
-                        <!-- Date + Time block -->
                         <div class="w-20 text-center flex-shrink-0">
                             <p class="text-xs text-gray-400 font-medium">{{ displayDate(a.scheduled_at) }}</p>
                             <p class="text-sm font-bold text-gray-800">{{ a.scheduled_at.split(' ')[1] }}</p>
                             <p class="text-xs text-gray-400">→ {{ a.ends_at }}</p>
                         </div>
-                        <!-- Info -->
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
                                 <p class="font-semibold text-gray-900 truncate">{{ a.patient }}</p>
@@ -130,20 +138,66 @@
                                 📝 {{ a.notes }}
                             </p>
                         </div>
-                        <!-- Status -->
                         <StatusBadge :color="a.status_color">{{ a.status_label }}</StatusBadge>
-                        <!-- Code -->
                         <span class="font-mono text-xs text-gray-400 flex-shrink-0 hidden sm:block">{{ a.code }}</span>
                     </Link>
-
-                    <!-- Rời lịch button -->
                     <div v-if="can('appointments.manage')" class="pr-3 flex-shrink-0">
-                        <button @click="openReschedule(a)"
-                            title="Rời lịch nhanh"
+                        <button @click="openReschedule(a)" title="Rời lịch nhanh"
                             class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-colors">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                            </svg>
+                            Rời lịch
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── GRID VIEW ── -->
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div v-for="a in paginatedAppointments" :key="a.id"
+                    class="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-md transition-all flex flex-col">
+                    <Link :href="route('schedule.appointments.show', a.id)" class="flex-1 p-4 flex flex-col gap-3 min-w-0">
+                        <!-- Header: date/time + status -->
+                        <div class="flex items-start justify-between gap-2">
+                            <div>
+                                <p class="text-xs text-gray-400">{{ displayDate(a.scheduled_at) }}</p>
+                                <p class="text-base font-bold text-gray-800 leading-tight">{{ a.scheduled_at.split(' ')[1] }}</p>
+                                <p class="text-xs text-gray-400">→ {{ a.ends_at }}</p>
+                            </div>
+                            <StatusBadge :color="a.status_color" class="flex-shrink-0 mt-0.5">{{ a.status_label }}</StatusBadge>
+                        </div>
+                        <!-- Patient -->
+                        <div>
+                            <p class="font-semibold text-gray-900 truncate">{{ a.patient }}</p>
+                            <p class="text-xs text-gray-400">{{ a.patient_phone }}</p>
+                        </div>
+                        <!-- Details -->
+                        <div class="text-xs text-gray-500 space-y-1">
+                            <p v-if="a.doctor !== '—'" class="truncate flex items-center gap-1.5">
+                                <svg class="w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                {{ a.doctor }}
+                            </p>
+                            <p v-if="a.service !== '—'" class="truncate flex items-center gap-1.5">
+                                <svg class="w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                {{ a.service }}
+                            </p>
+                            <p class="truncate flex items-center gap-1.5">
+                                <svg class="w-3 h-3 text-gray-300 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/></svg>
+                                {{ a.branch }}
+                            </p>
+                        </div>
+                        <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 truncate">
+                            📝 {{ a.notes }}
+                        </p>
+                    </Link>
+                    <!-- Footer -->
+                    <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100">
+                        <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
+                        <button v-if="can('appointments.manage')" @click="openReschedule(a)" title="Rời lịch nhanh"
+                            class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                             </svg>
                             Rời lịch
                         </button>
@@ -380,6 +434,9 @@ const doctorId     = ref('');
 const filterStatus = ref('');
 const perPage      = ref(20);
 const currentPage  = ref(1);
+const viewMode     = ref(localStorage.getItem('apt_view_mode') || 'list');
+
+watch(viewMode, (val) => localStorage.setItem('apt_view_mode', val));
 
 // ── Computed ──────────────────────────────────────────────────
 const formattedDate = computed(() => dayjs(date.value).format('DD/MM/YYYY'));
