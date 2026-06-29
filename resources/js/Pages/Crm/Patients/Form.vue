@@ -263,8 +263,10 @@ async function handleSubmit() {
         } else {
             doSave();
         }
-    } catch {
-        doSave();
+    } catch (err) {
+        console.error('check-duplicate error:', err);
+        // Không tự động lưu khi check thất bại — yêu cầu user thử lại
+        alert('Không thể kiểm tra trùng lặp. Vui lòng thử lại.');
     } finally {
         checking.value = false;
     }
