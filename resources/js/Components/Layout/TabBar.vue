@@ -17,13 +17,13 @@
                 :key="tab.url"
                 :href="tab.url"
                 role="tab"
-                :aria-selected="tab.active"
+                :aria-selected="isActive(tab)"
                 :class="[
                     'group relative flex items-center gap-1.5 px-3 py-2 text-xs whitespace-nowrap cursor-pointer',
-                    'border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
-                    tab.active
-                        ? 'border-primary-600 text-primary-700 bg-white font-medium shadow-sm'
-                        : 'border-transparent text-gray-500 hover:text-gray-800 hover:bg-white/70',
+                    'border-t-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
+                    isActive(tab)
+                        ? 'border-t-primary-600 bg-white text-primary-700 font-semibold -mb-px border-b border-b-white'
+                        : 'border-t-transparent text-gray-500 hover:text-gray-800 hover:bg-white/70',
                 ]"
                 @click.prevent="clickTab(tab)"
                 @contextmenu.prevent="openContext($event, tab)"
@@ -128,11 +128,18 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import { useTabs } from '@/composables/useTabs';
 import { restorePage } from '@/composables/usePageCache';
 
 const { tabs, closeTab, pinTab, closeAllTabs } = useTabs();
+
+// Dùng usePage().url (luôn reactive) thay vì tab.active để xác định tab đang xem
+const page = usePage();
+const currentPath = computed(() => new URL(page.url, 'http://x').pathname);
+function isActive(tab) {
+    return new URL(tab.url, 'http://x').pathname === currentPath.value;
+}
 
 // ── Scroll ────────────────────────────────────────────────────
 const scrollEl       = ref(null);
@@ -158,7 +165,7 @@ onMounted(() => nextTick().then(checkScroll));
 
 // ── Tab click — use cached page if available, else normal navigation ─
 function clickTab(tab) {
-    if (tab.active) return;
+    if (isActive(tab)) return;
     if (!restorePage(tab.url)) router.visit(tab.url);
 }
 
