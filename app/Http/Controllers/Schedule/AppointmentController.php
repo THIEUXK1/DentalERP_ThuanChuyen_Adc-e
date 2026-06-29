@@ -26,7 +26,7 @@ class AppointmentController extends Controller
 
         return Inertia::render('Schedule/Appointments/Index', [
             'all_appointments' => Appointment::with(['patient', 'doctor', 'chair', 'service'])
-                ->orderBy('scheduled_at')
+                ->orderByDesc('scheduled_at')
                 ->get()
                 ->map(fn ($a) => $this->dto($a)),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
