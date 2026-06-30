@@ -19,62 +19,13 @@
                             <span class="hidden sm:inline">{{ v.label }}</span>
                         </button>
                     </div>
-                    <!-- Báo cáo dropdown -->
-                    <div class="relative" ref="reportDropdownRef">
-                        <button @click="reportOpen = !reportOpen"
-                            :class="['inline-flex items-center gap-1.5 px-3 py-2 border text-sm rounded-xl shadow-sm font-medium transition-colors',
-                                reportOpen ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50']">
-                            <svg class="w-4 h-4" :class="reportOpen ? 'text-white' : 'text-emerald-600'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                            <span class="hidden sm:inline">Báo cáo</span>
-                            <svg class="w-3.5 h-3.5 transition-transform" :class="reportOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-                            </svg>
-                        </button>
-
-                        <!-- Dropdown panel -->
-                        <Teleport to="body">
-                            <div v-if="reportOpen"
-                                class="fixed z-50 bg-white rounded-2xl border border-gray-200 shadow-xl p-4 w-80"
-                                :style="reportPanelStyle">
-                                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Chọn khoảng thời gian</p>
-
-                                <!-- Quick presets -->
-                                <div class="grid grid-cols-2 gap-1.5 mb-4">
-                                    <button v-for="p in reportPresets" :key="p.label"
-                                        @click="openReport(p.from, p.to)"
-                                        :class="['px-3 py-2 text-sm rounded-xl border text-left font-medium transition-colors',
-                                            p.highlight
-                                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100'
-                                                : 'bg-gray-50 border-gray-200 text-gray-700 hover:bg-gray-100']">
-                                        {{ p.label }}
-                                    </button>
-                                </div>
-
-                                <div class="border-t border-gray-100 pt-3">
-                                    <p class="text-xs font-medium text-gray-500 mb-2">Tùy chọn khoảng ngày</p>
-                                    <div class="flex items-center gap-2 mb-3">
-                                        <div class="flex-1">
-                                            <label class="block text-xs text-gray-400 mb-1">Từ ngày</label>
-                                            <input type="date" v-model="reportFrom"
-                                                class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                                        </div>
-                                        <span class="text-gray-400 mt-4">→</span>
-                                        <div class="flex-1">
-                                            <label class="block text-xs text-gray-400 mb-1">Đến ngày</label>
-                                            <input type="date" v-model="reportTo" :min="reportFrom"
-                                                class="w-full border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                                        </div>
-                                    </div>
-                                    <button @click="openReport(reportFrom, reportTo)"
-                                        class="w-full py-2 bg-emerald-600 text-white text-sm rounded-xl hover:bg-emerald-700 font-medium">
-                                        Xem báo cáo →
-                                    </button>
-                                </div>
-                            </div>
-                        </Teleport>
-                    </div>
+                    <Link :href="route('reports.daily-schedule')"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 shadow-sm font-medium">
+                        <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        <span class="hidden sm:inline">Báo cáo</span>
+                    </Link>
                     <button v-if="can('appointments.create')" @click="openCreate"
                         class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 shadow-sm font-medium">
                         + Đặt lịch
@@ -617,7 +568,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, Link, useForm } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
@@ -977,52 +928,6 @@ function submitCreate() {
         onSuccess: () => { showCreate.value = false; },
     });
 }
-
-// ── Report dropdown ─────────────────────────────────────────────
-const reportOpen    = ref(false);
-const reportDropdownRef = ref(null);
-const reportFrom    = ref(dayjs().format('YYYY-MM-DD'));
-const reportTo      = ref(dayjs().format('YYYY-MM-DD'));
-const reportPanelStyle = ref({});
-
-const reportPresets = computed(() => {
-    const today = dayjs();
-    const monThisWeek = today.day() === 0 ? today.subtract(6,'day') : today.startOf('week').add(1,'day');
-    return [
-        { label: 'Hôm nay',       highlight: true,  from: today.format('YYYY-MM-DD'), to: today.format('YYYY-MM-DD') },
-        { label: 'Hôm qua',       highlight: false, from: today.subtract(1,'day').format('YYYY-MM-DD'), to: today.subtract(1,'day').format('YYYY-MM-DD') },
-        { label: 'Tuần này',      highlight: true,  from: monThisWeek.format('YYYY-MM-DD'), to: monThisWeek.add(6,'day').format('YYYY-MM-DD') },
-        { label: 'Tuần trước',    highlight: false, from: monThisWeek.subtract(7,'day').format('YYYY-MM-DD'), to: monThisWeek.subtract(1,'day').format('YYYY-MM-DD') },
-        { label: 'Tháng này',     highlight: true,  from: today.startOf('month').format('YYYY-MM-DD'), to: today.endOf('month').format('YYYY-MM-DD') },
-        { label: 'Tháng trước',   highlight: false, from: today.subtract(1,'month').startOf('month').format('YYYY-MM-DD'), to: today.subtract(1,'month').endOf('month').format('YYYY-MM-DD') },
-    ];
-});
-
-function openReport(from, to) {
-    reportOpen.value = false;
-    router.visit(route('reports.daily-schedule', { from, to }));
-}
-
-watch(reportOpen, (val) => {
-    if (!val) return;
-    // Position panel below the button
-    const btn = reportDropdownRef.value?.querySelector('button');
-    if (!btn) return;
-    const rect = btn.getBoundingClientRect();
-    const panelW = 320;
-    let left = rect.right - panelW;
-    if (left < 8) left = 8;
-    reportPanelStyle.value = {
-        top:  rect.bottom + 8 + 'px',
-        left: left + 'px',
-    };
-});
-
-function onClickOutsideReport(e) {
-    if (!reportDropdownRef.value?.contains(e.target)) reportOpen.value = false;
-}
-onMounted(()      => document.addEventListener('mousedown', onClickOutsideReport));
-onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutsideReport));
 
 // ── Reschedule ─────────────────────────────────────────────────
 const rescheduleTarget = ref(null);

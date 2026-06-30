@@ -63,9 +63,8 @@ class ReportController extends Controller
     {
         $this->authorize('reports.view');
 
-        $today    = now()->toDateString();
-        $from     = $request->from     ?? ($request->date ?? $today);
-        $to       = $request->to       ?? $from;
+        $from     = $request->from ?? ($request->date ?? now()->startOfMonth()->toDateString());
+        $to       = $request->to   ?? now()->endOfMonth()->toDateString();
         $branchId = $request->branch_id ? (int) $request->branch_id : null;
         $doctorId = $request->doctor_id ? (int) $request->doctor_id : null;
         $status   = $request->status   ?? null;
@@ -73,11 +72,8 @@ class ReportController extends Controller
         // Cap range to 90 days to avoid memory issues
         if ($to < $from) $to = $from;
 
-        $apts = Appointment::with(['patient', 'doctor', 'service', 'chair'])
+        $appointments = Appointment::with(['patient', 'doctor', 'service', 'chair'])
             ->whereBetween('scheduled_at', [$from.' 00:00:00', $to.' 23:59:59'])
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->when($doctorId, fn ($q) => $q->where('doctor_id', $doctorId))
-            ->when($status,   fn ($q) => $q->where('status', $status))
             ->orderBy('scheduled_at')
             ->orderBy('doctor_id')
             ->get()
@@ -90,6 +86,7 @@ class ReportController extends Controller
                 'patient_phone'    => $a->patient?->phone ?? '',
                 'doctor'           => $a->doctor?->full_name ?? 'Chưa gán',
                 'doctor_id'        => $a->doctor_id,
+                'branch_id'        => $a->branch_id,
                 'service'          => $a->service?->name ?? '—',
                 'chair'            => $a->chair?->name ?? '—',
                 'scheduled_at'     => $a->scheduled_at->format('H:i'),
@@ -98,45 +95,19 @@ class ReportController extends Controller
                 'status'           => $a->status->value,
                 'status_label'     => $a->status->label(),
                 'notes'            => $a->notes ?? '',
-            ]);
-
-        $isRange = $from !== $to;
-
-        if ($isRange) {
-            // Group by date → then by doctor within each date
-            $byDate = $apts->groupBy('date')->map(fn ($dateRows, $date) => [
-                'date'       => $date,
-                'date_label' => $dateRows->first()['date_label'],
-                'total'      => $dateRows->count(),
-                'byDoctor'   => $dateRows->groupBy('doctor')->map(fn ($rows, $name) => [
-                    'name'  => $name,
-                    'rows'  => $rows->values()->all(),
-                    'total' => $rows->count(),
-                ])->values()->all(),
-            ])->values()->all();
-            $byDoctor = null;
-        } else {
-            // Single day: group by doctor only
-            $byDate = null;
-            $byDoctor = $apts->groupBy('doctor')->map(fn ($rows, $name) => [
-                'name'  => $name,
-                'rows'  => $rows->values()->all(),
-                'total' => $rows->count(),
-            ])->values()->all();
-        }
+            ])
+            ->values()
+            ->all();
 
         return Inertia::render('Reports/DailySchedule', [
-            'byDoctor' => $byDoctor,
-            'byDate'   => $byDate,
-            'isRange'  => $isRange,
-            'total'    => $apts->count(),
+            'appointments' => $appointments,
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'doctors'  => Employee::doctors()->where('is_active', true)->orderBy('full_name')->get()
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
             'statuses' => collect(AppointmentStatus::cases())
                 ->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-            'filters'  => compact('from', 'to', 'branchId', 'doctorId', 'status'),
+            'filters'  => compact('from', 'to'),
         ]);
     }
 
