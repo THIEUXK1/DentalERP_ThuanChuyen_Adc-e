@@ -11,7 +11,7 @@
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 overflow-y-auto py-3 space-y-1 px-2 scrollbar-thin scrollbar-thumb-gray-800">
+        <nav ref="navEl" class="flex-1 overflow-y-auto py-3 space-y-1 px-2 scrollbar-thin scrollbar-thumb-gray-800">
             <template v-for="group in visibleGroups" :key="group.label">
                 <p v-if="!collapsed && group.items.length" class="text-[10px] text-gray-500 font-bold uppercase px-3 pt-4 pb-1.5 tracking-widest select-none">
                     {{ group.label }}
@@ -25,14 +25,27 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
-import { usePage } from '@inertiajs/vue3';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { usePage, router } from '@inertiajs/vue3';
 import NavItem from './NavItem.vue';
 import { usePermission } from '@/composables/usePermission';
 import { menuConfig } from './menuConfig';
 
 defineProps({ collapsed: Boolean });
 defineEmits(['toggle']);
+
+const navEl = ref(null);
+let savedScroll = 0;
+
+onMounted(() => {
+    const off1 = router.on('before', () => {
+        savedScroll = navEl.value?.scrollTop ?? 0;
+    });
+    const off2 = router.on('navigate', () => {
+        if (navEl.value) navEl.value.scrollTop = savedScroll;
+    });
+    onUnmounted(() => { off1(); off2(); });
+});
 
 const { hasPermission: can, hasAnyRole } = usePermission();
 const page = usePage();
