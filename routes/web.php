@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\ActivityLogController;
+use App\Http\Controllers\Admin\ClinicRecordController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
@@ -121,6 +122,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('activity-log', [ActivityLogController::class, 'index'])->name('activity-log.index')->middleware('can:admin.audit_log');
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index')->middleware('can:settings.view');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update')->middleware('can:settings.manage');
+    Route::get('clinic-records', [ClinicRecordController::class, 'index'])->name('clinic-records.index')->middleware('can:admin.audit_log');
 });
 
 // Notifications

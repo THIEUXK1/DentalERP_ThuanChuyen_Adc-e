@@ -9,7 +9,7 @@
             <TopBar :title="title" />
             <TabBar />
 
-            <main class="flex-1 p-6">
+            <main class="flex-1 p-6 flex flex-col">
                 <slot />
             </main>
         </div>

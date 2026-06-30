@@ -210,7 +210,8 @@ export const menuConfig = [
             { label: 'Người dùng', route: 'admin.users.index', icon: 'users', permission: 'admin.users' },
             { label: 'Vai trò', route: 'admin.roles.index', icon: 'role', permission: 'admin.roles' },
             { label: 'Cấu hình', route: 'admin.settings.index', icon: 'settings', permission: 'settings.view' },
-            { label: 'Audit Log', route: 'admin.activity-log.index', icon: 'audit-log', permission: 'admin.audit_log' }
+            { label: 'Audit Log', route: 'admin.activity-log.index', icon: 'audit-log', permission: 'admin.audit_log' },
+            { label: 'Bảng ghi phòng khám', route: 'admin.clinic-records.index', icon: 'audit-log', permission: 'admin.audit_log' }
         ]
     }
 ];
