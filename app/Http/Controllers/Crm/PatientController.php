@@ -143,6 +143,26 @@ class PatientController extends Controller
         $amountPaid  = $invoices->sum('amount_paid');
         $amountDue   = max(0, $totalAmount - $amountPaid);
 
+        // ── Appointments ────────────────────────────────────────────────────
+        $appointments = Appointment::where('patient_id', $patient->id)
+            ->with(['doctor', 'service'])
+            ->orderByDesc('scheduled_at')
+            ->get()
+            ->map(fn ($a) => [
+                'id'               => $a->id,
+                'code'             => $a->code,
+                'scheduled_at'     => $a->scheduled_at->format('d/m/Y H:i'),
+                'scheduled_date'   => $a->scheduled_at->format('d/m/Y'),
+                'scheduled_time'   => $a->scheduled_at->format('H:i'),
+                'duration_minutes' => $a->duration_minutes,
+                'doctor'           => $a->doctor?->full_name ?? '—',
+                'service'          => $a->service?->name ?? '—',
+                'status'           => $a->status->value,
+                'status_label'     => $a->status->label(),
+                'status_color'     => $a->status->color(),
+                'notes'            => $a->notes,
+            ]);
+
         // ── Treatment history (plans + items) ───────────────────────────────
         $treatmentPlans = TreatmentPlan::where('patient_id', $patient->id)
             ->with(['doctor', 'items.service', 'invoices'])
@@ -152,16 +172,25 @@ class PatientController extends Controller
                 $paid = $plan->invoices->sum('amount_paid');
                 $due  = max(0, ($plan->total_amount - $plan->discount_amount) - $paid);
                 return [
-                    'id'           => $plan->id,
-                    'code'         => $plan->code,
-                    'status'       => $plan->status->value,
-                    'status_label' => $plan->status->label(),
-                    'doctor'       => $plan->doctor?->full_name,
-                    'total_amount' => $plan->total_amount - $plan->discount_amount,
-                    'amount_paid'  => $paid,
-                    'amount_due'   => $due,
-                    'created_at'   => $plan->created_at->format('d/m/Y H:i'),
-                    'items'        => $plan->items->map(fn ($item) => [
+                    'id'                 => $plan->id,
+                    'code'               => $plan->code,
+                    'status'             => $plan->status->value,
+                    'status_label'       => $plan->status->label(),
+                    'doctor'             => $plan->doctor?->full_name,
+                    'total_amount'       => $plan->total_amount - $plan->discount_amount,
+                    'amount_paid'        => $paid,
+                    'amount_due'         => $due,
+                    'created_at'         => $plan->created_at->format('d/m/Y H:i'),
+                    'diagnosis'          => $plan->diagnosis,
+                    'chief_complaint'    => $plan->chief_complaint,
+                    'treatment_goal'     => $plan->treatment_goal,
+                    'priority'           => $plan->priority,
+                    'start_date'         => $plan->start_date?->format('d/m/Y'),
+                    'expected_end_date'  => $plan->expected_end_date?->format('d/m/Y'),
+                    'estimated_sessions' => $plan->estimated_sessions,
+                    'frequency'          => $plan->frequency,
+                    'notes'              => $plan->notes,
+                    'items'              => $plan->items->map(fn ($item) => [
                         'id'           => $item->id,
                         'name'         => $item->name,
                         'tooth_number' => $item->tooth_number,
@@ -270,6 +299,7 @@ class PatientController extends Controller
                 'amount_due'   => $amountDue,
             ],
             'treatmentPlans'    => $treatmentPlans,
+            'appointments'      => $appointments,
             'activities'        => $activities,
             'clinicalNotes'     => $clinicalNotes,
             'toothConditions'   => $toothConditions,

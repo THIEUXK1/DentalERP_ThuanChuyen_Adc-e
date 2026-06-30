@@ -1,4 +1,63 @@
 <template>
+    <div class="space-y-4">
+
+    <!-- ── Lịch hẹn ──────────────────────────────────────────────────────── -->
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Lịch hẹn liên quan
+            </h3>
+            <span class="text-xs text-gray-400">{{ appointments.length }} lịch hẹn</span>
+        </div>
+
+        <div v-if="appointments.length === 0" class="flex flex-col items-center justify-center py-8 text-gray-400">
+            <svg class="w-8 h-8 mb-2 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+            </svg>
+            <p class="text-sm">Chưa có lịch hẹn</p>
+        </div>
+
+        <div v-else class="overflow-x-auto">
+            <table class="w-full text-xs">
+                <thead>
+                    <tr class="bg-gray-50 border-b border-gray-100">
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium w-8">#</th>
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium">Mã lịch</th>
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium">Ngày giờ hẹn</th>
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden sm:table-cell">Bác sĩ</th>
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Dịch vụ</th>
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Thời lượng</th>
+                        <th class="px-4 py-2 text-center text-gray-500 font-medium">Trạng thái</th>
+                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden lg:table-cell">Ghi chú</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-50">
+                    <tr v-for="(appt, idx) in appointments" :key="appt.id" class="hover:bg-sky-50/30 transition-colors">
+                        <td class="px-4 py-2 text-gray-400">{{ idx + 1 }}</td>
+                        <td class="px-4 py-2 font-mono text-gray-700 font-medium">{{ appt.code }}</td>
+                        <td class="px-4 py-2">
+                            <p class="font-medium text-gray-800">{{ appt.scheduled_date }}</p>
+                            <p class="text-gray-400">{{ appt.scheduled_time }}</p>
+                        </td>
+                        <td class="px-4 py-2 text-gray-600 hidden sm:table-cell">{{ appt.doctor }}</td>
+                        <td class="px-4 py-2 text-gray-600 hidden md:table-cell">{{ appt.service }}</td>
+                        <td class="px-4 py-2 text-gray-500 hidden md:table-cell">{{ appt.duration_minutes ? appt.duration_minutes + ' phút' : '—' }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', apptStatusClass(appt.status)]">
+                                {{ appt.status_label }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-2 text-gray-400 hidden lg:table-cell max-w-xs truncate">{{ appt.notes || '—' }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ── Kế hoạch điều trị ──────────────────────────────────────────────── -->
     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <!-- Header -->
         <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
@@ -56,8 +115,52 @@
                     </Link>
                 </div>
 
-                <!-- Items table -->
-                <div v-if="expanded.has(plan.id)" class="overflow-x-auto">
+                <!-- Expanded content -->
+                <div v-if="expanded.has(plan.id)">
+                    <!-- Clinical info panel -->
+                    <div class="px-4 py-3 bg-indigo-50/40 border-b border-indigo-100 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-2 text-xs">
+                        <div v-if="plan.chief_complaint">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Lý do khám</p>
+                            <p class="text-gray-800 font-medium">{{ plan.chief_complaint }}</p>
+                        </div>
+                        <div v-if="plan.diagnosis">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Chẩn đoán</p>
+                            <p class="text-gray-800 font-medium">{{ plan.diagnosis }}</p>
+                        </div>
+                        <div v-if="plan.treatment_goal">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Mục tiêu</p>
+                            <p class="text-gray-800 font-medium">{{ plan.treatment_goal }}</p>
+                        </div>
+                        <div v-if="plan.priority">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ưu tiên</p>
+                            <span :class="['inline-flex px-2 py-0.5 rounded-full font-medium', priorityClass(plan.priority)]">
+                                {{ priorityLabel(plan.priority) }}
+                            </span>
+                        </div>
+                        <div v-if="plan.start_date">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Bắt đầu dự kiến</p>
+                            <p class="text-gray-800 font-medium">{{ plan.start_date }}</p>
+                        </div>
+                        <div v-if="plan.expected_end_date">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Hoàn thành dự kiến</p>
+                            <p class="text-gray-800 font-medium">{{ plan.expected_end_date }}</p>
+                        </div>
+                        <div v-if="plan.estimated_sessions">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Số buổi</p>
+                            <p class="text-gray-800 font-medium">{{ plan.estimated_sessions }} buổi</p>
+                        </div>
+                        <div v-if="plan.frequency">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Tần suất</p>
+                            <p class="text-gray-800 font-medium">{{ plan.frequency }}</p>
+                        </div>
+                        <div v-if="plan.notes" class="col-span-2 sm:col-span-3 lg:col-span-4">
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ghi chú</p>
+                            <p class="text-gray-700">{{ plan.notes }}</p>
+                        </div>
+                    </div>
+
+                    <!-- Items table -->
+                    <div class="overflow-x-auto">
                     <table class="w-full text-xs">
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-100">
@@ -71,6 +174,9 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
+                            <tr v-if="plan.items.length === 0">
+                                <td colspan="7" class="px-4 py-4 text-center text-gray-400">Chưa có dịch vụ</td>
+                            </tr>
                             <tr v-for="(item, ii) in plan.items" :key="item.id"
                                 class="hover:bg-blue-50/30 transition-colors">
                                 <td class="px-4 py-2 text-gray-400">{{ ii + 1 }}</td>
@@ -95,16 +201,19 @@
                                 </td>
                             </tr>
                             <!-- Row total -->
-                            <tr class="bg-gray-50 border-t border-gray-200">
+                            <tr v-if="plan.items.length > 0" class="bg-gray-50 border-t border-gray-200">
                                 <td colspan="5" class="px-4 py-2 text-right text-gray-500 text-xs font-medium">Tổng kế hoạch:</td>
                                 <td class="px-4 py-2 text-right tabular-nums font-bold text-gray-900">{{ fmt(plan.total_amount) }}</td>
                                 <td></td>
                             </tr>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </div>
+    </div>
+
     </div>
 </template>
 
@@ -114,6 +223,7 @@ import { Link } from '@inertiajs/vue3';
 
 const props = defineProps({
     treatmentPlans: { type: Array, default: () => [] },
+    appointments:   { type: Array, default: () => [] },
 });
 
 // First plan auto-expanded
@@ -148,6 +258,28 @@ function itemStatusClass(status) {
         in_progress:'bg-amber-100 text-amber-700',
         completed:  'bg-emerald-100 text-emerald-700',
         cancelled:  'bg-red-100 text-red-600',
+    };
+    return map[status] ?? 'bg-gray-100 text-gray-600';
+}
+
+function priorityLabel(p) {
+    return { normal: 'Bình thường', urgent: 'Cần xử lý sớm', emergency: 'Cấp cứu' }[p] ?? p;
+}
+
+function priorityClass(p) {
+    return { normal: 'bg-gray-100 text-gray-600', urgent: 'bg-amber-100 text-amber-700', emergency: 'bg-red-100 text-red-700' }[p] ?? 'bg-gray-100 text-gray-600';
+}
+
+function apptStatusClass(status) {
+    const map = {
+        booked:       'bg-gray-100 text-gray-600',
+        confirmed:    'bg-blue-100 text-blue-700',
+        checked_in:   'bg-teal-100 text-teal-700',
+        in_treatment: 'bg-indigo-100 text-indigo-700',
+        completed:    'bg-emerald-100 text-emerald-700',
+        cancelled:    'bg-red-100 text-red-600',
+        no_show:      'bg-orange-100 text-orange-700',
+        rescheduled:  'bg-yellow-100 text-yellow-700',
     };
     return map[status] ?? 'bg-gray-100 text-gray-600';
 }

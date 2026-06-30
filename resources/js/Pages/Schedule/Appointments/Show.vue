@@ -79,15 +79,56 @@
                                 <dt class="text-xs text-gray-400 mb-0.5">Chi nhánh</dt>
                                 <dd class="text-gray-800">{{ appointment.branch || '—' }}</dd>
                             </div>
-                            <div class="sm:col-span-2" v-if="appointment.notes">
-                                <dt class="text-xs text-gray-400 mb-0.5">Ghi chú</dt>
-                                <dd class="text-gray-800 whitespace-pre-wrap">{{ appointment.notes }}</dd>
-                            </div>
                             <div class="sm:col-span-2" v-if="appointment.cancel_reason">
                                 <dt class="text-xs text-red-400 mb-0.5">Lý do hủy</dt>
                                 <dd class="text-red-600">{{ appointment.cancel_reason }}</dd>
                             </div>
                         </dl>
+                    </div>
+
+                    <!-- Ghi chú -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-5">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                </svg>
+                                Ghi chú
+                            </h3>
+                            <button v-if="!editingNotes && can('appointments.manage')"
+                                @click="startEditNotes"
+                                class="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/>
+                                </svg>
+                                Chỉnh sửa
+                            </button>
+                        </div>
+
+                        <!-- View mode -->
+                        <div v-if="!editingNotes">
+                            <p v-if="appointment.notes" class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed bg-amber-50 rounded-lg px-4 py-3 border border-amber-100">{{ appointment.notes }}</p>
+                            <p v-else class="text-sm text-gray-400 italic">Chưa có ghi chú nào. Nhấn "Chỉnh sửa" để thêm.</p>
+                        </div>
+
+                        <!-- Edit mode -->
+                        <div v-else class="space-y-3">
+                            <textarea v-model="notesForm.notes" rows="5" autofocus
+                                placeholder="Nhập ghi chú cho lịch hẹn này..."
+                                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none leading-relaxed"
+                            ></textarea>
+                            <div class="flex items-center gap-2 justify-end">
+                                <button @click="cancelEditNotes" class="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Hủy</button>
+                                <button @click="saveNotes" :disabled="notesForm.processing"
+                                    class="px-4 py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5">
+                                    <svg v-if="notesForm.processing" class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                                    </svg>
+                                    Lưu ghi chú
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -164,6 +205,7 @@ import { usePermission } from '@/composables/usePermission';
 const { hasPermission: can } = usePermission();
 const props = defineProps({ appointment: Object, transitions: Array });
 
+// ── Transitions ─────────────────────────────────────────────────
 const showCancel = ref(false);
 const cancelForm = useForm({ status: 'cancelled', cancel_reason: '' });
 
@@ -171,10 +213,27 @@ function doTransition(status) {
     if (status === 'cancelled') { showCancel.value = true; return; }
     router.post(route('schedule.appointments.transition', props.appointment.id), { status });
 }
-
 function submitCancel() {
     cancelForm.post(route('schedule.appointments.transition', props.appointment.id), {
         onSuccess: () => { showCancel.value = false; },
+    });
+}
+
+// ── Notes ────────────────────────────────────────────────────────
+const editingNotes = ref(false);
+const notesForm = useForm({ notes: props.appointment.notes ?? '' });
+
+function startEditNotes() {
+    notesForm.notes = props.appointment.notes ?? '';
+    editingNotes.value = true;
+}
+function cancelEditNotes() {
+    editingNotes.value = false;
+}
+function saveNotes() {
+    notesForm.patch(route('schedule.appointments.update-notes', props.appointment.id), {
+        preserveScroll: true,
+        onSuccess: () => { editingNotes.value = false; },
     });
 }
 </script>

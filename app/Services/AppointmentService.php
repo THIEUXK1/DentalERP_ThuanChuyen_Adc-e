@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 class AppointmentService
 {
-    private array $terminalStatuses = ['cancelled', 'no_show', 'completed'];
+    private array $terminalStatuses = ['cancelled', 'no_show', 'completed', 'arrived_early', 'checked_in', 'arrived_late'];
 
     public function checkConflict(array $data, ?int $ignoreId = null): void
     {

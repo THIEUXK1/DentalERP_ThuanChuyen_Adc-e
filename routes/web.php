@@ -241,6 +241,8 @@ Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(functi
         ->name('appointments.transition')->middleware('can:appointments.manage');
     Route::patch('appointments/{appointment}/quick-reschedule', [AppointmentController::class, 'quickReschedule'])
         ->name('appointments.quick-reschedule')->middleware('can:appointments.manage');
+    Route::patch('appointments/{appointment}/notes', [AppointmentController::class, 'updateNotes'])
+        ->name('appointments.update-notes')->middleware('can:appointments.manage');
 });
 
 // Core

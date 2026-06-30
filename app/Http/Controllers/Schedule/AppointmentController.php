@@ -132,6 +132,15 @@ class AppointmentController extends Controller
         return back()->with('success', "Đã rời lịch hẹn {$appointment->code}.");
     }
 
+    public function updateNotes(Request $request, Appointment $appointment): RedirectResponse
+    {
+        $this->authorize('appointments.manage');
+        $data = $request->validate(['notes' => 'nullable|string|max:2000']);
+        $appointment->update(['notes' => $data['notes'] ?? null]);
+
+        return back()->with('success', 'Đã lưu ghi chú.');
+    }
+
     public function transition(Request $request, Appointment $appointment): RedirectResponse
     {
         $this->authorize('appointments.manage');

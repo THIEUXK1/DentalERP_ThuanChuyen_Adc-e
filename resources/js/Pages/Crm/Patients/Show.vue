@@ -1,6 +1,6 @@
 <template>
     <AppLayout :title="`KH: ${patient.full_name}`">
-        <div class="max-w-5xl space-y-3">
+        <div class="space-y-3">
 
             <!-- ── Header ───────────────────────────────────────────────────── -->
             <div class="bg-white rounded-xl border border-gray-200 px-5 py-4 space-y-3">
@@ -165,6 +165,7 @@
             <TreatmentHistoryTab
                 v-if="activeTab === 'treatment'"
                 :treatment-plans="treatmentPlans"
+                :appointments="appointments"
             />
 
             <!-- ── Tab: Sơ đồ răng ───────────────────────────────────────────── -->
@@ -242,6 +243,7 @@ const props = defineProps({
     patient:            Object,
     financial:          Object,
     treatmentPlans:     Array,
+    appointments:       Array,
     activities:         Array,
     clinicalNotes:      Array,
     toothConditions:    Array,
@@ -272,7 +274,7 @@ const actForm      = useForm({ type: 'note', content: '', patient_id: props.pati
 
 const tabs = computed(() => [
     { key: 'info',         label: 'Thông tin' },
-    { key: 'treatment',    label: 'Điều trị', count: props.treatmentPlans?.length ?? 0 },
+    { key: 'treatment',    label: 'Điều trị', count: (props.treatmentPlans?.length ?? 0) + (props.appointments?.length ?? 0) },
     { key: 'chart',        label: 'Sơ đồ răng' },
     { key: 'clinical',     label: 'Lâm sàng', count: props.clinicalNotes?.length ?? 0 },
     { key: 'attachments',  label: 'Tài liệu', count: props.attachments?.length ?? 0 },
