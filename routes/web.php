@@ -83,6 +83,7 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function () {
     Route::get('revenue', [ReportController::class, 'revenue'])->name('revenue')->middleware('can:reports.financial');
     Route::get('appointments', [ReportController::class, 'appointments'])->name('appointments')->middleware('can:reports.view');
+    Route::get('daily-schedule', [ReportController::class, 'dailySchedule'])->name('daily-schedule')->middleware('can:reports.view');
     Route::get('debt', [ReportController::class, 'debt'])->name('debt')->middleware('can:reports.financial');
     Route::get('crm', [ReportController::class, 'crm'])->name('crm')->middleware('can:reports.view');
     Route::get('profit-loss', [ReportController::class, 'profitLoss'])->name('profit-loss')->middleware('can:reports.financial');

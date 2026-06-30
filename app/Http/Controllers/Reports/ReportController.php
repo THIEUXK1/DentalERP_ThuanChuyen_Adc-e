@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Reports;
 
+use App\Enums\AppointmentStatus;
 use App\Http\Controllers\Controller;
+use App\Models\Appointment;
 use App\Models\Branch;
+use App\Models\Employee;
 use App\Models\FundAccount;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
@@ -53,6 +56,60 @@ class ReportController extends Controller
             'total' => array_sum(array_column($rows, 'count')),
             'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'filters' => compact('from', 'to', 'branchId'),
+        ]);
+    }
+
+    public function dailySchedule(Request $request): Response
+    {
+        $this->authorize('reports.view');
+
+        $date     = $request->date     ?? now()->toDateString();
+        $branchId = $request->branch_id ? (int) $request->branch_id : null;
+        $doctorId = $request->doctor_id ? (int) $request->doctor_id : null;
+        $status   = $request->status ?? null;
+
+        $apts = Appointment::with(['patient', 'doctor', 'service', 'chair'])
+            ->whereBetween('scheduled_at', [$date.' 00:00:00', $date.' 23:59:59'])
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($doctorId, fn ($q) => $q->where('doctor_id', $doctorId))
+            ->when($status,   fn ($q) => $q->where('status', $status))
+            ->orderBy('doctor_id')
+            ->orderBy('scheduled_at')
+            ->get()
+            ->map(fn ($a) => [
+                'id'               => $a->id,
+                'code'             => $a->code,
+                'patient'          => $a->patient?->full_name ?? '—',
+                'patient_phone'    => $a->patient?->phone ?? '',
+                'doctor'           => $a->doctor?->full_name ?? 'Chưa gán',
+                'doctor_id'        => $a->doctor_id,
+                'service'          => $a->service?->name ?? '—',
+                'chair'            => $a->chair?->name ?? '—',
+                'scheduled_at'     => $a->scheduled_at->format('H:i'),
+                'ends_at'          => $a->ends_at->format('H:i'),
+                'duration_minutes' => $a->duration_minutes,
+                'status'           => $a->status->value,
+                'status_label'     => $a->status->label(),
+                'notes'            => $a->notes ?? '',
+            ]);
+
+        // Group by doctor
+        $byDoctor = $apts->groupBy('doctor')->map(fn ($rows, $name) => [
+            'name'  => $name,
+            'rows'  => $rows->values()->all(),
+            'total' => $rows->count(),
+        ])->values()->all();
+
+        return Inertia::render('Reports/DailySchedule', [
+            'byDoctor' => $byDoctor,
+            'total'    => $apts->count(),
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get()
+                ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'doctors'  => Employee::doctors()->where('is_active', true)->orderBy('full_name')->get()
+                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+            'statuses' => collect(AppointmentStatus::cases())
+                ->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            'filters'  => compact('date', 'branchId', 'doctorId', 'status'),
         ]);
     }
 
