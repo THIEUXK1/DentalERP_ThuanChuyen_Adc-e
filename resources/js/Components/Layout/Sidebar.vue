@@ -35,16 +35,25 @@ defineProps({ collapsed: Boolean });
 defineEmits(['toggle']);
 
 const navEl = ref(null);
-let savedScroll = 0;
+const SCROLL_KEY = 'sb_nav_scroll';
 
 onMounted(() => {
-    const off1 = router.on('before', () => {
-        savedScroll = navEl.value?.scrollTop ?? 0;
-    });
-    const off2 = router.on('navigate', () => {
-        if (navEl.value) navEl.value.scrollTop = savedScroll;
-    });
-    onUnmounted(() => { off1(); off2(); });
+    const saved = parseInt(sessionStorage.getItem(SCROLL_KEY) || '0', 10);
+    if (saved && navEl.value) navEl.value.scrollTop = saved;
+});
+
+const stopBefore = router.on('before', () => {
+    if (navEl.value) sessionStorage.setItem(SCROLL_KEY, String(navEl.value.scrollTop));
+});
+
+const stopNavigate = router.on('navigate', () => {
+    const saved = parseInt(sessionStorage.getItem(SCROLL_KEY) || '0', 10);
+    if (navEl.value) navEl.value.scrollTop = saved;
+});
+
+onUnmounted(() => {
+    stopBefore();
+    stopNavigate();
 });
 
 const { hasPermission: can, hasAnyRole } = usePermission();
