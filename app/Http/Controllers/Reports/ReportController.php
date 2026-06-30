@@ -63,22 +63,29 @@ class ReportController extends Controller
     {
         $this->authorize('reports.view');
 
-        $date     = $request->date     ?? now()->toDateString();
+        $today    = now()->toDateString();
+        $from     = $request->from     ?? ($request->date ?? $today);
+        $to       = $request->to       ?? $from;
         $branchId = $request->branch_id ? (int) $request->branch_id : null;
         $doctorId = $request->doctor_id ? (int) $request->doctor_id : null;
-        $status   = $request->status ?? null;
+        $status   = $request->status   ?? null;
+
+        // Cap range to 90 days to avoid memory issues
+        if ($to < $from) $to = $from;
 
         $apts = Appointment::with(['patient', 'doctor', 'service', 'chair'])
-            ->whereBetween('scheduled_at', [$date.' 00:00:00', $date.' 23:59:59'])
+            ->whereBetween('scheduled_at', [$from.' 00:00:00', $to.' 23:59:59'])
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($doctorId, fn ($q) => $q->where('doctor_id', $doctorId))
             ->when($status,   fn ($q) => $q->where('status', $status))
-            ->orderBy('doctor_id')
             ->orderBy('scheduled_at')
+            ->orderBy('doctor_id')
             ->get()
             ->map(fn ($a) => [
                 'id'               => $a->id,
                 'code'             => $a->code,
+                'date'             => $a->scheduled_at->format('Y-m-d'),
+                'date_label'       => $a->scheduled_at->format('d/m/Y'),
                 'patient'          => $a->patient?->full_name ?? '—',
                 'patient_phone'    => $a->patient?->phone ?? '',
                 'doctor'           => $a->doctor?->full_name ?? 'Chưa gán',
@@ -93,15 +100,35 @@ class ReportController extends Controller
                 'notes'            => $a->notes ?? '',
             ]);
 
-        // Group by doctor
-        $byDoctor = $apts->groupBy('doctor')->map(fn ($rows, $name) => [
-            'name'  => $name,
-            'rows'  => $rows->values()->all(),
-            'total' => $rows->count(),
-        ])->values()->all();
+        $isRange = $from !== $to;
+
+        if ($isRange) {
+            // Group by date → then by doctor within each date
+            $byDate = $apts->groupBy('date')->map(fn ($dateRows, $date) => [
+                'date'       => $date,
+                'date_label' => $dateRows->first()['date_label'],
+                'total'      => $dateRows->count(),
+                'byDoctor'   => $dateRows->groupBy('doctor')->map(fn ($rows, $name) => [
+                    'name'  => $name,
+                    'rows'  => $rows->values()->all(),
+                    'total' => $rows->count(),
+                ])->values()->all(),
+            ])->values()->all();
+            $byDoctor = null;
+        } else {
+            // Single day: group by doctor only
+            $byDate = null;
+            $byDoctor = $apts->groupBy('doctor')->map(fn ($rows, $name) => [
+                'name'  => $name,
+                'rows'  => $rows->values()->all(),
+                'total' => $rows->count(),
+            ])->values()->all();
+        }
 
         return Inertia::render('Reports/DailySchedule', [
             'byDoctor' => $byDoctor,
+            'byDate'   => $byDate,
+            'isRange'  => $isRange,
             'total'    => $apts->count(),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
@@ -109,7 +136,7 @@ class ReportController extends Controller
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
             'statuses' => collect(AppointmentStatus::cases())
                 ->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-            'filters'  => compact('date', 'branchId', 'doctorId', 'status'),
+            'filters'  => compact('from', 'to', 'branchId', 'doctorId', 'status'),
         ]);
     }
 
