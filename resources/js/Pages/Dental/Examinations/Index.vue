@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="Phiếu khám & Chẩn đoán">
-        <div class="max-w-7xl mx-auto p-6 space-y-4">
+        <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <h1 class="text-xl font-bold text-gray-800">Phiếu khám & Chẩn đoán</h1>
                 <a :href="route('dental.examinations.create')"

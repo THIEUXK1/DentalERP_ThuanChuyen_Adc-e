@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="Quy tắc CSKH">
-        <div class="max-w-4xl space-y-4">
+        <div class="space-y-4">
             <div class="flex items-center justify-between">
                 <h1 class="text-lg font-semibold text-gray-800">Quy tắc chăm sóc khách hàng</h1>
                 <button @click="openCreate" class="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700">

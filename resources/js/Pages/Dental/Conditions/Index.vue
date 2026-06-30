@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="Danh mục bệnh/vấn đề răng miệng">
-        <div class="max-w-6xl mx-auto p-6 space-y-4">
+        <div class="space-y-4">
             <!-- Header -->
             <div class="flex items-center justify-between">
                 <h1 class="text-xl font-bold text-gray-800">Danh mục bệnh/vấn đề răng miệng</h1>

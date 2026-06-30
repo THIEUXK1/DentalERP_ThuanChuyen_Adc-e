@@ -131,6 +131,7 @@ import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { router, usePage } from '@inertiajs/vue3';
 import { useTabs } from '@/composables/useTabs';
 import { restorePage } from '@/composables/usePageCache';
+import { saveScroll, restoreScroll } from '@/composables/useScrollRestore';
 
 const { tabs, closeTab, pinTab, closeAllTabs } = useTabs();
 
@@ -163,10 +164,15 @@ watch(tabs, async () => {
 }, { deep: true });
 onMounted(() => nextTick().then(checkScroll));
 
-// ── Tab click — use cached page if available, else normal navigation ─
+// ── Tab click — save scroll, use cached page if available, else normal navigation ─
 function clickTab(tab) {
     if (isActive(tab)) return;
-    if (!restorePage(tab.url)) router.visit(tab.url);
+    saveScroll(page.url);
+    if (!restorePage(tab.url)) {
+        router.visit(tab.url, { onSuccess: () => nextTick(() => restoreScroll(tab.url)) });
+    } else {
+        nextTick(() => restoreScroll(tab.url));
+    }
 }
 
 // ── 3 dots menu ───────────────────────────────────────────────

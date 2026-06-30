@@ -1,6 +1,6 @@
 <template>
     <AppLayout title="KPI Chuyên môn Nha khoa">
-        <div class="max-w-7xl mx-auto p-6 space-y-4">
+        <div class="space-y-4">
             <h1 class="text-xl font-bold text-gray-800">KPI Chuyên môn Nha khoa</h1>
 
             <!-- Summary cards -->
