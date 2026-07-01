@@ -361,15 +361,33 @@
                         <div v-if="schedule.length === 0" class="text-xs text-gray-400 text-center py-3">Chưa có lịch thanh toán</div>
                         <div v-else class="space-y-2">
                             <div v-for="(inst, idx) in schedule" :key="idx"
-                                class="flex items-start justify-between text-xs p-2 rounded-lg bg-gray-50">
-                                <div>
-                                    <p class="text-gray-700 font-medium">{{ inst.due_date }}</p>
-                                    <p v-if="inst.note" class="text-gray-400 mt-0.5">{{ inst.note }}</p>
-                                </div>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="font-bold text-indigo-700 tabular-nums">{{ formatVnd(inst.amount) }}</span>
-                                    <button v-if="!isScheduleLocked" @click="removeInstallment(idx)"
-                                        class="text-gray-300 hover:text-red-500 ml-1">✕</button>
+                                :class="['text-xs p-2 rounded-lg border', instInvoice(idx)?.locked ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-transparent']">
+                                <div class="flex items-start justify-between">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span class="text-gray-500 font-medium">Đợt {{ idx + 1 }}</span>
+                                            <span v-if="instInvoice(idx)" :class="[
+                                                'px-1.5 py-0.5 rounded-full font-semibold text-[10px]',
+                                                instInvoice(idx).status === 'paid' ? 'bg-emerald-100 text-emerald-700' :
+                                                instInvoice(idx).status === 'partial_paid' ? 'bg-amber-100 text-amber-700' :
+                                                'bg-gray-100 text-gray-500'
+                                            ]">{{ instInvoice(idx).status_label }}</span>
+                                        </div>
+                                        <p class="text-gray-700 font-medium mt-0.5">{{ inst.due_date || 'Chưa có ngày' }}</p>
+                                        <p v-if="inst.note" class="text-gray-400 mt-0.5">{{ inst.note }}</p>
+                                        <p v-if="instInvoice(idx)?.locked" class="text-emerald-600 mt-0.5 font-medium">
+                                            Đã thu: {{ formatVnd(instInvoice(idx).amount_paid) }}
+                                        </p>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 ml-2 flex-shrink-0">
+                                        <span class="font-bold text-indigo-700 tabular-nums">{{ formatVnd(inst.amount) }}</span>
+                                        <button v-if="!isScheduleLocked && !instInvoice(idx)?.locked"
+                                            @click="removeInstallment(idx)"
+                                            class="text-gray-300 hover:text-red-500 ml-1">✕</button>
+                                        <span v-else-if="instInvoice(idx)?.locked"
+                                            title="Đã có thanh toán, không thể xóa"
+                                            class="text-emerald-400 ml-1 cursor-not-allowed">🔒</span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="border-t pt-2 flex justify-between text-xs font-bold">
@@ -652,6 +670,11 @@ const showScheduleForm = ref(false);
 const newInst          = ref({ due_date: '', amount: '', note: '' });
 const isScheduleLocked = computed(() => ['completed', 'cancelled'].includes(props.plan.status));
 const scheduleTotal    = computed(() => schedule.value.reduce((s, i) => s + (parseInt(i.amount) || 0), 0));
+
+// Returns invoice info for a given installment index (null if not yet invoiced)
+function instInvoice(idx) {
+    return props.plan.installment_invoice_map?.[idx] ?? null;
+}
 
 // Auto-fill unit price when service selected
 function onServiceChange() {

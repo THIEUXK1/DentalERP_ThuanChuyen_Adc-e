@@ -108,7 +108,8 @@
                             <th class="px-4 py-3 text-left font-medium">Khách hàng</th>
                             <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Bác sĩ</th>
                             <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Chi nhánh</th>
-                            <th class="px-4 py-3 text-right font-medium">Tổng tiền</th>
+                            <th class="px-4 py-3 text-right font-medium">Giá trị KH</th>
+                            <th class="px-4 py-3 text-right font-medium hidden xl:table-cell">Lịch thanh toán</th>
                             <th class="px-4 py-3 text-left font-medium">Trạng thái</th>
                             <th class="px-4 py-3 text-left font-medium hidden md:table-cell">Ngày tạo</th>
                             <th class="px-4 py-3 text-right font-medium w-16"></th>
@@ -124,7 +125,16 @@
                             </td>
                             <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ p.doctor }}</td>
                             <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ p.branch }}</td>
-                            <td class="px-4 py-3 text-right font-medium text-gray-800 whitespace-nowrap">{{ formatVnd(p.net_total) }}</td>
+                            <td class="px-4 py-3 text-right whitespace-nowrap">
+                                <span class="font-medium text-gray-800">{{ formatVnd(p.net_total) }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-right hidden xl:table-cell whitespace-nowrap">
+                                <template v-if="p.payment_schedule_count > 0">
+                                    <span class="font-semibold text-emerald-700">{{ formatVnd(p.payment_schedule_total) }}</span>
+                                    <span class="ml-1 text-xs text-gray-400">({{ p.payment_schedule_count }} đợt)</span>
+                                </template>
+                                <span v-else class="text-gray-300 text-xs">—</span>
+                            </td>
                             <td class="px-4 py-3">
                                 <StatusBadge :color="p.status_color">{{ p.status_label }}</StatusBadge>
                             </td>
@@ -160,9 +170,18 @@
                     <p v-if="p.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 truncate">
                         📝 {{ p.notes }}
                     </p>
-                    <div class="flex items-center justify-between mt-auto pt-2 border-t border-gray-100">
-                        <span class="text-sm font-semibold text-primary-700">{{ formatVnd(p.net_total) }}</span>
-                        <span class="text-xs text-gray-400">{{ p.created_at }}</span>
+                    <div class="mt-auto pt-2 border-t border-gray-100 space-y-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-gray-400">Giá trị KH</span>
+                            <span class="text-sm font-semibold text-primary-700">{{ formatVnd(p.net_total) }}</span>
+                        </div>
+                        <div v-if="p.payment_schedule_count > 0" class="flex items-center justify-between">
+                            <span class="text-xs text-gray-400">Lịch TT ({{ p.payment_schedule_count }} đợt)</span>
+                            <span class="text-sm font-semibold text-emerald-600">{{ formatVnd(p.payment_schedule_total) }}</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-gray-400">{{ p.created_at }}</span>
+                        </div>
                     </div>
                 </Link>
             </div>

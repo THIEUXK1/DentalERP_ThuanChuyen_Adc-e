@@ -12,7 +12,7 @@ class PatientInvoice extends Model
     use LogsActivity;
 
     protected $fillable = [
-        'code', 'patient_id', 'treatment_plan_id', 'branch_id',
+        'code', 'patient_id', 'treatment_plan_id', 'installment_index', 'branch_id',
         'status', 'subtotal', 'discount', 'total', 'amount_paid',
         'due_date', 'notes', 'created_by',
     ];

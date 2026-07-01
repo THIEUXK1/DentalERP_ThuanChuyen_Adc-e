@@ -22,12 +22,12 @@ class PatientInvoiceController extends Controller
     {
         $this->authorize('cashier.view');
 
-        $query = PatientInvoice::with(['patient', 'branch'])
+        $query = PatientInvoice::with(['patient', 'branch', 'treatmentPlan'])
             ->when($request->search, fn ($q, $v) => $q->whereHas('patient', fn ($pq) => $pq->where('full_name', 'ilike', "%{$v}%")->orWhere('phone', 'ilike', "%{$v}%")))
             ->when($request->status, fn ($q, $v) => $q->where('status', $v))
             ->when($request->branch_id, fn ($q, $v) => $q->where('branch_id', $v))
             ->when($request->patient_id, fn ($q, $v) => $q->where('patient_id', $v))
-            ->orderByDesc('id');
+            ->orderByRaw('due_date ASC NULLS LAST, id DESC');
 
         $selectedPatient = null;
         if ($request->patient_id) {
@@ -36,18 +36,22 @@ class PatientInvoiceController extends Controller
 
         return Inertia::render('Cashier/Invoices/Index', [
             'invoices' => $query->paginate(20)->through(fn ($inv) => [
-                'id' => $inv->id,
-                'code' => $inv->code,
-                'patient' => $inv->patient->full_name,
-                'patient_id' => $inv->patient_id,
-                'branch' => $inv->branch->name,
-                'status' => $inv->status->value,
-                'status_label' => $inv->status->label(),
-                'status_color' => $inv->status->color(),
-                'total' => $inv->total,
-                'amount_paid' => $inv->amount_paid,
-                'amount_due' => $inv->amountDue(),
-                'created_at' => $inv->created_at->format('d/m/Y'),
+                'id'                => $inv->id,
+                'code'              => $inv->code,
+                'patient'           => $inv->patient->full_name,
+                'patient_id'        => $inv->patient_id,
+                'branch'            => $inv->branch->name,
+                'status'            => $inv->status->value,
+                'status_label'      => $inv->status->label(),
+                'status_color'      => $inv->status->color(),
+                'total'             => $inv->total,
+                'amount_paid'       => $inv->amount_paid,
+                'amount_due'        => $inv->amountDue(),
+                'due_date'          => $inv->due_date?->format('d/m/Y'),
+                'due_date_raw'      => $inv->due_date?->toDateString(),
+                'installment_index' => $inv->installment_index,
+                'treatment_plan_code' => $inv->treatmentPlan?->code,
+                'created_at'        => $inv->created_at->format('d/m/Y'),
             ]),
             'selected_patient' => $selectedPatient ? [
                 'id' => $selectedPatient->id,
