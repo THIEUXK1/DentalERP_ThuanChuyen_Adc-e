@@ -268,6 +268,28 @@ class PatientController extends Controller
         $amountPaid  = $invoices->sum('amount_paid');
         $amountDue   = max(0, $totalAmount - $amountPaid);
 
+        // ── Invoice list for tab ────────────────────────────────────────────
+        $patientInvoices = PatientInvoice::where('patient_id', $patient->id)
+            ->with(['treatmentPlan'])
+            ->orderByRaw('due_date ASC NULLS LAST, id DESC')
+            ->get()
+            ->map(fn ($inv) => [
+                'id'                => $inv->id,
+                'code'              => $inv->code,
+                'status'            => $inv->status->value,
+                'status_label'      => $inv->status->label(),
+                'status_color'      => $inv->status->color(),
+                'total'             => $inv->total,
+                'amount_paid'       => $inv->amount_paid,
+                'amount_due'        => $inv->amountDue(),
+                'due_date'          => $inv->due_date?->format('d/m/Y'),
+                'due_date_raw'      => $inv->due_date?->toDateString(),
+                'installment_index' => $inv->installment_index,
+                'plan_id'           => $inv->treatment_plan_id,
+                'plan_code'         => $inv->treatmentPlan?->code,
+                'created_at'        => $inv->created_at->format('d/m/Y'),
+            ]);
+
         // ── Appointments ────────────────────────────────────────────────────
         $appointments = Appointment::where('patient_id', $patient->id)
             ->with(['doctor', 'service'])
@@ -423,6 +445,7 @@ class PatientController extends Controller
                 'amount_paid'  => $amountPaid,
                 'amount_due'   => $amountDue,
             ],
+            'invoices'          => $patientInvoices,
             'treatmentPlans'    => $treatmentPlans,
             'appointments'      => $appointments,
             'pendingDeletions'  => $this->pendingDeletionsMap($patient),

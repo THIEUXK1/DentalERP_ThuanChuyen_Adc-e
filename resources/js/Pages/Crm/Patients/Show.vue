@@ -161,6 +161,114 @@
                 </div>
             </template>
 
+            <!-- ── Tab: Hóa đơn ──────────────────────────────────────────────── -->
+            <div v-if="activeTab === 'invoices'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                    <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                        </svg>
+                        Danh sách hóa đơn
+                    </h3>
+                    <div class="flex items-center gap-3">
+                        <span class="text-xs text-gray-400">{{ invoices.length }} hóa đơn</span>
+                        <Link :href="route('cashier.invoices.index', { patient_id: patient.id })"
+                            class="text-xs text-indigo-600 hover:text-indigo-800 font-medium hover:underline">
+                            Xem tất cả →
+                        </Link>
+                    </div>
+                </div>
+
+                <!-- Empty state -->
+                <div v-if="invoices.length === 0" class="text-center py-12 text-gray-400">
+                    <svg class="w-10 h-10 mx-auto mb-2 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    </svg>
+                    <p class="text-sm">Chưa có hóa đơn nào</p>
+                </div>
+
+                <!-- Invoice table -->
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50/60 text-gray-500 text-xs border-b border-gray-100">
+                            <tr>
+                                <th class="px-4 py-2.5 text-left font-medium">Mã HĐ</th>
+                                <th class="px-4 py-2.5 text-left font-medium">Kế hoạch</th>
+                                <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ngày</th>
+                                <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Đến hạn</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Tổng tiền</th>
+                                <th class="px-4 py-2.5 text-right font-medium hidden md:table-cell">Đã TT</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Còn nợ</th>
+                                <th class="px-4 py-2.5 text-left font-medium">Trạng thái</th>
+                                <th class="px-4 py-2.5 w-10"></th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            <tr v-for="inv in invoices" :key="inv.id"
+                                :class="['hover:bg-gray-50 transition-colors', inv.status === 'cancelled' ? 'opacity-60' : '']">
+                                <td class="px-4 py-2.5">
+                                    <span class="font-mono text-xs text-gray-500">{{ inv.code }}</span>
+                                    <span v-if="inv.installment_index !== null && inv.installment_index !== undefined"
+                                        class="ml-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">
+                                        Đợt {{ inv.installment_index + 1 }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5">
+                                    <Link v-if="inv.plan_id"
+                                        :href="route('clinical.treatment-plans.show', inv.plan_id)"
+                                        class="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline">
+                                        {{ inv.plan_code }}
+                                    </Link>
+                                    <span v-else class="text-gray-300 text-xs">—</span>
+                                </td>
+                                <td class="px-4 py-2.5 text-xs text-gray-400 hidden sm:table-cell">{{ inv.created_at }}</td>
+                                <td class="px-4 py-2.5 text-xs hidden md:table-cell"
+                                    :class="inv.due_date_raw && inv.due_date_raw < new Date().toISOString().split('T')[0] && inv.amount_due > 0 ? 'text-red-600 font-medium' : 'text-gray-400'">
+                                    {{ inv.due_date ?? '—' }}
+                                </td>
+                                <td class="px-4 py-2.5 text-right font-medium text-gray-800 tabular-nums">{{ formatVnd(inv.total) }}</td>
+                                <td class="px-4 py-2.5 text-right text-emerald-600 tabular-nums hidden md:table-cell">{{ formatVnd(inv.amount_paid) }}</td>
+                                <td class="px-4 py-2.5 text-right tabular-nums"
+                                    :class="inv.amount_due > 0 ? 'text-red-600 font-semibold' : 'text-gray-300'">
+                                    {{ formatVnd(inv.amount_due) }}
+                                </td>
+                                <td class="px-4 py-2.5">
+                                    <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                                        inv.status === 'cancelled' ? 'bg-gray-100 text-gray-500' :
+                                        inv.amount_due <= 0 ? 'bg-emerald-100 text-emerald-700' :
+                                        'bg-red-100 text-red-700']">
+                                        {{ inv.status === 'cancelled' ? 'Đã hủy' : inv.amount_due <= 0 ? 'Thanh toán đủ' : 'Còn nợ' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5 text-right">
+                                    <Link :href="route('cashier.invoices.show', inv.id)"
+                                        class="text-xs text-indigo-500 hover:text-indigo-700 font-medium hover:underline whitespace-nowrap">
+                                        Xem →
+                                    </Link>
+                                </td>
+                            </tr>
+                        </tbody>
+                        <!-- Summary footer -->
+                        <tfoot class="border-t-2 border-gray-200 bg-gray-50">
+                            <tr>
+                                <td colspan="4" class="px-4 py-2.5 text-xs text-gray-500 font-medium hidden md:table-cell">Tổng cộng</td>
+                                <td colspan="2" class="px-4 py-2.5 text-xs text-gray-500 font-medium md:hidden">Tổng cộng</td>
+                                <td class="px-4 py-2.5 text-right font-bold text-gray-800 tabular-nums">
+                                    {{ formatVnd(invoices.filter(i => i.status !== 'cancelled').reduce((s, i) => s + i.total, 0)) }}
+                                </td>
+                                <td class="px-4 py-2.5 text-right text-emerald-700 font-bold tabular-nums hidden md:table-cell">
+                                    {{ formatVnd(invoices.filter(i => i.status !== 'cancelled').reduce((s, i) => s + i.amount_paid, 0)) }}
+                                </td>
+                                <td class="px-4 py-2.5 text-right text-red-600 font-bold tabular-nums">
+                                    {{ formatVnd(invoices.filter(i => i.status !== 'cancelled').reduce((s, i) => s + i.amount_due, 0)) }}
+                                </td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
             <!-- ── Tab: Lịch sử điều trị ──────────────────────────────────────── -->
             <TreatmentHistoryTab
                 v-if="activeTab === 'treatment'"
@@ -237,12 +345,15 @@ import ConsentFormsTab from './components/ConsentFormsTab.vue';
 import RelationshipsSection from './components/RelationshipsSection.vue';
 import TreatmentTimeline from './components/TreatmentTimeline.vue';
 import { usePermission } from '@/composables/usePermission';
+import { useCurrency } from '@/composables/useCurrency';
 
 const { hasPermission: can } = usePermission();
+const { formatVnd } = useCurrency();
 
 const props = defineProps({
     patient:            Object,
     financial:          Object,
+    invoices:           { type: Array, default: () => [] },
     treatmentPlans:     Array,
     appointments:       Array,
     pendingDeletions:   { type: Object, default: () => ({}) },
@@ -265,7 +376,7 @@ const activeTab    = ref('info');
 
 onMounted(() => {
     const hash = window.location.hash.replace('#', '');
-    const tabKeys = ['info', 'treatment', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
+    const tabKeys = ['info', 'invoices', 'treatment', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
     if (hash && tabKeys.includes(hash)) {
         activeTab.value = hash;
     }
@@ -276,6 +387,7 @@ const actForm      = useForm({ type: 'note', content: '', patient_id: props.pati
 
 const tabs = computed(() => [
     { key: 'info',         label: 'Thông tin' },
+    { key: 'invoices',     label: 'Hóa đơn', count: props.invoices?.length ?? 0 },
     { key: 'treatment',    label: 'Điều trị', count: (props.treatmentPlans?.length ?? 0) + (props.appointments?.length ?? 0) },
     { key: 'chart',        label: 'Sơ đồ răng' },
     { key: 'clinical',     label: 'Lâm sàng', count: props.clinicalNotes?.length ?? 0 },

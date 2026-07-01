@@ -235,10 +235,12 @@ Route::middleware(['auth'])->prefix('clinical')->name('clinical.')->group(functi
     Route::post('treatment-plans/{treatmentPlan}/items', [TreatmentPlanItemController::class, 'store'])->name('treatment-plans.items.store')->middleware('can:treatment_plans.edit');
     Route::put('treatment-plan-items/{treatmentPlanItem}', [TreatmentPlanItemController::class, 'update'])->name('treatment-plan-items.update')->middleware('can:treatment_plans.edit');
     Route::delete('treatment-plan-items/{treatmentPlanItem}', [TreatmentPlanItemController::class, 'destroy'])->name('treatment-plan-items.destroy')->middleware('can:treatment_plans.edit');
+    Route::patch('treatment-plan-items/{treatmentPlanItem}/status', [TreatmentPlanItemController::class, 'updateStatus'])->name('treatment-plan-items.update-status')->middleware('can:treatment_plans.edit');
     Route::post('treatment-plan-items/{treatmentPlanItem}/complete', [TreatmentPlanItemController::class, 'complete'])->name('treatment-plan-items.complete')->middleware('can:treatment_plans.edit');
     Route::post('treatment-plans/{treatmentPlan}/transition', [TreatmentPlanController::class, 'transition'])->name('treatment-plans.transition')->middleware('can:treatment_plans.edit');
     Route::post('treatment-plans/{treatmentPlan}/approve', [TreatmentPlanController::class, 'approve'])->name('treatment-plans.approve')->middleware('can:treatment_plans.approve');
     Route::patch('treatment-plans/{treatmentPlan}/payment-schedule', [TreatmentPlanController::class, 'savePaymentSchedule'])->name('treatment-plans.payment-schedule')->middleware('can:treatment_plans.edit');
+    Route::patch('treatment-plans/{treatmentPlan}/payment-notes', [TreatmentPlanController::class, 'savePaymentNotes'])->name('treatment-plans.payment-notes')->middleware('can:treatment_plans.edit');
     Route::get('treatment-plans/{treatmentPlan}/pdf', [TreatmentPlanController::class, 'pdf'])->name('treatment-plans.pdf')->middleware('can:treatment_plans.view');
 });
 
@@ -251,6 +253,9 @@ Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(functi
         ->name('appointments.quick-reschedule')->middleware('can:appointments.manage');
     Route::patch('appointments/{appointment}/notes', [AppointmentController::class, 'updateNotes'])
         ->name('appointments.update-notes')->middleware('can:appointments.manage');
+
+    Route::get('registrations', [AppointmentController::class, 'registrationIndex'])
+        ->name('registrations.index')->middleware('can:appointments.view');
 
     Route::delete('pending-deletions/{pendingDeletion}/undo', [PendingDeletionController::class, 'undo'])
         ->name('pending-deletions.undo');

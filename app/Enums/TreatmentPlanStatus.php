@@ -38,17 +38,17 @@ enum TreatmentPlanStatus: string
     public function allowedTransitions(): array
     {
         return match ($this) {
-            self::Draft => [self::Quoted, self::Cancelled],
-            self::Quoted => [self::Approved, self::Draft, self::Cancelled],
-            self::Approved => [self::InProgress, self::Cancelled],
-            self::InProgress => [self::Completed, self::Cancelled],
-            self::Completed => [],
-            self::Cancelled => [],
+            self::Draft      => [self::Approved, self::InProgress, self::Completed, self::Cancelled],
+            self::Quoted     => [self::Approved, self::InProgress, self::Completed],
+            self::Approved   => [self::InProgress, self::Completed],
+            self::InProgress => [self::Completed],
+            self::Completed  => [],
+            self::Cancelled  => [],
         };
     }
 
     public function isEditable(): bool
     {
-        return in_array($this, [self::Draft, self::Quoted]);
+        return in_array($this, [self::Draft, self::Quoted, self::Approved]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Clinical;
 
+use App\Enums\TreatmentItemStatus;
 use App\Http\Controllers\Controller;
 use App\Models\PriceList;
 use App\Models\TreatmentPlan;
@@ -9,6 +10,7 @@ use App\Models\TreatmentPlanItem;
 use App\Services\TreatmentPlanService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rules\Enum;
 
 class TreatmentPlanItemController extends Controller
 {
@@ -99,6 +101,19 @@ class TreatmentPlanItemController extends Controller
         }
 
         return back()->with('success', 'Đã xóa dịch vụ.');
+    }
+
+    public function updateStatus(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse
+    {
+        $this->authorize('treatment_plans.edit');
+
+        $data = $request->validate([
+            'status' => ['required', new Enum(TreatmentItemStatus::class)],
+        ]);
+
+        $treatmentPlanItem->update(['status' => $data['status']]);
+
+        return back()->with('success', 'Đã cập nhật trạng thái.');
     }
 
     public function complete(TreatmentPlanItem $treatmentPlanItem): RedirectResponse

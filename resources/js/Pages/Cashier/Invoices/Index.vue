@@ -135,6 +135,15 @@
                     <span class="text-indigo-800">Đang lọc hóa đơn của: <strong>{{ patientName }}</strong></span>
                     <button @click="filterPatientId = null" class="text-indigo-500 hover:text-indigo-700 text-xs font-medium">Xóa lọc BN</button>
                 </div>
+
+                <!-- Plan banner -->
+                <div v-if="filterPlanId" class="flex items-center justify-between text-sm bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2">
+                    <span class="text-emerald-800">
+                        Đang lọc theo kế hoạch:
+                        <strong class="font-mono">{{ planCode }}</strong>
+                    </span>
+                    <button @click="filterPlanId = null" class="text-emerald-600 hover:text-emerald-800 text-xs font-medium">Xóa lọc</button>
+                </div>
             </div>
 
             <!-- ── Controls row ───────────────────────────────────────── -->
@@ -199,72 +208,153 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <tr v-for="inv in paginated" :key="inv.id"
-                            :class="['hover:bg-gray-50 transition-colors', isOverdue(inv) ? 'bg-red-50/40' : '']">
-                            <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ inv.code }}</td>
-                            <td class="px-4 py-3">
-                                <p class="font-medium text-gray-900">{{ inv.patient }}</p>
-                                <p v-if="inv.patient_phone" class="text-xs text-gray-400">{{ inv.patient_phone }}</p>
-                            </td>
-                            <td class="px-4 py-3 hidden xl:table-cell">
-                                <div class="flex flex-col gap-0.5">
-                                    <span v-if="inv.treatment_plan_code" class="font-mono text-xs text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded w-fit">
-                                        {{ inv.treatment_plan_code }}
+                        <template v-for="inv in paginated" :key="inv.id">
+                            <!-- Master / standalone row -->
+                            <tr :class="['hover:bg-gray-50 transition-colors', isOverdue(inv) ? 'bg-red-50/40' : isNearDue(inv) ? 'bg-amber-50/50' : '']">
+                                <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ inv.code }}</td>
+                                <td class="px-4 py-3">
+                                    <Link :href="route('patients.show', inv.patient_id)"
+                                        class="font-medium text-gray-900 hover:text-indigo-600 hover:underline">
+                                        {{ inv.patient }}
+                                    </Link>
+                                    <p v-if="inv.patient_phone" class="text-xs text-gray-400">{{ inv.patient_phone }}</p>
+                                </td>
+                                <td class="px-4 py-3 hidden xl:table-cell">
+                                    <div class="flex flex-col gap-0.5">
+                                        <Link v-if="inv.plan_id && inv.treatment_plan_code"
+                                            :href="route('clinical.treatment-plans.show', inv.plan_id)"
+                                            class="font-mono text-xs text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded w-fit hover:bg-indigo-100 hover:underline">
+                                            {{ inv.treatment_plan_code }}
+                                        </Link>
+                                        <button v-if="inv.plan_id && installmentCount(inv.plan_id) > 0"
+                                            @click="toggleExpand(inv.plan_id)"
+                                            class="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded w-fit font-medium hover:bg-amber-100 transition-colors text-left">
+                                            {{ expandedPlans.has(inv.plan_id) ? '▲' : '▼' }} {{ installmentCount(inv.plan_id) }} đợt
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span v-if="inv.due_date" :class="['text-sm', isOverdue(inv) ? 'text-red-600 font-semibold' : isNearDue(inv) ? 'text-amber-700 font-semibold' : 'text-gray-700']">
+                                        {{ inv.due_date }}
+                                        <span v-if="isOverdue(inv)" class="ml-1 text-xs">⚠</span>
                                     </span>
-                                    <span v-if="inv.installment_index !== null && inv.installment_index !== undefined"
-                                        class="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded w-fit">
-                                        Đợt {{ inv.installment_index + 1 }}
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="px-4 py-3">
-                                <span v-if="inv.due_date" :class="['text-sm', isOverdue(inv) ? 'text-red-600 font-semibold' : 'text-gray-700']">
-                                    {{ inv.due_date }}
-                                    <span v-if="isOverdue(inv)" class="ml-1 text-xs">⚠</span>
-                                </span>
-                                <span v-else class="text-gray-300 text-sm">—</span>
-                            </td>
-                            <td class="px-4 py-3 text-right font-medium text-gray-800 tabular-nums">{{ formatVnd(inv.total) }}</td>
-                            <td class="px-4 py-3 text-right text-green-600 tabular-nums hidden md:table-cell">{{ formatVnd(inv.amount_paid) }}</td>
-                            <td class="px-4 py-3 text-right tabular-nums hidden md:table-cell"
-                                :class="inv.amount_due > 0 ? 'text-red-600 font-medium' : 'text-gray-300'">
-                                {{ formatVnd(inv.amount_due) }}
-                            </td>
-                            <td class="px-4 py-3">
-                                <StatusBadge :color="inv.status_color">{{ inv.status_label }}</StatusBadge>
-                            </td>
-                            <td class="px-4 py-3 text-right">
-                                <Link :href="route('cashier.invoices.show', inv.id)"
-                                    class="text-primary-600 text-xs font-medium hover:underline">Thu tiền</Link>
-                            </td>
-                        </tr>
+                                    <span v-if="isNearDue(inv)" class="block mt-0.5 text-xs bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium w-fit">⏰ Sắp đến hạn</span>
+                                    <span v-else-if="!inv.due_date" class="text-gray-300 text-sm">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-right font-medium text-gray-800 tabular-nums">{{ formatVnd(inv.total) }}</td>
+                                <td class="px-4 py-3 text-right text-green-600 tabular-nums hidden md:table-cell">{{ formatVnd(inv.amount_paid) }}</td>
+                                <td class="px-4 py-3 text-right tabular-nums hidden md:table-cell"
+                                    :class="inv.amount_due > 0 ? 'text-red-600 font-medium' : 'text-gray-300'">
+                                    {{ formatVnd(inv.amount_due) }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    <StatusBadge :color="displayStatusColor(inv)">{{ displayStatusLabel(inv) }}</StatusBadge>
+                                </td>
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-1.5 justify-end flex-wrap">
+                                        <!-- Hồ sơ BN -->
+                                        <Link :href="route('patients.show', inv.patient_id)"
+                                            class="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                            title="Hồ sơ bệnh nhân">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                            </svg>
+                                        </Link>
+                                        <!-- Kế hoạch điều trị -->
+                                        <Link v-if="inv.plan_id"
+                                            :href="route('clinical.treatment-plans.show', inv.plan_id)"
+                                            class="inline-flex items-center justify-center w-6 h-6 rounded text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-colors"
+                                            title="Kế hoạch điều trị">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                            </svg>
+                                        </Link>
+                                        <!-- Expand toggle (small screens) -->
+                                        <button v-if="inv.plan_id && installmentCount(inv.plan_id) > 0"
+                                            @click="toggleExpand(inv.plan_id)"
+                                            class="text-primary-600 text-xs font-medium hover:underline xl:hidden">
+                                            {{ expandedPlans.has(inv.plan_id) ? '▲' : '▼ Đợt' }}
+                                        </button>
+                                        <!-- Làm thanh toán -->
+                                        <Link v-if="installmentCount(inv.plan_id) === 0"
+                                            :href="route('cashier.invoices.show', inv.id)"
+                                            class="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1 rounded-lg whitespace-nowrap transition-colors">
+                                            Làm thanh toán
+                                        </Link>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Child installment rows (expanded) -->
+                            <template v-if="inv.plan_id && expandedPlans.has(inv.plan_id)">
+                                <tr v-for="child in getInstallments(inv.plan_id)" :key="'inst-' + child.id"
+                                    class="bg-amber-50/60 border-l-4 border-l-amber-300 hover:bg-amber-50 transition-colors">
+                                    <td class="px-4 py-2 pl-8 font-mono text-xs text-gray-400">{{ child.code }}</td>
+                                    <td class="px-4 py-2">
+                                        <span class="text-xs font-semibold text-amber-700">Đợt {{ child.installment_index + 1 }}</span>
+                                    </td>
+                                    <td class="px-4 py-2 hidden xl:table-cell text-xs text-gray-400">—</td>
+                                    <td class="px-4 py-2">
+                                        <span v-if="child.due_date" :class="['text-xs', isOverdue(child) ? 'text-red-600 font-semibold' : isNearDue(child) ? 'text-amber-700 font-semibold' : 'text-gray-600']">
+                                            {{ child.due_date }}
+                                            <span v-if="isOverdue(child)" class="ml-0.5">⚠</span>
+                                        </span>
+                                        <span v-if="isNearDue(child)" class="block mt-0.5 text-xs bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium w-fit">⏰ Sắp đến hạn</span>
+                                        <span v-else-if="!child.due_date" class="text-gray-300 text-xs">—</span>
+                                    </td>
+                                    <td class="px-4 py-2 text-right text-xs font-medium text-gray-700 tabular-nums">{{ formatVnd(child.total) }}</td>
+                                    <td class="px-4 py-2 text-right text-green-600 text-xs tabular-nums hidden md:table-cell">{{ formatVnd(child.amount_paid) }}</td>
+                                    <td class="px-4 py-2 text-right text-xs tabular-nums hidden md:table-cell"
+                                        :class="child.amount_due > 0 ? 'text-red-600 font-medium' : 'text-gray-300'">
+                                        {{ formatVnd(child.amount_due) }}
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <StatusBadge :color="displayStatusColor(child)">{{ displayStatusLabel(child) }}</StatusBadge>
+                                    </td>
+                                    <td class="px-4 py-2">
+                                        <Link :href="route('cashier.invoices.show', child.id)"
+                                            class="text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 px-2.5 py-1 rounded-lg whitespace-nowrap transition-colors">
+                                            Làm thanh toán
+                                        </Link>
+                                    </td>
+                                </tr>
+                            </template>
+                        </template>
                     </tbody>
                 </table>
             </div>
 
             <!-- ── GRID VIEW ──────────────────────────────────────────── -->
             <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                <Link v-for="inv in paginated" :key="inv.id"
-                    :href="route('cashier.invoices.show', inv.id)"
-                    :class="['bg-white rounded-xl border hover:shadow-md transition-all p-4 flex flex-col gap-2',
-                        isOverdue(inv) ? 'border-red-200 hover:border-red-300' : 'border-gray-200 hover:border-primary-200']">
+                <div v-for="inv in paginated" :key="inv.id"
+                    :class="['bg-white rounded-xl border transition-all p-4 flex flex-col gap-2',
+                        isOverdue(inv) ? 'border-red-200' : isNearDue(inv) ? 'border-amber-300 shadow-sm shadow-amber-100' : 'border-gray-200']">
                     <div class="flex items-start justify-between gap-2">
                         <span class="font-mono text-xs text-gray-400">{{ inv.code }}</span>
                         <StatusBadge :color="inv.status_color" class="flex-shrink-0 text-xs">{{ inv.status_label }}</StatusBadge>
                     </div>
                     <div>
-                        <p class="font-semibold text-gray-900 truncate">{{ inv.patient }}</p>
+                        <Link :href="route('patients.show', inv.patient_id)"
+                            class="font-semibold text-gray-900 hover:text-indigo-600 hover:underline truncate block">
+                            {{ inv.patient }}
+                        </Link>
                         <p v-if="inv.patient_phone" class="text-xs text-gray-400">{{ inv.patient_phone }}</p>
                     </div>
                     <div v-if="inv.treatment_plan_code" class="flex gap-1 flex-wrap">
-                        <span class="font-mono text-xs text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{{ inv.treatment_plan_code }}</span>
-                        <span v-if="inv.installment_index !== null && inv.installment_index !== undefined"
+                        <Link v-if="inv.plan_id"
+                            :href="route('clinical.treatment-plans.show', inv.plan_id)"
+                            class="font-mono text-xs text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded hover:bg-indigo-100 hover:underline">
+                            {{ inv.treatment_plan_code }}
+                        </Link>
+                        <span v-if="installmentCount(inv.plan_id) > 0"
                             class="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                            Đợt {{ inv.installment_index + 1 }}
+                            {{ installmentCount(inv.plan_id) }} đợt
                         </span>
                     </div>
-                    <div v-if="inv.due_date" class="text-xs" :class="isOverdue(inv) ? 'text-red-600 font-semibold' : 'text-gray-500'">
-                        📅 Đến hạn: {{ inv.due_date }} <span v-if="isOverdue(inv)">⚠</span>
+                    <div v-if="inv.due_date" :class="['text-xs', isOverdue(inv) ? 'text-red-600 font-semibold' : isNearDue(inv) ? 'text-amber-700 font-semibold' : 'text-gray-500']">
+                        📅 Đến hạn: {{ inv.due_date }}
+                        <span v-if="isOverdue(inv)">⚠</span>
+                        <span v-else-if="isNearDue(inv)" class="ml-1 inline-block bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium">⏰ Sắp đến hạn</span>
                     </div>
                     <div class="mt-auto pt-2 border-t border-gray-100 space-y-1">
                         <div class="flex justify-between text-xs">
@@ -280,7 +370,13 @@
                             <span class="text-red-600 font-semibold tabular-nums">{{ formatVnd(inv.amount_due) }}</span>
                         </div>
                     </div>
-                </Link>
+                    <div class="flex gap-2 pt-1">
+                        <Link :href="route('cashier.invoices.show', inv.id)"
+                            class="flex-1 text-center py-1.5 text-xs font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+                            Làm thanh toán
+                        </Link>
+                    </div>
+                </div>
             </div>
 
             <!-- ── Pagination ─────────────────────────────────────────── -->
@@ -323,7 +419,7 @@ const SortIcon = {
 };
 
 const { formatVnd } = useCurrency();
-const props = defineProps({ invoices: Array, statuses: Array, branches: Array, init_patient_id: Number });
+const props = defineProps({ invoices: Array, statuses: Array, branches: Array, init_patient_id: Number, init_plan_id: Number });
 
 // ── State ───────────────────────────────────────────────────────────────────
 const viewMode           = ref(localStorage.getItem('inv_view') || 'list');
@@ -337,6 +433,7 @@ const dueDateTo          = ref('');
 const filterOverdue      = ref(false);
 const filterNeedCollection = ref(false);
 const filterPatientId    = ref(props.init_patient_id ?? null);
+const filterPlanId       = ref(props.init_plan_id    ?? null);
 const sortBy             = ref('due_date_raw');
 const sortDir            = ref('asc');
 const activePreset       = ref('');
@@ -345,7 +442,7 @@ watch(viewMode, v => localStorage.setItem('inv_view', v));
 watch(perPage,  v => localStorage.setItem('inv_per', String(v)));
 
 // Reset to page 1 when filters change
-watch([search, filterStatus, filterBranch, dueDateFrom, dueDateTo, filterOverdue, filterNeedCollection, filterPatientId, perPage],
+watch([search, filterStatus, filterBranch, dueDateFrom, dueDateTo, filterOverdue, filterNeedCollection, filterPatientId, filterPlanId, perPage],
     () => { page.value = 1; });
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -353,6 +450,12 @@ const today = new Date().toISOString().split('T')[0];
 
 function isOverdue(inv) {
     return inv.due_date_raw && inv.due_date_raw < today && inv.amount_due > 0;
+}
+
+function isNearDue(inv) {
+    if (!inv.due_date_raw || inv.amount_due <= 0) return false;
+    const in3Days = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+    return inv.due_date_raw >= today && inv.due_date_raw <= in3Days;
 }
 
 const datePresets = [
@@ -396,18 +499,47 @@ watch([dueDateFrom, dueDateTo], () => {
     activePreset.value = preset ? preset.label : '';
 });
 
-// ── Patient name for banner ──────────────────────────────────────────────────
+// ── Patient / plan name for banners ─────────────────────────────────────────
 const patientName = computed(() => {
     if (!filterPatientId.value) return '';
     return props.invoices.find(i => i.patient_id === filterPatientId.value)?.patient ?? '';
 });
 
+const planCode = computed(() => {
+    if (!filterPlanId.value) return '';
+    return props.invoices.find(i => i.plan_id === filterPlanId.value)?.treatment_plan_code ?? `#${filterPlanId.value}`;
+});
+
+// ── Expand installment rows ──────────────────────────────────────────────────
+const expandedPlans = ref(new Set());
+
+function toggleExpand(planId) {
+    const s = new Set(expandedPlans.value);
+    s.has(planId) ? s.delete(planId) : s.add(planId);
+    expandedPlans.value = s;
+}
+
+function getInstallments(planId) {
+    if (!planId) return [];
+    return [...props.invoices]
+        .filter(i => i.plan_id === planId && i.installment_index !== null && i.installment_index !== undefined)
+        .sort((a, b) => a.installment_index - b.installment_index);
+}
+
+function installmentCount(planId) {
+    return getInstallments(planId).length;
+}
+
 // ── Filtering ────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
-    let list = props.invoices;
+    // Installment-specific invoices are rendered as child rows under their master; exclude from main list
+    let list = props.invoices.filter(i => i.installment_index === null || i.installment_index === undefined);
 
     if (filterPatientId.value) {
         list = list.filter(i => i.patient_id === filterPatientId.value);
+    }
+    if (filterPlanId.value) {
+        list = list.filter(i => i.plan_id === filterPlanId.value);
     }
     if (search.value.trim()) {
         const q = search.value.toLowerCase();
@@ -442,16 +574,21 @@ const filtered = computed(() => {
 
 // ── Sorting ──────────────────────────────────────────────────────────────────
 const sorted = computed(() => {
-    if (!sortBy.value) return filtered.value;
-    return [...filtered.value].sort((a, b) => {
-        let va = a[sortBy.value] ?? '';
-        let vb = b[sortBy.value] ?? '';
-        if (typeof va === 'string') va = va.toLowerCase();
-        if (typeof vb === 'string') vb = vb.toLowerCase();
-        if (va < vb) return sortDir.value === 'asc' ? -1 : 1;
-        if (va > vb) return sortDir.value === 'asc' ? 1 : -1;
-        return 0;
-    });
+    const base = sortBy.value
+        ? [...filtered.value].sort((a, b) => {
+            let va = a[sortBy.value] ?? '';
+            let vb = b[sortBy.value] ?? '';
+            if (typeof va === 'string') va = va.toLowerCase();
+            if (typeof vb === 'string') vb = vb.toLowerCase();
+            if (va < vb) return sortDir.value === 'asc' ? -1 : 1;
+            if (va > vb) return sortDir.value === 'asc' ? 1 : -1;
+            return 0;
+          })
+        : [...filtered.value];
+    // Pin invoices due within 3 days to the top of the list
+    const nearDue = base.filter(i => isNearDue(i));
+    const rest    = base.filter(i => !isNearDue(i));
+    return [...nearDue, ...rest];
 });
 
 function toggleSort(field) {
@@ -499,11 +636,25 @@ const summary = computed(() => ({
 
 const overdueCount = computed(() => props.invoices.filter(i => isOverdue(i)).length);
 
+// ── Display status (simplified for cashier view) ─────────────────────────────
+function displayStatusLabel(inv) {
+    if (inv.status === 'cancelled') return inv.status_label;
+    if (inv.amount_due <= 0)        return 'Thanh toán đủ';
+    if (inv.amount_due > 0)         return 'Còn nợ';
+    return inv.status_label;
+}
+function displayStatusColor(inv) {
+    if (inv.status === 'cancelled') return inv.status_color;
+    if (inv.amount_due <= 0)        return 'green';
+    if (inv.amount_due > 0)         return 'red';
+    return inv.status_color;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const hasFilters = computed(() =>
     !!(search.value || filterStatus.value || filterBranch.value ||
        dueDateFrom.value || dueDateTo.value || filterOverdue.value ||
-       filterNeedCollection.value || filterPatientId.value)
+       filterNeedCollection.value || filterPatientId.value || filterPlanId.value)
 );
 
 function clearFilters() {
@@ -515,6 +666,7 @@ function clearFilters() {
     filterOverdue.value      = false;
     filterNeedCollection.value = false;
     filterPatientId.value    = null;
+    filterPlanId.value       = null;
     activePreset.value       = '';
 }
 

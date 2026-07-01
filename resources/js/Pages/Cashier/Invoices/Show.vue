@@ -1,26 +1,38 @@
 <template>
     <AppLayout :title="`Thu tiền: ${invoice.code}`">
-        <div class="max-w-4xl space-y-4">
+        <div class="space-y-4">
 
             <!-- ── Header ───────────────────────────────────────────────────── -->
             <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
-                <div class="flex items-start justify-between gap-4">
-                    <div>
+                <div class="flex items-start justify-between gap-4 flex-wrap">
+                    <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <Link :href="route('cashier.invoices.index')" class="text-gray-400 hover:text-gray-600 text-sm">← Hóa đơn</Link>
                             <span class="text-gray-300">/</span>
                             <span class="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ invoice.code }}</span>
                             <StatusBadge :color="invoice.status_color">{{ invoice.status_label }}</StatusBadge>
+                            <span v-if="invoice.installment_index !== null && invoice.installment_index !== undefined"
+                                class="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                Đợt {{ invoice.installment_index + 1 }}
+                            </span>
                             <Link v-if="invoice.plan_id"
                                 :href="route('clinical.treatment-plans.show', invoice.plan_id)"
-                                class="text-xs text-indigo-500 hover:text-indigo-700">
-                                → KHDT
+                                class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                {{ invoice.plan_code }}
                             </Link>
                         </div>
                         <h2 class="text-xl font-bold text-gray-900">{{ invoice.patient }}</h2>
-                        <p class="text-sm text-gray-500 mt-0.5">{{ invoice.patient_phone }} · {{ invoice.branch }}</p>
+                        <p class="text-sm text-gray-500 mt-0.5">
+                            {{ invoice.patient_phone }}
+                            <span class="mx-1.5 text-gray-300">·</span>
+                            {{ invoice.branch }}
+                            <span v-if="invoice.plan_doctor" class="ml-2 text-gray-400">🦷 {{ invoice.plan_doctor }}</span>
+                        </p>
                     </div>
-                    <div class="flex gap-2 flex-shrink-0">
+                    <div class="flex gap-2 flex-shrink-0 flex-wrap">
                         <a :href="route('cashier.invoices.receipt', invoice.id)" target="_blank"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -39,7 +51,7 @@
                     </div>
                 </div>
 
-                <!-- Financial summary bar — Bambu style -->
+                <!-- Financial summary bar -->
                 <div class="mt-3 flex flex-wrap gap-4 text-sm bg-slate-800 rounded-xl px-4 py-3">
                     <div class="flex items-center gap-2">
                         <span class="text-slate-400 text-xs">Tổng phải trả</span>
@@ -57,9 +69,13 @@
                             {{ formatVnd(invoice.amount_due) }}
                         </span>
                     </div>
-                    <span v-if="invoice.discount > 0" class="flex items-center gap-2 ml-auto">
+                    <span v-if="invoice.discount > 0" class="flex items-center gap-2">
                         <span class="text-slate-400 text-xs">Giảm giá</span>
                         <span class="font-bold text-amber-300 tabular-nums">-{{ formatVnd(invoice.discount) }}</span>
+                    </span>
+                    <span v-if="invoice.due_date" class="flex items-center gap-2">
+                        <span class="text-slate-400 text-xs">Đến hạn</span>
+                        <span class="text-slate-200 text-sm">{{ invoice.due_date }}</span>
                     </span>
                     <span :class="['ml-auto self-center text-xs px-2.5 py-1 rounded-full font-semibold border',
                         invoice.amount_due <= 0
@@ -70,11 +86,13 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <!-- LEFT: Payment form + history -->
-                <div class="lg:col-span-2 space-y-4">
+            <!-- ── Main 3-col grid ───────────────────────────────────────────── -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4">
 
-                    <!-- ── Payment form — Bambu style ──────────────────────── -->
+                <!-- LEFT: Payment form + history (spans 2 on lg, 3 on xl) -->
+                <div class="lg:col-span-2 xl:col-span-3 space-y-4">
+
+                    <!-- ── Payment form ────────────────────────────────────────── -->
                     <div v-if="invoice.status !== 'paid' && invoice.status !== 'cancelled'"
                         class="bg-white rounded-xl border border-indigo-100 p-5">
                         <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-1.5">
@@ -84,10 +102,10 @@
                             Thu tiền
                         </h3>
 
-                        <!-- Payment method selector — 4 big buttons like Bambu -->
+                        <!-- Payment method selector -->
                         <div class="mb-4">
                             <label class="text-xs text-gray-500 mb-2 block font-medium uppercase tracking-wide">Hình thức thanh toán *</label>
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="grid grid-cols-3 sm:grid-cols-6 gap-2">
                                 <button v-for="m in methods" :key="m.value"
                                     @click="payForm.method = m.value"
                                     :class="['flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 text-sm font-medium transition-all',
@@ -100,16 +118,15 @@
                             </div>
                         </div>
 
-                        <!-- Amount + Date row -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                            <div>
+                        <!-- Amount + Date + Reference + Notes -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
+                            <div class="sm:col-span-1">
                                 <label class="text-xs text-gray-500 mb-1.5 block font-medium">Số tiền thu (₫) *</label>
                                 <div class="flex gap-2">
                                     <input v-model="payForm.amount" type="number" :min="canRefund ? undefined : 1"
                                         :placeholder="`Còn nợ: ${formatVnd(invoice.amount_due)}`"
                                         class="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none tabular-nums text-right font-semibold"
                                         @input="debtMode = false" />
-                                    <!-- Nút "Nợ" — Bambu style -->
                                     <button @click="setDebtMode"
                                         :class="['px-3 py-2 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap',
                                             debtMode
@@ -127,10 +144,6 @@
                                 <input v-model="payForm.payment_date" type="date"
                                     class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                             </div>
-                        </div>
-
-                        <!-- Reference + Notes -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                             <div>
                                 <label class="text-xs text-gray-500 mb-1.5 block font-medium">Mã giao dịch / Tham chiếu</label>
                                 <input v-model="payForm.reference" type="text" placeholder="Số chuyển khoản, mã QR..."
@@ -153,10 +166,8 @@
                             </p>
                         </div>
 
-                        <!-- Error display -->
                         <p v-if="payForm.errors.amount" class="text-xs text-red-500 mb-3">{{ payForm.errors.amount }}</p>
 
-                        <!-- Action buttons — Lưu & Thoát | Lưu | Lưu & In (Bambu style) -->
                         <div class="flex flex-wrap gap-2 justify-end pt-3 border-t border-gray-100">
                             <Link :href="route('cashier.invoices.index')"
                                 class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
@@ -176,7 +187,72 @@
                         </div>
                     </div>
 
-                    <!-- ── Payment history ─────────────────────────────────── -->
+                    <!-- ── Dịch vụ điều trị ────────────────────────────────────── -->
+                    <div v-if="planItems.length > 0" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                Dịch vụ điều trị
+                            </h3>
+                            <span class="text-xs text-gray-400">{{ planItems.length }} dịch vụ</span>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50/60 text-gray-500 text-xs border-b border-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-2.5 text-left font-medium">Dịch vụ</th>
+                                        <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Răng</th>
+                                        <th class="px-4 py-2.5 text-right font-medium">SL</th>
+                                        <th class="px-4 py-2.5 text-right font-medium">Đơn giá</th>
+                                        <th class="px-4 py-2.5 text-right font-medium hidden md:table-cell">CK</th>
+                                        <th class="px-4 py-2.5 text-right font-medium">Thành tiền</th>
+                                        <th class="px-4 py-2.5 text-left font-medium hidden lg:table-cell">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-50">
+                                    <tr v-for="item in planItems" :key="item.id" class="hover:bg-gray-50">
+                                        <td class="px-4 py-2.5">
+                                            <p class="font-medium text-gray-800">{{ item.service_name }}</p>
+                                            <p v-if="item.notes" class="text-xs text-gray-400">{{ item.notes }}</p>
+                                        </td>
+                                        <td class="px-4 py-2.5 hidden sm:table-cell">
+                                            <span v-if="item.tooth_number"
+                                                class="inline-block bg-blue-50 text-blue-700 text-xs font-mono px-1.5 py-0.5 rounded">
+                                                {{ item.tooth_number }}
+                                            </span>
+                                            <span v-else class="text-gray-300">—</span>
+                                        </td>
+                                        <td class="px-4 py-2.5 text-right text-gray-600">{{ item.quantity }}</td>
+                                        <td class="px-4 py-2.5 text-right tabular-nums text-gray-600">{{ formatVnd(item.unit_price) }}</td>
+                                        <td class="px-4 py-2.5 text-right tabular-nums text-rose-500 hidden md:table-cell">
+                                            {{ item.discount > 0 ? '-' + formatVnd(item.discount) : '—' }}
+                                        </td>
+                                        <td class="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-800">{{ formatVnd(item.amount) }}</td>
+                                        <td class="px-4 py-2.5 hidden lg:table-cell">
+                                            <StatusBadge :color="item.status_color" class="text-xs">{{ item.status_label }}</StatusBadge>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                                <tfoot class="border-t-2 border-gray-200 bg-gray-50">
+                                    <tr>
+                                        <td class="px-4 py-2.5 text-xs font-medium text-gray-500">Tổng cộng</td>
+                                        <td class="hidden sm:table-cell"></td>
+                                        <td class="hidden md:table-cell"></td>
+                                        <td class="hidden md:table-cell"></td>
+                                        <td class="hidden md:table-cell"></td>
+                                        <td class="px-4 py-2.5 text-right font-bold text-gray-900 tabular-nums">
+                                            {{ formatVnd(planItems.reduce((s, i) => s + i.amount, 0)) }}
+                                        </td>
+                                        <td class="hidden lg:table-cell"></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- ── Lịch sử thanh toán ──────────────────────────────────── -->
                     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                         <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                             <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
@@ -195,32 +271,35 @@
                                     <th class="px-4 py-2.5 text-left font-medium">Hình thức</th>
                                     <th class="px-4 py-2.5 text-right font-medium">Số tiền</th>
                                     <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Tham chiếu</th>
-                                    <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Người thu</th>
+                                    <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ghi chú</th>
+                                    <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Người thu</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
                                 <tr v-for="p in payments" :key="p.id" class="hover:bg-gray-50">
-                                    <td class="px-4 py-3 text-gray-600">{{ p.payment_date }}</td>
+                                    <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ p.payment_date }}</td>
                                     <td class="px-4 py-3">
                                         <span :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', methodBadgeClass(p.method)]">
                                             {{ methodIcon(p.method) }} {{ p.method_label }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-3 text-right tabular-nums font-semibold"
+                                    <td class="px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap"
                                         :class="p.amount < 0 ? 'text-red-600' : 'text-emerald-700'">
                                         {{ p.amount < 0 ? '−' : '' }}{{ formatVnd(Math.abs(p.amount)) }}
                                     </td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.reference ?? '—' }}</td>
-                                    <td class="px-4 py-3 text-gray-500 hidden sm:table-cell">{{ p.creator }}</td>
+                                    <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.notes ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ p.creator }}</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                <!-- RIGHT: Invoice summary + Discount -->
+                <!-- RIGHT: Invoice detail + Discount -->
                 <div class="space-y-4">
-                    <!-- Debt summary card -->
+
+                    <!-- Chi tiết hóa đơn -->
                     <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
                         <h3 class="text-sm font-semibold text-gray-700">Chi tiết hóa đơn</h3>
                         <div class="space-y-2 text-sm">
@@ -247,9 +326,34 @@
                                 </span>
                             </div>
                         </div>
-                        <StatusBadge v-if="debt" :color="debt.status_color" class="w-full justify-center">
-                            {{ debt.status_label }}
-                        </StatusBadge>
+
+                        <!-- Debt status -->
+                        <div v-if="debt" class="pt-2 border-t space-y-1.5 text-xs text-gray-500">
+                            <div class="flex justify-between">
+                                <span>Công nợ</span>
+                                <StatusBadge :color="debt.status_color" class="text-xs">{{ debt.status_label }}</StatusBadge>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Đã trả</span>
+                                <span class="text-emerald-600 tabular-nums">{{ formatVnd(debt.paid) }}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Còn lại</span>
+                                <span class="text-rose-600 font-medium tabular-nums">{{ formatVnd(debt.remaining) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Notes -->
+                        <div v-if="invoice.notes" class="pt-2 border-t text-xs text-gray-500">
+                            <p class="font-medium mb-0.5">Ghi chú</p>
+                            <p>{{ invoice.notes }}</p>
+                        </div>
+
+                        <!-- Cancel reason -->
+                        <div v-if="invoice.cancel_reason" class="pt-2 border-t">
+                            <p class="text-xs font-medium text-red-600 mb-0.5">Lý do hủy</p>
+                            <p class="text-xs text-red-500">{{ invoice.cancel_reason }}</p>
+                        </div>
                     </div>
 
                     <!-- Discount (gated) -->
@@ -265,10 +369,120 @@
                             </button>
                         </div>
                     </div>
+
+                    <!-- Link back to plan -->
+                    <div v-if="invoice.plan_id" class="bg-indigo-50 rounded-xl border border-indigo-100 p-4">
+                        <p class="text-xs text-indigo-600 font-medium mb-2">Kế hoạch điều trị</p>
+                        <Link :href="route('clinical.treatment-plans.show', invoice.plan_id)"
+                            class="flex items-center justify-between gap-2 text-sm text-indigo-700 hover:text-indigo-900 font-medium">
+                            <span class="font-mono">{{ invoice.plan_code }}</span>
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </Link>
+                        <p v-if="invoice.plan_status" class="text-xs text-indigo-500 mt-1">{{ invoice.plan_status }}</p>
+                        <p v-if="invoice.plan_net_total" class="text-xs text-indigo-500 mt-0.5 tabular-nums">
+                            Tổng kế hoạch: {{ formatVnd(invoice.plan_net_total) }}
+                        </p>
+                    </div>
+
+                    <!-- Lịch thanh toán -->
+                    <div v-if="planSchedule.length > 0" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                        <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+                                <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                                </svg>
+                                Lịch thanh toán
+                            </h3>
+                            <span class="text-xs text-gray-400">{{ planSchedule.length }} đợt</span>
+                        </div>
+                        <div class="divide-y divide-gray-100">
+                            <div v-for="(inst, idx) in planSchedule" :key="idx"
+                                :class="['px-4 py-3', invoice.installment_index === idx ? 'bg-indigo-50 border-l-2 border-l-indigo-400' : '']">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <div class="flex items-center gap-1.5 flex-wrap">
+                                            <span :class="['text-xs font-semibold', invoice.installment_index === idx ? 'text-indigo-700' : 'text-gray-700']">
+                                                Đợt {{ idx + 1 }}
+                                            </span>
+                                            <span v-if="invoice.installment_index === idx"
+                                                class="text-xs bg-indigo-100 text-indigo-600 border border-indigo-200 px-1.5 py-0.5 rounded-full font-medium">
+                                                Hóa đơn này
+                                            </span>
+                                        </div>
+                                        <p v-if="inst.due_date" class="text-xs text-gray-400 mt-0.5">📅 {{ formatDate(inst.due_date) }}</p>
+                                        <p v-if="inst.note" class="text-xs text-gray-500 mt-0.5 italic truncate">{{ inst.note }}</p>
+                                    </div>
+                                    <span class="text-xs font-bold tabular-nums text-gray-800 whitespace-nowrap flex-shrink-0">
+                                        {{ formatVnd(inst.amount) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </AppLayout>
+
+    <!-- ── Cancel modal ───────────────────────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="showCancelModal"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            @click.self="showCancelModal = false">
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+
+                <!-- Header -->
+                <div class="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-gray-100">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Xác nhận hủy hóa đơn</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">
+                            Hóa đơn <span class="font-mono font-medium text-gray-700">{{ invoice.code }}</span>
+                            — {{ invoice.patient }}
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Warning notice -->
+                <div class="mx-5 mt-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                    ⚠ Hành động này <strong>không thể hoàn tác</strong>. Hóa đơn sẽ bị hủy vĩnh viễn và không thể thu tiền.
+                </div>
+
+                <!-- Reason input -->
+                <div class="px-5 mt-4 pb-1">
+                    <label class="text-xs font-medium text-gray-700 mb-1.5 block">
+                        Lý do hủy <span class="text-red-500">*</span>
+                    </label>
+                    <textarea v-model="cancelReason" rows="3"
+                        placeholder="Nhập lý do hủy hóa đơn (bắt buộc)..."
+                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 focus:outline-none resize-none"
+                        :class="cancelReasonError ? 'border-red-400 bg-red-50' : ''">
+                    </textarea>
+                    <p v-if="cancelReasonError" class="text-xs text-red-500 mt-1">{{ cancelReasonError }}</p>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex gap-2 justify-end px-5 py-4">
+                    <button @click="showCancelModal = false"
+                        class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 font-medium">
+                        Đóng
+                    </button>
+                    <button @click="confirmCancel"
+                        class="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 font-medium disabled:opacity-50"
+                        :disabled="!cancelReason.trim()">
+                        Xác nhận hủy
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup>
@@ -281,14 +495,30 @@ import dayjs from 'dayjs';
 
 const { formatVnd } = useCurrency();
 const props = defineProps({
-    invoice: Object, payments: Array, debt: Object,
-    methods: Array, canRefund: Boolean, canDiscount: Boolean,
+    invoice: Object,
+    payments: Array,
+    debt: Object,
+    plan_items: { type: Array, default: () => [] },
+    plan_payment_schedule: { type: Array, default: () => [] },
+    methods: Array,
+    canRefund: Boolean,
+    canDiscount: Boolean,
 });
 
+const planItems      = props.plan_items ?? [];
+const planSchedule   = props.plan_payment_schedule ?? [];
 const discountAmount = ref(props.invoice.discount);
+
+const showCancelModal  = ref(false);
+const cancelReason     = ref('');
+const cancelReasonError = ref('');
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    return dayjs(dateStr).format('DD/MM/YYYY');
+}
 const debtMode       = ref(false);
 
-// Enrich methods with icons
 const methods = (props.methods ?? []).map(m => ({
     ...m,
     icon: { cash: '💵', transfer: '🏦', card: '💳', ewallet: '📱', installment: '📅', voucher: '🎟️' }[m.value] ?? '💰',
@@ -310,8 +540,8 @@ function fillFullAmount() {
 function setDebtMode() {
     debtMode.value = !debtMode.value;
     if (debtMode.value) {
-        payForm.amount   = 0;
-        payForm.notes    = 'Ghi nợ';
+        payForm.amount = 0;
+        payForm.notes  = 'Ghi nợ';
     } else {
         payForm.amount = '';
         payForm.notes  = '';
@@ -335,12 +565,23 @@ function applyDiscount() {
 }
 
 function doCancel() {
-    if (confirm('Bạn muốn hủy hóa đơn này?')) {
-        router.post(route('cashier.invoices.cancel', props.invoice.id));
-    }
+    cancelReason.value     = '';
+    cancelReasonError.value = '';
+    showCancelModal.value  = true;
 }
 
-// Method styling helpers
+function confirmCancel() {
+    if (!cancelReason.value.trim()) {
+        cancelReasonError.value = 'Vui lòng nhập lý do hủy.';
+        return;
+    }
+    router.post(route('cashier.invoices.cancel', props.invoice.id), {
+        cancel_reason: cancelReason.value.trim(),
+    }, {
+        onSuccess: () => { showCancelModal.value = false; },
+    });
+}
+
 function methodActiveClass(method) {
     return {
         cash:        'border-emerald-400 bg-emerald-50 text-emerald-700',

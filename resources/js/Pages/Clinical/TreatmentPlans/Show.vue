@@ -20,6 +20,13 @@
                         </p>
                     </div>
                     <div class="flex gap-2 flex-shrink-0">
+                        <Link :href="route('cashier.invoices.index', { plan_id: plan.id })"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-indigo-700 font-medium">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                            </svg>
+                            Hóa đơn
+                        </Link>
                         <a :href="route('clinical.treatment-plans.pdf', plan.id)" target="_blank"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -286,19 +293,75 @@
                 <!-- RIGHT: Summary + Status transitions + Payment schedule -->
                 <div class="space-y-4">
 
-                    <!-- Status transitions -->
-                    <div v-if="transitions.length > 0" class="bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-                            <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    <!-- 4-stage stepper -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                             </svg>
-                            Chuyển trạng thái
+                            Lộ trình điều trị
                         </h3>
-                        <div class="space-y-2">
-                            <button v-for="t in transitions" :key="t.value"
-                                @click="doTransition(t.value)"
-                                class="w-full px-3 py-2 text-xs text-left bg-white border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-colors font-medium">
-                                → {{ t.label }}
+
+                        <!-- Cancelled banner -->
+                        <div v-if="plan.status === 'cancelled'"
+                            class="text-xs text-red-600 font-medium py-2 px-3 bg-red-50 border border-red-200 rounded-lg mb-3">
+                            ✕ Kế hoạch đã bị hủy
+                        </div>
+
+                        <div class="space-y-0">
+                            <div v-for="(stage, idx) in STAGES" :key="stage.key" class="flex gap-3">
+                                <!-- Indicator column -->
+                                <div class="flex flex-col items-center">
+                                    <div :class="['w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0 transition-all',
+                                        currentStepIdx > idx
+                                            ? 'border-indigo-400 bg-indigo-500 text-white'
+                                            : currentStepIdx === idx
+                                                ? [stage.dotClass, 'shadow-sm']
+                                                : 'border-gray-200 bg-white text-gray-300']">
+                                        <svg v-if="currentStepIdx > idx" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/>
+                                        </svg>
+                                        <span v-else>{{ idx + 1 }}</span>
+                                    </div>
+                                    <div v-if="idx < STAGES.length - 1"
+                                        :class="['w-0.5 h-8 my-0.5', currentStepIdx > idx ? 'bg-indigo-300' : 'bg-gray-200']">
+                                    </div>
+                                </div>
+
+                                <!-- Content column -->
+                                <div class="flex-1 pb-2 pt-0.5">
+                                    <div class="flex items-center justify-between min-h-[28px]">
+                                        <div>
+                                            <p :class="['text-sm font-semibold leading-tight',
+                                                currentStepIdx === idx ? stage.labelClass : currentStepIdx > idx ? 'text-gray-400' : 'text-gray-400']">
+                                                {{ stage.label }}
+                                            </p>
+                                            <p v-if="currentStepIdx === idx" :class="['text-xs mt-0.5', stage.subClass]">
+                                                Trạng thái hiện tại
+                                            </p>
+                                        </div>
+                                        <template v-if="currentStepIdx < idx && canGoToStep(idx)">
+                                            <span v-if="stage.key === 'completed' && !allItemsCompleted"
+                                                :title="`Còn ${pendingItemCount} dịch vụ chưa hoàn thành`"
+                                                class="text-xs px-2.5 py-1 rounded-lg font-medium border border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed flex-shrink-0 select-none">
+                                                Chuyển →
+                                            </span>
+                                            <button v-else
+                                                @click="doTransition(stage.targetStatus)"
+                                                :class="['text-xs px-2.5 py-1 rounded-lg font-medium border transition-colors flex-shrink-0', stage.btnClass]">
+                                                Chuyển →
+                                            </button>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Hủy kế hoạch -->
+                        <div v-if="canCancel" class="border-t border-gray-100 mt-2 pt-3">
+                            <button @click="doTransition('cancelled')"
+                                class="w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 font-medium transition-colors">
+                                Hủy kế hoạch
                             </button>
                         </div>
                     </div>
@@ -335,7 +398,7 @@
                     </div>
 
                     <!-- Payment schedule -->
-                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                    <div id="payment-schedule" class="bg-white rounded-xl border border-gray-200 p-4">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
                                 <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -595,6 +658,70 @@ const props = defineProps({
     doctors: Array,
 });
 
+// ── 4-stage stepper ───────────────────────────────────────────────────────
+const STAGES = [
+    {
+        key: 'draft', label: 'Nháp', targetStatus: 'draft',
+        statuses: ['draft'],
+        dotClass:   'border-gray-500 bg-gray-600 text-white',
+        labelClass: 'text-gray-700',
+        subClass:   'text-gray-400',
+        btnClass:   'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100',
+    },
+    {
+        key: 'not_started', label: 'Chưa điều trị', targetStatus: 'approved',
+        statuses: ['quoted', 'approved'],
+        dotClass:   'border-amber-500 bg-amber-500 text-white',
+        labelClass: 'text-amber-700',
+        subClass:   'text-amber-500',
+        btnClass:   'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100',
+    },
+    {
+        key: 'in_progress', label: 'Đang điều trị', targetStatus: 'in_progress',
+        statuses: ['in_progress'],
+        dotClass:   'border-indigo-600 bg-indigo-600 text-white',
+        labelClass: 'text-indigo-700',
+        subClass:   'text-indigo-400',
+        btnClass:   'bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100',
+    },
+    {
+        key: 'completed', label: 'Hoàn thành', targetStatus: 'completed',
+        statuses: ['completed'],
+        dotClass:   'border-emerald-600 bg-emerald-600 text-white',
+        labelClass: 'text-emerald-700',
+        subClass:   'text-emerald-500',
+        btnClass:   'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100',
+    },
+];
+
+const currentStepIdx = computed(() => {
+    const s = props.plan.status;
+    if (s === 'draft')                        return 0;
+    if (['quoted', 'approved'].includes(s))   return 1;
+    if (s === 'in_progress')                  return 2;
+    if (s === 'completed')                    return 3;
+    return -1; // cancelled
+});
+
+function canGoToStep(idx) {
+    return props.transitions.some(t => t.value === STAGES[idx].targetStatus);
+}
+
+const allItemsCompleted = computed(() =>
+    props.items.length > 0 && props.items.every(i => i.status === 'completed')
+);
+
+const pendingItemCount = computed(() =>
+    props.items.filter(i => i.status !== 'completed').length
+);
+
+const canCancel = computed(() =>
+    props.plan.status !== 'cancelled' &&
+    props.plan.status !== 'completed' &&
+    props.transitions.some(t => t.value === 'cancelled')
+);
+
+// ──────────────────────────────────────────────────────────────────────────
 const selectedTeeth    = ref([]);
 const treatedTeethList = props.items.filter(i => i.tooth_number).map(i => i.tooth_number);
 
@@ -671,9 +798,25 @@ const newInst          = ref({ due_date: '', amount: '', note: '' });
 const isScheduleLocked = computed(() => ['completed', 'cancelled'].includes(props.plan.status));
 const scheduleTotal    = computed(() => schedule.value.reduce((s, i) => s + (parseInt(i.amount) || 0), 0));
 
-// Returns invoice info for a given installment index (null if not yet invoiced)
 function instInvoice(idx) {
     return props.plan.installment_invoice_map?.[idx] ?? null;
+}
+
+function addInstallment() {
+    if (!newInst.value.due_date || !newInst.value.amount) return;
+    schedule.value.push({ due_date: newInst.value.due_date, amount: parseInt(newInst.value.amount), note: newInst.value.note });
+    newInst.value = { due_date: '', amount: '', note: '' };
+    showScheduleForm.value = false;
+    saveSchedule();
+}
+
+function removeInstallment(idx) {
+    schedule.value.splice(idx, 1);
+    saveSchedule();
+}
+
+function saveSchedule() {
+    router.patch(route('clinical.treatment-plans.payment-schedule', props.plan.id), { schedule: schedule.value }, { preserveState: true });
 }
 
 // Auto-fill unit price when service selected
@@ -706,24 +849,7 @@ function completeItem(id) {
 }
 
 function changeItemStatus(id, status) {
-    router.put(route('clinical.treatment-plan-items.update', id), { status }, { preserveState: true });
-}
-
-function addInstallment() {
-    if (!newInst.value.due_date || !newInst.value.amount) return;
-    schedule.value.push({ due_date: newInst.value.due_date, amount: parseInt(newInst.value.amount), note: newInst.value.note });
-    newInst.value = { due_date: '', amount: '', note: '' };
-    showScheduleForm.value = false;
-    saveSchedule();
-}
-
-function removeInstallment(idx) {
-    schedule.value.splice(idx, 1);
-    saveSchedule();
-}
-
-function saveSchedule() {
-    router.patch(route('clinical.treatment-plans.payment-schedule', props.plan.id), { schedule: schedule.value }, { preserveState: true });
+    router.patch(route('clinical.treatment-plan-items.update-status', id), { status }, { preserveScroll: true, preserveState: true });
 }
 
 function doTransition(status) {

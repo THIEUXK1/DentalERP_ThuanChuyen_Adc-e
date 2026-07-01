@@ -216,6 +216,7 @@ class TreatmentPlanController extends Controller
                 'deposit_amount'   => $treatmentPlan->deposit_amount,
                 'net_total'        => $treatmentPlan->net_total,
                 'notes'            => $treatmentPlan->notes,
+                'payment_notes'    => $treatmentPlan->payment_notes,
                 'approved_at'      => $treatmentPlan->approved_at?->format('d/m/Y H:i'),
                 'payment_schedule' => $treatmentPlan->payment_schedule ?? [],
                 'installment_invoice_map' => $installmentInvoiceMap,
@@ -335,6 +336,12 @@ class TreatmentPlanController extends Controller
                         'status'             => 'pending',
                     ]);
                 }
+            }
+
+            // Auto-create invoice when editing a plan into approved state
+            $newStatus = ($data['status'] ?? null);
+            if ($newStatus === TreatmentPlanStatus::Approved->value && ! $treatmentPlan->invoices()->exists()) {
+                $this->invoiceSvc->fromTreatmentPlan($treatmentPlan->fresh());
             }
         });
 
@@ -480,6 +487,16 @@ class TreatmentPlanController extends Controller
         }
 
         return back()->with('success', 'Đã lưu lịch thanh toán.');
+    }
+
+    public function savePaymentNotes(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
+    {
+        $this->authorize('treatment_plans.edit');
+
+        $data = $request->validate(['payment_notes' => 'nullable|string|max:2000']);
+        $treatmentPlan->update(['payment_notes' => $data['payment_notes'] ?? null]);
+
+        return back()->with('success', 'Đã lưu ghi chú thanh toán.');
     }
 
     public function pdf(TreatmentPlan $treatmentPlan): Response

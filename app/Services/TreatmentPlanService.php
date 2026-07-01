@@ -110,6 +110,13 @@ class TreatmentPlanService
             throw new \RuntimeException("Không thể chuyển từ [{$plan->status->label()}] sang [{$to->label()}].");
         }
 
+        if ($to === TreatmentPlanStatus::Completed) {
+            $remaining = $plan->items()->where('status', '!=', TreatmentItemStatus::Completed->value)->count();
+            if ($remaining > 0) {
+                throw new \RuntimeException("Còn {$remaining} dịch vụ chưa hoàn thành. Vui lòng hoàn thành tất cả dịch vụ trước khi đóng kế hoạch.");
+            }
+        }
+
         DB::transaction(fn () => $plan->update(['status' => $to]));
     }
 
