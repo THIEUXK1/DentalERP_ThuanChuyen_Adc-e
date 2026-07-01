@@ -2,121 +2,206 @@
     <AppLayout title="Kế hoạch điều trị">
         <div class="space-y-4">
 
-            <!-- Header -->
-            <div class="flex items-center justify-between">
+            <!-- ── Header ──────────────────────────────────────────────── -->
+            <div class="flex items-center justify-between gap-3 flex-wrap">
                 <h2 class="text-lg font-semibold text-gray-800">
                     Kế hoạch điều trị
-                    <span class="ml-2 text-sm font-normal text-gray-400">({{ filteredPlans.length }})</span>
+                    <span class="ml-1.5 text-sm font-normal text-gray-400">({{ filtered.length }})</span>
                 </h2>
                 <div class="flex items-center gap-2">
+                    <button @click="exportCsv"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                        </svg>
+                        Xuất CSV
+                    </button>
                     <!-- View toggle -->
-                    <div class="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                    <div class="flex border border-gray-200 rounded-lg overflow-hidden">
                         <button @click="viewMode = 'list'"
-                            :class="['p-2 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600']"
-                            title="Dạng danh sách">
+                            :class="['p-1.5 transition-colors', viewMode === 'list' ? 'bg-primary-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600']">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
                             </svg>
                         </button>
                         <button @click="viewMode = 'grid'"
-                            :class="['p-2 transition-colors', viewMode === 'grid' ? 'bg-primary-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600']"
-                            title="Dạng hộp">
+                            :class="['p-1.5 transition-colors', viewMode === 'grid' ? 'bg-primary-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600']">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/>
                             </svg>
                         </button>
                     </div>
                     <Link v-if="can('treatment_plans.create')" :href="route('clinical.treatment-plans.create')"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
                         + Tạo kế hoạch
                     </Link>
                 </div>
             </div>
 
-            <!-- Filter bar -->
-            <div class="bg-white rounded-xl border border-gray-200 p-4 flex flex-wrap items-center gap-3">
+            <!-- ── Summary stats ────────────────────────────────────────── -->
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+                    <p class="text-xs text-gray-500">Kế hoạch</p>
+                    <p class="text-xl font-bold text-gray-900 mt-0.5">{{ summary.count }}</p>
+                    <p v-if="summary.inProgress > 0" class="text-xs text-indigo-600 mt-0.5">{{ summary.inProgress }} đang điều trị</p>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+                    <p class="text-xs text-gray-500">Giá trị kế hoạch</p>
+                    <p class="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">{{ formatVnd(summary.netTotal) }}</p>
+                </div>
+                <div class="bg-white rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                    <p class="text-xs text-emerald-600">Tổng lịch TT</p>
+                    <p class="text-xl font-bold text-emerald-700 mt-0.5 tabular-nums">{{ formatVnd(summary.scheduleTotal) }}</p>
+                    <p class="text-xs text-emerald-500 mt-0.5">{{ summary.withSchedule }} có lịch</p>
+                </div>
+                <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
+                    <p class="text-xs text-gray-500">Chưa duyệt</p>
+                    <p class="text-xl font-bold text-amber-600 mt-0.5">{{ summary.pending }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5">draft + báo giá</p>
+                </div>
+            </div>
 
-                <!-- Search -->
-                <div class="relative flex-1 min-w-[200px]">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
-                    </svg>
-                    <input v-model="search" type="text" placeholder="Tìm tên BN, mã, bác sĩ, chi nhánh, ghi chú..."
-                        class="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
-                    <button v-if="search" @click="search = ''"
-                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            <!-- ── Filters ──────────────────────────────────────────────── -->
+            <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                <!-- Row 1: search + status + branch + doctor -->
+                <div class="flex flex-wrap gap-3">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
                         </svg>
-                    </button>
+                        <input v-model="search" type="text" placeholder="Tên BN, mã KH, bác sĩ, chi nhánh, ghi chú..."
+                            class="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
+                        <button v-if="search" @click="search = ''" class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                    <select v-model="filterStatus"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option value="">Tất cả trạng thái</option>
+                        <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                    </select>
+                    <select v-model="filterBranch"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option value="">Tất cả chi nhánh</option>
+                        <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+                    </select>
+                    <select v-model="filterDoctor"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option value="">Tất cả bác sĩ</option>
+                        <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                    </select>
                 </div>
 
-                <select v-model="filterBranch"
-                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
-                    <option value="">Tất cả chi nhánh</option>
-                    <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
-                </select>
+                <!-- Row 2: date range + presets + quick filters -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <span class="text-xs text-gray-500 font-medium">Ngày tạo:</span>
+                    <input v-model="dateFrom" type="date"
+                        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
+                    <span class="text-gray-400 text-xs">→</span>
+                    <input v-model="dateTo" type="date"
+                        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
 
-                <select v-model="filterStatus"
-                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
-                    <option value="">Tất cả trạng thái</option>
-                    <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-                </select>
+                    <div class="flex gap-1 flex-wrap">
+                        <button v-for="p in datePresets" :key="p.label"
+                            @click="applyPreset(p)"
+                            :class="['text-xs px-2 py-1 rounded border transition-colors',
+                                activePreset === p.label
+                                    ? 'bg-primary-600 text-white border-primary-600'
+                                    : 'border-gray-200 text-gray-500 hover:border-primary-400 hover:text-primary-600']">
+                            {{ p.label }}
+                        </button>
+                    </div>
 
+                    <div class="flex items-center gap-2 ml-auto flex-wrap">
+                        <!-- Quick: đang điều trị -->
+                        <button @click="filterInProgress = !filterInProgress"
+                            :class="['text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors',
+                                filterInProgress ? 'bg-indigo-600 text-white border-indigo-600' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50']">
+                            🦷 Đang điều trị
+                        </button>
+                        <!-- Quick: có lịch TT -->
+                        <button @click="filterHasSchedule = !filterHasSchedule"
+                            :class="['text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors',
+                                filterHasSchedule ? 'bg-emerald-600 text-white border-emerald-600' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50']">
+                            📅 Có lịch TT
+                        </button>
+                        <!-- Clear all -->
+                        <button v-if="hasFilters" @click="clearFilters"
+                            class="text-xs px-2.5 py-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            Xóa lọc
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Controls ─────────────────────────────────────────────── -->
+            <div class="flex items-center justify-between text-xs text-gray-500">
+                <span>Hiển thị <strong class="text-gray-700">{{ paginated.length }}</strong> / {{ filtered.length }}
+                    <span v-if="filtered.length < all_plans.length" class="text-gray-400">(tổng {{ all_plans.length }})</span>
+                </span>
                 <select v-model="perPage"
-                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    class="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
                     <option :value="10">10/trang</option>
                     <option :value="20">20/trang</option>
                     <option :value="50">50/trang</option>
                     <option :value="100">100/trang</option>
                     <option value="all">Tất cả</option>
                 </select>
-
-                <button v-if="hasActiveFilters" @click="clearFilters"
-                    class="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 flex-shrink-0 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                    Xóa lọc
-                </button>
             </div>
 
-            <!-- Results info -->
-            <div class="flex items-center justify-between text-xs text-gray-500 px-1">
-                <span>
-                    Hiển thị <strong class="text-gray-700">{{ paginatedPlans.length }}</strong>
-                    / {{ filteredPlans.length }} kế hoạch
-                    <span v-if="filteredPlans.length < all_plans.length" class="text-gray-400">
-                        (tổng {{ all_plans.length }})
-                    </span>
-                </span>
-                <span v-if="totalPages > 1">Trang {{ currentPage }}/{{ totalPages }}</span>
+            <!-- ── Empty ─────────────────────────────────────────────────── -->
+            <div v-if="filtered.length === 0"
+                class="bg-white rounded-xl border border-gray-200 py-12 text-center text-gray-400">
+                {{ hasFilters ? 'Không tìm thấy kế hoạch phù hợp' : 'Chưa có kế hoạch điều trị nào' }}
             </div>
 
-            <!-- Empty state -->
-            <div v-if="filteredPlans.length === 0"
-                class="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400">
-                {{ hasActiveFilters ? 'Không tìm thấy kế hoạch phù hợp' : 'Chưa có kế hoạch điều trị nào' }}
-            </div>
-
-            <!-- LIST VIEW -->
-            <div v-else-if="viewMode === 'list'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <!-- ── LIST VIEW ─────────────────────────────────────────────── -->
+            <div v-else-if="viewMode === 'list'" class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
                 <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-600">
+                    <thead class="bg-gray-50 text-gray-600 text-xs">
                         <tr>
-                            <th class="px-4 py-3 text-left font-medium">Mã</th>
-                            <th class="px-4 py-3 text-left font-medium">Khách hàng</th>
-                            <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">Bác sĩ</th>
-                            <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Chi nhánh</th>
-                            <th class="px-4 py-3 text-right font-medium">Giá trị KH</th>
-                            <th class="px-4 py-3 text-right font-medium hidden xl:table-cell">Lịch thanh toán</th>
+                            <th class="px-4 py-3 text-left">
+                                <button @click="toggleSort('code')" class="flex items-center gap-1 font-medium hover:text-gray-900">
+                                    Mã <SortIcon :field="'code'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
+                            <th class="px-4 py-3 text-left">
+                                <button @click="toggleSort('patient')" class="flex items-center gap-1 font-medium hover:text-gray-900">
+                                    Khách hàng <SortIcon :field="'patient'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
+                            <th class="px-4 py-3 text-left hidden sm:table-cell">
+                                <button @click="toggleSort('doctor')" class="flex items-center gap-1 font-medium hover:text-gray-900">
+                                    Bác sĩ <SortIcon :field="'doctor'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
+                            <th class="px-4 py-3 text-left hidden lg:table-cell font-medium">Chi nhánh</th>
+                            <th class="px-4 py-3 text-right">
+                                <button @click="toggleSort('net_total')" class="flex items-center gap-1 font-medium hover:text-gray-900 ml-auto">
+                                    Giá trị KH <SortIcon :field="'net_total'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
+                            <th class="px-4 py-3 text-right hidden xl:table-cell">
+                                <button @click="toggleSort('payment_schedule_total')" class="flex items-center gap-1 font-medium hover:text-gray-900 ml-auto">
+                                    Lịch TT <SortIcon :field="'payment_schedule_total'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
                             <th class="px-4 py-3 text-left font-medium">Trạng thái</th>
-                            <th class="px-4 py-3 text-left font-medium hidden md:table-cell">Ngày tạo</th>
-                            <th class="px-4 py-3 text-right font-medium w-16"></th>
+                            <th class="px-4 py-3 text-left hidden md:table-cell">
+                                <button @click="toggleSort('created_at_raw')" class="flex items-center gap-1 font-medium hover:text-gray-900">
+                                    Ngày tạo <SortIcon :field="'created_at_raw'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
+                            <th class="px-4 py-3 w-16"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <tr v-for="p in paginatedPlans" :key="p.id" class="hover:bg-gray-50 transition-colors">
+                        <tr v-for="p in paginated" :key="p.id" class="hover:bg-gray-50 transition-colors">
                             <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ p.code }}</td>
                             <td class="px-4 py-3 font-medium text-gray-900">
                                 <Link :href="route('clinical.treatment-plans.show', p.id)" class="hover:text-primary-600">
@@ -125,12 +210,12 @@
                             </td>
                             <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ p.doctor }}</td>
                             <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ p.branch }}</td>
-                            <td class="px-4 py-3 text-right whitespace-nowrap">
-                                <span class="font-medium text-gray-800">{{ formatVnd(p.net_total) }}</span>
+                            <td class="px-4 py-3 text-right font-medium text-gray-800 tabular-nums whitespace-nowrap">
+                                {{ formatVnd(p.net_total) }}
                             </td>
                             <td class="px-4 py-3 text-right hidden xl:table-cell whitespace-nowrap">
                                 <template v-if="p.payment_schedule_count > 0">
-                                    <span class="font-semibold text-emerald-700">{{ formatVnd(p.payment_schedule_total) }}</span>
+                                    <span class="font-semibold text-emerald-700 tabular-nums">{{ formatVnd(p.payment_schedule_total) }}</span>
                                     <span class="ml-1 text-xs text-gray-400">({{ p.payment_schedule_count }} đợt)</span>
                                 </template>
                                 <span v-else class="text-gray-300 text-xs">—</span>
@@ -148,14 +233,14 @@
                 </table>
             </div>
 
-            <!-- GRID VIEW -->
+            <!-- ── GRID VIEW ─────────────────────────────────────────────── -->
             <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                <Link v-for="p in paginatedPlans" :key="p.id"
+                <Link v-for="p in paginated" :key="p.id"
                     :href="route('clinical.treatment-plans.show', p.id)"
-                    class="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-md transition-all p-4 flex flex-col gap-3">
+                    class="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-md transition-all p-4 flex flex-col gap-2">
                     <div class="flex items-start justify-between gap-2">
                         <span class="font-mono text-xs text-gray-400">{{ p.code }}</span>
-                        <StatusBadge :color="p.status_color" class="flex-shrink-0">{{ p.status_label }}</StatusBadge>
+                        <StatusBadge :color="p.status_color" class="flex-shrink-0 text-xs">{{ p.status_label }}</StatusBadge>
                     </div>
                     <div>
                         <p class="font-semibold text-gray-900 truncate">{{ p.patient }}</p>
@@ -173,11 +258,11 @@
                     <div class="mt-auto pt-2 border-t border-gray-100 space-y-1">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-gray-400">Giá trị KH</span>
-                            <span class="text-sm font-semibold text-primary-700">{{ formatVnd(p.net_total) }}</span>
+                            <span class="text-sm font-semibold text-primary-700 tabular-nums">{{ formatVnd(p.net_total) }}</span>
                         </div>
                         <div v-if="p.payment_schedule_count > 0" class="flex items-center justify-between">
                             <span class="text-xs text-gray-400">Lịch TT ({{ p.payment_schedule_count }} đợt)</span>
-                            <span class="text-sm font-semibold text-emerald-600">{{ formatVnd(p.payment_schedule_total) }}</span>
+                            <span class="text-sm font-semibold text-emerald-600 tabular-nums">{{ formatVnd(p.payment_schedule_total) }}</span>
                         </div>
                         <div class="text-right">
                             <span class="text-xs text-gray-400">{{ p.created_at }}</span>
@@ -186,24 +271,24 @@
                 </Link>
             </div>
 
-            <!-- Pagination -->
+            <!-- ── Pagination ────────────────────────────────────────────── -->
             <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 py-2">
-                <button @click="currentPage = 1" :disabled="currentPage === 1"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">«</button>
-                <button @click="currentPage--" :disabled="currentPage === 1"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">‹</button>
+                <button @click="page = 1" :disabled="page === 1"
+                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">«</button>
+                <button @click="page--" :disabled="page === 1"
+                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">‹</button>
                 <template v-for="n in pageNumbers" :key="n">
                     <span v-if="n === '...'" class="px-2 py-1.5 text-xs text-gray-400">…</span>
-                    <button v-else @click="currentPage = n"
+                    <button v-else @click="page = n"
                         :class="['px-2.5 py-1.5 text-xs border rounded-lg transition-colors',
-                            n === currentPage ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 hover:bg-gray-50']">
+                            n === page ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 hover:bg-gray-50']">
                         {{ n }}
                     </button>
                 </template>
-                <button @click="currentPage++" :disabled="currentPage === totalPages"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">›</button>
-                <button @click="currentPage = totalPages" :disabled="currentPage === totalPages"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors">»</button>
+                <button @click="page++" :disabled="page === totalPages"
+                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">›</button>
+                <button @click="page = totalPages" :disabled="page === totalPages"
+                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">»</button>
             </div>
 
         </div>
@@ -218,59 +303,141 @@ import StatusBadge from '@/Components/Shared/StatusBadge.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
 
+const SortIcon = {
+    props: ['field', 'current', 'dir'],
+    template: `<span class="inline-block w-3" :class="field === current ? 'text-primary-600' : 'text-gray-300'">
+        {{ field === current ? (dir === 'asc' ? '↑' : '↓') : '↕' }}
+    </span>`,
+};
+
 const { hasPermission: can } = usePermission();
 const { formatVnd } = useCurrency();
+const props = defineProps({ all_plans: Array, statuses: Array, branches: Array, doctors: Array });
 
-const props = defineProps({ all_plans: Array, statuses: Array, branches: Array });
+// ── State ────────────────────────────────────────────────────────────────────
+const viewMode         = ref(localStorage.getItem('tp_view') || 'list');
+const perPage          = ref(localStorage.getItem('tp_per') === 'all' ? 'all' : Number(localStorage.getItem('tp_per') || 20));
+const page             = ref(1);
+const search           = ref('');
+const filterStatus     = ref('');
+const filterBranch     = ref('');
+const filterDoctor     = ref('');
+const dateFrom         = ref('');
+const dateTo           = ref('');
+const filterInProgress = ref(false);
+const filterHasSchedule = ref(false);
+const sortBy           = ref('');
+const sortDir          = ref('desc');
+const activePreset     = ref('');
 
-const search       = ref('');
-const filterBranch = ref('');
-const filterStatus = ref('');
-const perPage      = ref(localStorage.getItem('tp_per_page') === 'all' ? 'all' : (Number(localStorage.getItem('tp_per_page')) || 20));
-const currentPage  = ref(1);
-const viewMode     = ref(localStorage.getItem('tp_view_mode') || 'list');
+watch(viewMode, v => localStorage.setItem('tp_view', v));
+watch(perPage,  v => localStorage.setItem('tp_per', String(v)));
+watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, perPage],
+    () => { page.value = 1; });
 
-watch(viewMode,  v => localStorage.setItem('tp_view_mode', v));
-watch(perPage,   v => localStorage.setItem('tp_per_page', String(v)));
-watch([search, filterBranch, filterStatus, perPage], () => { currentPage.value = 1; });
+// ── Date presets ─────────────────────────────────────────────────────────────
+const today = new Date().toISOString().split('T')[0];
 
-const filteredPlans = computed(() => {
+const datePresets = [
+    { label: 'Hôm nay', from: today, to: today },
+    {
+        label: 'Tuần này',
+        from: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })(),
+        to:   (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().split('T')[0]; })(),
+    },
+    {
+        label: 'Tháng này',
+        from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+        to:   new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
+    },
+    {
+        label: 'Tháng trước',
+        from: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0],
+        to:   new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0],
+    },
+];
+
+function applyPreset(p) {
+    if (activePreset.value === p.label) {
+        dateFrom.value    = '';
+        dateTo.value      = '';
+        activePreset.value = '';
+    } else {
+        dateFrom.value    = p.from;
+        dateTo.value      = p.to;
+        activePreset.value = p.label;
+    }
+}
+
+watch([dateFrom, dateTo], () => {
+    const preset = datePresets.find(p => p.from === dateFrom.value && p.to === dateTo.value);
+    activePreset.value = preset ? preset.label : '';
+});
+
+// ── Filtering ─────────────────────────────────────────────────────────────────
+const filtered = computed(() => {
     let list = props.all_plans;
-    if (filterBranch.value) {
-        list = list.filter(p => p.branch_id == filterBranch.value);
-    }
-    if (filterStatus.value) {
-        list = list.filter(p => p.status === filterStatus.value);
-    }
+    if (filterStatus.value)  list = list.filter(p => p.status === filterStatus.value);
+    if (filterBranch.value)  list = list.filter(p => p.branch_id == filterBranch.value);
+    if (filterDoctor.value)  list = list.filter(p => p.doctor_id == filterDoctor.value);
+    if (dateFrom.value)      list = list.filter(p => p.created_at_raw >= dateFrom.value);
+    if (dateTo.value)        list = list.filter(p => p.created_at_raw <= dateTo.value);
+    if (filterInProgress.value)  list = list.filter(p => p.status === 'in_progress');
+    if (filterHasSchedule.value) list = list.filter(p => p.payment_schedule_count > 0);
     if (search.value.trim()) {
         const q = search.value.toLowerCase();
         list = list.filter(p =>
-            (p.patient     || '').toLowerCase().includes(q) ||
-            (p.code        || '').toLowerCase().includes(q) ||
-            (p.doctor      || '').toLowerCase().includes(q) ||
-            (p.branch      || '').toLowerCase().includes(q) ||
-            (p.status_label|| '').toLowerCase().includes(q) ||
-            (p.notes       || '').toLowerCase().includes(q) ||
-            (p.created_at  || '').includes(q)
+            (p.patient      || '').toLowerCase().includes(q) ||
+            (p.code         || '').toLowerCase().includes(q) ||
+            (p.doctor       || '').toLowerCase().includes(q) ||
+            (p.branch       || '').toLowerCase().includes(q) ||
+            (p.status_label || '').toLowerCase().includes(q) ||
+            (p.notes        || '').toLowerCase().includes(q) ||
+            (p.created_at   || '').includes(q)
         );
     }
     return list;
 });
 
-const paginatedPlans = computed(() => {
-    if (perPage.value === 'all') return filteredPlans.value;
+// ── Sorting ────────────────────────────────────────────────────────────────────
+const sorted = computed(() => {
+    if (!sortBy.value) return filtered.value;
+    return [...filtered.value].sort((a, b) => {
+        let va = a[sortBy.value] ?? '';
+        let vb = b[sortBy.value] ?? '';
+        if (typeof va === 'string') va = va.toLowerCase();
+        if (typeof vb === 'string') vb = vb.toLowerCase();
+        if (va < vb) return sortDir.value === 'asc' ? -1 : 1;
+        if (va > vb) return sortDir.value === 'asc' ? 1 : -1;
+        return 0;
+    });
+});
+
+function toggleSort(field) {
+    if (sortBy.value === field) {
+        sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortBy.value  = field;
+        sortDir.value = 'asc';
+    }
+    page.value = 1;
+}
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+const paginated = computed(() => {
+    if (perPage.value === 'all') return sorted.value;
     const size  = Number(perPage.value);
-    const start = (currentPage.value - 1) * size;
-    return filteredPlans.value.slice(start, start + size);
+    const start = (page.value - 1) * size;
+    return sorted.value.slice(start, start + size);
 });
 
 const totalPages = computed(() =>
-    perPage.value === 'all' ? 1 : Math.max(1, Math.ceil(filteredPlans.value.length / Number(perPage.value)))
+    perPage.value === 'all' ? 1 : Math.max(1, Math.ceil(filtered.value.length / Number(perPage.value)))
 );
 
 const pageNumbers = computed(() => {
     const total = totalPages.value;
-    const cur   = currentPage.value;
+    const cur   = page.value;
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const pages = [1];
     if (cur > 3) pages.push('...');
@@ -280,11 +447,47 @@ const pageNumbers = computed(() => {
     return pages;
 });
 
-const hasActiveFilters = computed(() => !!(search.value || filterBranch.value || filterStatus.value));
+// ── Summary ────────────────────────────────────────────────────────────────────
+const summary = computed(() => ({
+    count:        filtered.value.length,
+    netTotal:     filtered.value.reduce((s, p) => s + p.net_total, 0),
+    scheduleTotal: filtered.value.reduce((s, p) => s + p.payment_schedule_total, 0),
+    withSchedule: filtered.value.filter(p => p.payment_schedule_count > 0).length,
+    inProgress:   filtered.value.filter(p => p.status === 'in_progress').length,
+    pending:      filtered.value.filter(p => ['draft', 'quoted'].includes(p.status)).length,
+}));
+
+// ── Helpers ────────────────────────────────────────────────────────────────────
+const hasFilters = computed(() =>
+    !!(search.value || filterStatus.value || filterBranch.value || filterDoctor.value ||
+       dateFrom.value || dateTo.value || filterInProgress.value || filterHasSchedule.value)
+);
 
 function clearFilters() {
-    search.value       = '';
-    filterBranch.value = '';
-    filterStatus.value = '';
+    search.value          = '';
+    filterStatus.value    = '';
+    filterBranch.value    = '';
+    filterDoctor.value    = '';
+    dateFrom.value        = '';
+    dateTo.value          = '';
+    filterInProgress.value  = false;
+    filterHasSchedule.value = false;
+    activePreset.value    = '';
+}
+
+// ── Export CSV ─────────────────────────────────────────────────────────────────
+function exportCsv() {
+    const headers = ['Mã KH','Khách hàng','Bác sĩ','Chi nhánh','Giá trị KH','Tổng lịch TT','Số đợt','Trạng thái','Ngày tạo'];
+    const rows = sorted.value.map(p => [
+        p.code, p.patient, p.doctor, p.branch,
+        p.net_total, p.payment_schedule_total, p.payment_schedule_count,
+        p.status_label, p.created_at,
+    ]);
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a'); a.href = url;
+    a.download = `ke-hoach-${today}.csv`; a.click();
+    URL.revokeObjectURL(url);
 }
 </script>

@@ -40,6 +40,7 @@ class TreatmentPlanController extends Controller
                     'patient'      => $p->patient->full_name,
                     'patient_id'   => $p->patient_id,
                     'doctor'       => $p->doctor?->full_name ?? '—',
+                    'doctor_id'    => $p->doctor_id,
                     'branch'       => $p->branch->name,
                     'branch_id'    => $p->branch_id,
                     'status'       => $p->status->value,
@@ -51,9 +52,11 @@ class TreatmentPlanController extends Controller
                     'payment_schedule_count' => count($p->payment_schedule ?? []),
                     'notes'        => $p->notes ?? '',
                     'created_at'   => $p->created_at->format('d/m/Y'),
+                    'created_at_raw' => $p->created_at->toDateString(),
                 ]),
             'statuses' => collect(TreatmentPlanStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
             'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'doctors'  => Employee::doctors()->where('is_active', true)->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
         ]);
     }
 
