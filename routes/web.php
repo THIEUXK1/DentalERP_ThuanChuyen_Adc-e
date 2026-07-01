@@ -142,6 +142,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('patients/{patient}/avatar', [PatientController::class, 'uploadAvatar'])
         ->name('patients.upload-avatar')->middleware('can:patients.edit');
 
+    // Quick appointment registration per patient
+    Route::get('patients/{patient}/register-appointment', [PatientController::class, 'registerAppointment'])
+        ->name('patients.register-appointment')->middleware('can:appointments.view');
+    Route::post('patients/{patient}/quick-register', [PatientController::class, 'quickRegister'])
+        ->name('patients.quick-register')->middleware('can:appointments.create');
+
     // Clinical notes
     Route::post('patients/{patient}/clinical-notes', [ClinicalNoteController::class, 'store'])
         ->name('clinical-notes.store')->middleware('can:clinical_notes.create');

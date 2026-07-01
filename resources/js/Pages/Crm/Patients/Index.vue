@@ -157,7 +157,11 @@
                                     <span v-else class="text-gray-300 text-xs">—</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">
-                                    <div class="flex items-center gap-1.5 justify-end">
+                                    <div class="flex items-center gap-1.5 justify-end flex-wrap">
+                                        <Link :href="route('patients.register-appointment', p.id)"
+                                            class="px-2.5 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 font-medium whitespace-nowrap">
+                                            🗓 Đăng ký khám
+                                        </Link>
                                         <Link :href="route('patients.show', p.id)"
                                             class="px-2.5 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium">
                                             Xem
