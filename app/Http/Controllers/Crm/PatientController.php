@@ -93,13 +93,18 @@ class PatientController extends Controller
             ]);
 
         $quickStatuses = collect([
-            AppointmentStatus::Booked,
-            AppointmentStatus::Confirmed,
-            AppointmentStatus::CheckedIn,
-            AppointmentStatus::InTreatment,
-            AppointmentStatus::Completed,
-            AppointmentStatus::Cancelled,
-        ])->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]);
+            ['status' => AppointmentStatus::Booked,      'label' => null],
+            ['status' => AppointmentStatus::Confirmed,   'label' => null],
+            ['status' => AppointmentStatus::Pending,     'label' => 'Đang chờ'],
+            ['status' => AppointmentStatus::CheckedIn,   'label' => null],
+            ['status' => AppointmentStatus::InTreatment, 'label' => null],
+            ['status' => AppointmentStatus::Completed,   'label' => null],
+            ['status' => AppointmentStatus::Cancelled,   'label' => null],
+        ])->map(fn ($item) => [
+            'value' => $item['status']->value,
+            'label' => $item['label'] ?? $item['status']->label(),
+            'color' => $item['status']->color(),
+        ]);
 
         return Inertia::render('Crm/Patients/AppointmentRegister', [
             'patient' => [
