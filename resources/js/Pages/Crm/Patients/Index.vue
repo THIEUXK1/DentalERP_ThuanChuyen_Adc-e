@@ -78,6 +78,15 @@
                     </select>
                 </div>
                 <div>
+                    <label class="text-xs text-gray-500 mb-1 block">Sắp xếp</label>
+                    <select v-model="sortBy"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="next_appointment">🗓 Lịch hẹn gần nhất</option>
+                        <option value="created_at">📅 Ngày tạo mới nhất</option>
+                        <option value="name">🔤 Tên A→Z</option>
+                    </select>
+                </div>
+                <div>
                     <label class="text-xs text-gray-500 mb-1 block">Hiển thị</label>
                     <select v-model="perPage"
                         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -110,6 +119,9 @@
                                 <th class="px-4 py-3 text-left font-medium hidden md:table-cell">Nguồn</th>
                                 <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Chi nhánh</th>
                                 <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Ngày tạo</th>
+                                <th class="px-4 py-3 text-left font-medium hidden xl:table-cell">
+                                    <span class="flex items-center gap-1">🗓 Lịch hẹn gần nhất</span>
+                                </th>
                                 <th class="px-4 py-3 text-right font-medium">Hành động</th>
                             </tr>
                         </thead>
@@ -137,6 +149,13 @@
                                 </td>
                                 <td class="px-4 py-3 text-gray-500 hidden lg:table-cell">{{ p.branch ?? '—' }}</td>
                                 <td class="px-4 py-3 text-gray-400 text-xs hidden lg:table-cell">{{ p.created_at }}</td>
+                                <td class="px-4 py-3 hidden xl:table-cell">
+                                    <span v-if="p.next_appointment_display"
+                                        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 whitespace-nowrap">
+                                        🗓 {{ p.next_appointment_display }}
+                                    </span>
+                                    <span v-else class="text-gray-300 text-xs">—</span>
+                                </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center gap-1.5 justify-end">
                                         <Link :href="route('patients.show', p.id)"
@@ -185,6 +204,13 @@
                             </svg>
                             {{ p.branch }}
                         </div>
+                    </div>
+                    <div v-if="p.next_appointment_display"
+                        class="mt-2 flex items-center gap-1.5 px-2 py-1 bg-indigo-50 rounded-lg">
+                        <svg class="w-3 h-3 text-indigo-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                        </svg>
+                        <span class="text-xs font-medium text-indigo-700">{{ p.next_appointment_display }}</span>
                     </div>
                     <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                         <span v-if="p.source" :class="['text-xs px-2 py-0.5 rounded-full font-medium', sourceClass(p.source)]">
@@ -244,6 +270,7 @@ const _q = new URLSearchParams(window.location.search);
 const search      = ref(_q.get('search') ?? '');
 const branchId    = ref(_q.get('branch_id') ? Number(_q.get('branch_id')) : '');
 const source      = ref(_q.get('source') ?? '');
+const sortBy      = ref(_q.get('sort') ?? 'next_appointment');
 const perPage     = ref(_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page') ?? 20));
 const currentPage = ref(Number(_q.get('page') ?? 1));
 const viewMode    = ref('table');
@@ -256,16 +283,32 @@ const perPageOptions = [
     { value: 'all', label: 'Tất cả' },
 ];
 
-// ── Filtering ────────────────────────────────────────────────────
+// ── Filtering + Sorting ───────────────────────────────────────────
 const filteredPatients = computed(() => {
     const q = search.value.trim().toLowerCase();
-    return props.all_patients.filter(p => {
+    const list = props.all_patients.filter(p => {
         if (q && !p.full_name.toLowerCase().includes(q)
               && !(p.phone ?? '').toLowerCase().includes(q)
               && !(p.code  ?? '').toLowerCase().includes(q)) return false;
         if (branchId.value !== '' && p.branch_id !== branchId.value) return false;
         if (source.value && p.source !== source.value) return false;
         return true;
+    });
+
+    return [...list].sort((a, b) => {
+        if (sortBy.value === 'next_appointment') {
+            // Có lịch hẹn lên trước, null xuống cuối; cùng có thì gần nhất lên đầu
+            if (a.next_appointment_at && b.next_appointment_at)
+                return a.next_appointment_at < b.next_appointment_at ? -1 : 1;
+            if (a.next_appointment_at) return -1;
+            if (b.next_appointment_at) return 1;
+            return b.id - a.id;
+        }
+        if (sortBy.value === 'name') {
+            return a.full_name.localeCompare(b.full_name, 'vi');
+        }
+        // created_at: mới nhất lên đầu
+        return b.id - a.id;
     });
 });
 
@@ -275,7 +318,7 @@ const totalPages = computed(() =>
 );
 
 // Reset to page 1 when filter/per_page changes
-watch([search, branchId, source, perPage], () => { currentPage.value = 1; });
+watch([search, branchId, source, sortBy, perPage], () => { currentPage.value = 1; });
 
 // Clamp page if it goes out of range
 watch(totalPages, (n) => { if (currentPage.value > n) currentPage.value = n; });
@@ -310,24 +353,27 @@ const pageNumbers = computed(() => {
 });
 
 // ── Sync URL without reload ──────────────────────────────────────
-watch([search, branchId, source, perPage, currentPage], () => {
+watch([search, branchId, source, sortBy, perPage, currentPage], () => {
     const p = new URLSearchParams();
-    if (search.value)              p.set('search',    search.value);
-    if (branchId.value !== '')     p.set('branch_id', String(branchId.value));
-    if (source.value)              p.set('source',    source.value);
-    if (String(perPage.value) !== '20') p.set('per_page', String(perPage.value));
-    if (currentPage.value > 1)     p.set('page',      String(currentPage.value));
+    if (search.value)                    p.set('search',    search.value);
+    if (branchId.value !== '')           p.set('branch_id', String(branchId.value));
+    if (source.value)                    p.set('source',    source.value);
+    if (sortBy.value !== 'next_appointment') p.set('sort', sortBy.value);
+    if (String(perPage.value) !== '20')  p.set('per_page', String(perPage.value));
+    if (currentPage.value > 1)           p.set('page',      String(currentPage.value));
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
 const hasActiveFilters = computed(() =>
-    !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== '20')
+    !!(search.value || branchId.value !== '' || source.value ||
+       sortBy.value !== 'next_appointment' || String(perPage.value) !== '20')
 );
 
 function clearFilters() {
-    search.value = ''; branchId.value = ''; source.value = ''; perPage.value = 20;
+    search.value = ''; branchId.value = ''; source.value = '';
+    sortBy.value = 'next_appointment'; perPage.value = 20;
 }
 
 const AVATAR_COLORS = [

@@ -31,21 +31,34 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
+        $excludedStatuses = ['cancelled', 'no_show', 'completed', 'in_treatment'];
+
         return Inertia::render('Crm/Patients/Index', [
             'all_patients' => Patient::with('branch')
+                ->withMin(
+                    ['appointments' => fn ($q) => $q
+                        ->whereNotIn('status', $excludedStatuses)
+                        ->where('scheduled_at', '>=', now())],
+                    'scheduled_at'
+                )
                 ->orderByDesc('id')
                 ->get()
                 ->map(fn ($p) => [
-                    'id'         => $p->id,
-                    'code'       => $p->code,
-                    'full_name'  => $p->full_name,
-                    'phone'      => $p->phone ?? '',
-                    'gender'     => $p->gender,
-                    'source'     => $p->source,
-                    'branch'     => $p->branch?->name,
-                    'branch_id'  => $p->branch_id,
-                    'is_active'  => $p->is_active,
-                    'created_at' => $p->created_at->format('d/m/Y'),
+                    'id'                      => $p->id,
+                    'code'                    => $p->code,
+                    'full_name'               => $p->full_name,
+                    'phone'                   => $p->phone ?? '',
+                    'gender'                  => $p->gender,
+                    'source'                  => $p->source,
+                    'branch'                  => $p->branch?->name,
+                    'branch_id'               => $p->branch_id,
+                    'is_active'               => $p->is_active,
+                    'created_at'              => $p->created_at->format('d/m/Y'),
+                    'created_at_raw'          => $p->created_at->toDateString(),
+                    'next_appointment_at'     => $p->appointments_min_scheduled_at,
+                    'next_appointment_display'=> $p->appointments_min_scheduled_at
+                        ? \Carbon\Carbon::parse($p->appointments_min_scheduled_at)->format('d/m H:i')
+                        : null,
                 ]),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
