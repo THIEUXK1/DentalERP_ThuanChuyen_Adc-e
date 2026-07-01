@@ -32,6 +32,7 @@
                         <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Thời lượng</th>
                         <th class="px-4 py-2 text-center text-gray-500 font-medium">Trạng thái</th>
                         <th class="px-4 py-2 text-left text-gray-500 font-medium hidden lg:table-cell">Ghi chú</th>
+                        <th class="px-4 py-2 w-8"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-50">
@@ -51,6 +52,15 @@
                             </span>
                         </td>
                         <td class="px-4 py-2 text-gray-400 hidden lg:table-cell max-w-xs truncate">{{ appt.notes || '—' }}</td>
+                        <td class="px-4 py-2 text-center">
+                            <button @click="deleteAppointment(appt)"
+                                class="text-gray-300 hover:text-red-500 transition-colors"
+                                title="Xóa lịch hẹn">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                </svg>
+                            </button>
+                        </td>
                     </tr>
                 </tbody>
             </table>
@@ -113,6 +123,14 @@
                         </svg>
                         Xem
                     </Link>
+                    <!-- Delete button -->
+                    <button @click.stop="deletePlan(plan)"
+                        class="flex-shrink-0 text-gray-300 hover:text-red-500 transition-colors"
+                        title="Xóa kế hoạch">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
                 </div>
 
                 <!-- Expanded content -->
@@ -219,7 +237,7 @@
 
 <script setup>
 import { ref } from 'vue';
-import { Link } from '@inertiajs/vue3';
+import { Link, router } from '@inertiajs/vue3';
 
 const props = defineProps({
     treatmentPlans: { type: Array, default: () => [] },
@@ -268,6 +286,16 @@ function priorityLabel(p) {
 
 function priorityClass(p) {
     return { normal: 'bg-gray-100 text-gray-600', urgent: 'bg-amber-100 text-amber-700', emergency: 'bg-red-100 text-red-700' }[p] ?? 'bg-gray-100 text-gray-600';
+}
+
+function deleteAppointment(appt) {
+    if (!confirm(`Xóa lịch hẹn ${appt.code}?`)) return;
+    router.delete(route('schedule.appointments.destroy', appt.id), { preserveScroll: true });
+}
+
+function deletePlan(plan) {
+    if (!confirm(`Xóa kế hoạch ${plan.code}?\nChỉ có thể xóa kế hoạch ở trạng thái Nháp.`)) return;
+    router.delete(route('clinical.treatment-plans.destroy', plan.id), { preserveScroll: true });
 }
 
 function apptStatusClass(status) {

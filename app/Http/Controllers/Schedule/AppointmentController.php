@@ -141,6 +141,15 @@ class AppointmentController extends Controller
         return back()->with('success', 'Đã lưu ghi chú.');
     }
 
+    public function destroy(Appointment $appointment): RedirectResponse
+    {
+        $this->authorize('appointments.manage');
+
+        $appointment->delete();
+
+        return back()->with('success', 'Đã xóa lịch hẹn.');
+    }
+
     public function transition(Request $request, Appointment $appointment): RedirectResponse
     {
         $this->authorize('appointments.manage');

@@ -347,7 +347,7 @@ class TreatmentPlanController extends Controller
 
         $treatmentPlan->delete();
 
-        return redirect()->route('clinical.treatment-plans.index')->with('success', 'Đã xóa kế hoạch.');
+        return back()->with('success', 'Đã xóa kế hoạch.');
     }
 
     public function transition(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
