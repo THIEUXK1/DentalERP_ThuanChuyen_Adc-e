@@ -269,13 +269,15 @@ import { usePermission } from '@/composables/usePermission';
 const { hasPermission: can } = usePermission();
 const props = defineProps({ all_patients: Array, branches: Array, sources: Array });
 
-// ── Restore state from URL on load ──────────────────────────────
-const _q = new URLSearchParams(window.location.search);
-const search      = ref(_q.get('search') ?? '');
-const branchId    = ref(_q.get('branch_id') ? Number(_q.get('branch_id')) : '');
-const source      = ref(_q.get('source') ?? '');
-const sortBy      = ref(_q.get('sort') ?? 'next_appointment');
-const perPage     = ref(_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page') ?? 20));
+// ── Restore state from URL → sessionStorage → default ───────────
+const _q  = new URLSearchParams(window.location.search);
+const _ss = (() => { try { return JSON.parse(sessionStorage.getItem('patients_filter') ?? '{}'); } catch { return {}; } })();
+
+const search      = ref(_q.has('search')    ? _q.get('search')                                              : (_ss.search   ?? ''));
+const branchId    = ref(_q.has('branch_id') ? Number(_q.get('branch_id'))                                   : (_ss.branchId ?? ''));
+const source      = ref(_q.has('source')    ? _q.get('source')                                              : (_ss.source   ?? ''));
+const sortBy      = ref(_q.has('sort')      ? _q.get('sort')                                                : (_ss.sortBy   ?? 'created_at'));
+const perPage     = ref(_q.has('per_page')  ? (_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page'))) : (_ss.perPage ?? 20));
 const currentPage = ref(Number(_q.get('page') ?? 1));
 const viewMode    = ref('table');
 
@@ -362,22 +364,27 @@ watch([search, branchId, source, sortBy, perPage, currentPage], () => {
     if (search.value)                    p.set('search',    search.value);
     if (branchId.value !== '')           p.set('branch_id', String(branchId.value));
     if (source.value)                    p.set('source',    source.value);
-    if (sortBy.value !== 'next_appointment') p.set('sort', sortBy.value);
-    if (String(perPage.value) !== '20')  p.set('per_page', String(perPage.value));
+    if (sortBy.value !== 'created_at')   p.set('sort',      sortBy.value);
+    if (String(perPage.value) !== '20')  p.set('per_page',  String(perPage.value));
     if (currentPage.value > 1)           p.set('page',      String(currentPage.value));
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
+    sessionStorage.setItem('patients_filter', JSON.stringify({
+        search: search.value, branchId: branchId.value, source: source.value,
+        sortBy: sortBy.value, perPage: perPage.value,
+    }));
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
 const hasActiveFilters = computed(() =>
     !!(search.value || branchId.value !== '' || source.value ||
-       sortBy.value !== 'next_appointment' || String(perPage.value) !== '20')
+       sortBy.value !== 'created_at' || String(perPage.value) !== '20')
 );
 
 function clearFilters() {
     search.value = ''; branchId.value = ''; source.value = '';
-    sortBy.value = 'next_appointment'; perPage.value = 20;
+    sortBy.value = 'created_at'; perPage.value = 20;
+    sessionStorage.removeItem('patients_filter');
 }
 
 const AVATAR_COLORS = [

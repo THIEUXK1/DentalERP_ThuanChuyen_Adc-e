@@ -19,7 +19,7 @@ export const menuConfig = [
     {
         label: 'LỊCH HẸN',
         items: [
-            { label: 'Đăng ký khám', route: 'schedule.appointments.create', icon: 'appointment', permission: 'appointments.create' },
+            { label: 'Đăng ký khám', route: 'schedule.registrations.index', icon: 'appointment', permission: 'appointments.view' },
             { label: 'Lịch hẹn', route: 'schedule.appointments.index', icon: 'appointment', permission: 'appointments.view' }
         ]
     },

@@ -2,6 +2,15 @@
     <!-- Action Button Bar — inspired by Bambu -->
     <div class="flex flex-wrap items-center gap-1.5">
         <!-- Primary actions -->
+        <Link v-if="can('appointments.create')"
+            :href="route('patients.register-appointment', patientId)"
+            class="action-btn action-btn-teal">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+            </svg>
+            Đăng ký khám
+        </Link>
+
         <Link v-if="can('appointments.view')"
             :href="route('schedule.appointments.create', { patient_id: patientId })"
             class="action-btn action-btn-primary">
@@ -76,6 +85,9 @@ defineProps({
 }
 .action-btn-amber {
     @apply bg-amber-500 text-white border-amber-500 hover:bg-amber-600 hover:border-amber-600 shadow-sm;
+}
+.action-btn-teal {
+    @apply bg-teal-600 text-white border-teal-600 hover:bg-teal-700 hover:border-teal-700 shadow-sm;
 }
 .action-btn-ghost {
     @apply bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:text-gray-800;

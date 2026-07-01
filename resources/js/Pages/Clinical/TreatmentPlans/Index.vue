@@ -40,25 +40,46 @@
 
             <!-- ── Summary stats ────────────────────────────────────────── -->
             <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
-                    <p class="text-xs text-gray-500">Kế hoạch</p>
-                    <p class="text-xl font-bold text-gray-900 mt-0.5">{{ summary.count }}</p>
-                    <p v-if="summary.inProgress > 0" class="text-xs text-indigo-600 mt-0.5">{{ summary.inProgress }} đang điều trị</p>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
-                    <p class="text-xs text-gray-500">Giá trị kế hoạch</p>
-                    <p class="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">{{ formatVnd(summary.netTotal) }}</p>
-                </div>
-                <div class="bg-white rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3">
-                    <p class="text-xs text-emerald-600">Tổng lịch TT</p>
-                    <p class="text-xl font-bold text-emerald-700 mt-0.5 tabular-nums">{{ formatVnd(summary.scheduleTotal) }}</p>
-                    <p class="text-xs text-emerald-500 mt-0.5">{{ summary.withSchedule }} có lịch</p>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-200 px-4 py-3">
-                    <p class="text-xs text-gray-500">Chưa duyệt</p>
-                    <p class="text-xl font-bold text-amber-600 mt-0.5">{{ summary.pending }}</p>
-                    <p class="text-xs text-gray-400 mt-0.5">draft + báo giá</p>
-                </div>
+                <!-- Nháp -->
+                <button @click="toggleStatusGroup('draft')"
+                    :class="['text-left rounded-xl border px-4 py-3 transition-all',
+                        activeStatusGroup === 'draft'
+                            ? 'bg-gray-700 border-gray-700 text-white shadow-md'
+                            : 'bg-white border-gray-200 hover:border-gray-400']">
+                    <p :class="['text-xs font-medium', activeStatusGroup === 'draft' ? 'text-gray-300' : 'text-gray-500']">Nháp</p>
+                    <p :class="['text-2xl font-bold mt-0.5', activeStatusGroup === 'draft' ? 'text-white' : 'text-gray-700']">{{ summary.draft }}</p>
+                    <p :class="['text-xs mt-0.5', activeStatusGroup === 'draft' ? 'text-gray-400' : 'text-gray-400']">kế hoạch</p>
+                </button>
+                <!-- Chưa điều trị -->
+                <button @click="toggleStatusGroup('not_started')"
+                    :class="['text-left rounded-xl border px-4 py-3 transition-all',
+                        activeStatusGroup === 'not_started'
+                            ? 'bg-amber-500 border-amber-500 text-white shadow-md'
+                            : 'bg-white border-amber-200 hover:border-amber-400']">
+                    <p :class="['text-xs font-medium', activeStatusGroup === 'not_started' ? 'text-amber-100' : 'text-amber-600']">Chưa điều trị</p>
+                    <p :class="['text-2xl font-bold mt-0.5', activeStatusGroup === 'not_started' ? 'text-white' : 'text-amber-700']">{{ summary.notStarted }}</p>
+                    <p :class="['text-xs mt-0.5', activeStatusGroup === 'not_started' ? 'text-amber-100' : 'text-amber-400']">đã duyệt / báo giá</p>
+                </button>
+                <!-- Đang điều trị -->
+                <button @click="toggleStatusGroup('in_progress')"
+                    :class="['text-left rounded-xl border px-4 py-3 transition-all',
+                        activeStatusGroup === 'in_progress'
+                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-md'
+                            : 'bg-white border-indigo-200 hover:border-indigo-400']">
+                    <p :class="['text-xs font-medium', activeStatusGroup === 'in_progress' ? 'text-indigo-200' : 'text-indigo-600']">Đang điều trị</p>
+                    <p :class="['text-2xl font-bold mt-0.5', activeStatusGroup === 'in_progress' ? 'text-white' : 'text-indigo-700']">{{ summary.inProgress }}</p>
+                    <p :class="['text-xs mt-0.5', activeStatusGroup === 'in_progress' ? 'text-indigo-200' : 'text-indigo-400']">đang thực hiện</p>
+                </button>
+                <!-- Hoàn thành -->
+                <button @click="toggleStatusGroup('completed')"
+                    :class="['text-left rounded-xl border px-4 py-3 transition-all',
+                        activeStatusGroup === 'completed'
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
+                            : 'bg-white border-emerald-200 hover:border-emerald-400']">
+                    <p :class="['text-xs font-medium', activeStatusGroup === 'completed' ? 'text-emerald-100' : 'text-emerald-600']">Hoàn thành</p>
+                    <p :class="['text-2xl font-bold mt-0.5', activeStatusGroup === 'completed' ? 'text-white' : 'text-emerald-700']">{{ summary.completed }}</p>
+                    <p :class="['text-xs mt-0.5', activeStatusGroup === 'completed' ? 'text-emerald-100' : 'text-emerald-400']">kế hoạch</p>
+                </button>
             </div>
 
             <!-- ── Filters ──────────────────────────────────────────────── -->
@@ -324,15 +345,16 @@ const filterBranch     = ref('');
 const filterDoctor     = ref('');
 const dateFrom         = ref('');
 const dateTo           = ref('');
-const filterInProgress = ref(false);
+const filterInProgress  = ref(false);
 const filterHasSchedule = ref(false);
+const activeStatusGroup = ref('');
 const sortBy           = ref('');
 const sortDir          = ref('desc');
 const activePreset     = ref('');
 
 watch(viewMode, v => localStorage.setItem('tp_view', v));
 watch(perPage,  v => localStorage.setItem('tp_per', String(v)));
-watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, perPage],
+watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, activeStatusGroup, perPage],
     () => { page.value = 1; });
 
 // ── Date presets ─────────────────────────────────────────────────────────────
@@ -382,6 +404,10 @@ const filtered = computed(() => {
     if (filterDoctor.value)  list = list.filter(p => p.doctor_id == filterDoctor.value);
     if (dateFrom.value)      list = list.filter(p => p.created_at_raw >= dateFrom.value);
     if (dateTo.value)        list = list.filter(p => p.created_at_raw <= dateTo.value);
+    if (activeStatusGroup.value === 'draft')       list = list.filter(p => p.status === 'draft');
+    else if (activeStatusGroup.value === 'not_started') list = list.filter(p => ['quoted', 'approved'].includes(p.status));
+    else if (activeStatusGroup.value === 'in_progress') list = list.filter(p => p.status === 'in_progress');
+    else if (activeStatusGroup.value === 'completed')   list = list.filter(p => p.status === 'completed');
     if (filterInProgress.value)  list = list.filter(p => p.status === 'in_progress');
     if (filterHasSchedule.value) list = list.filter(p => p.payment_schedule_count > 0);
     if (search.value.trim()) {
@@ -412,6 +438,11 @@ const sorted = computed(() => {
         return 0;
     });
 });
+
+function toggleStatusGroup(group) {
+    activeStatusGroup.value = activeStatusGroup.value === group ? '' : group;
+    filterStatus.value = '';
+}
 
 function toggleSort(field) {
     if (sortBy.value === field) {
@@ -449,18 +480,17 @@ const pageNumbers = computed(() => {
 
 // ── Summary ────────────────────────────────────────────────────────────────────
 const summary = computed(() => ({
-    count:        filtered.value.length,
-    netTotal:     filtered.value.reduce((s, p) => s + p.net_total, 0),
-    scheduleTotal: filtered.value.reduce((s, p) => s + p.payment_schedule_total, 0),
-    withSchedule: filtered.value.filter(p => p.payment_schedule_count > 0).length,
-    inProgress:   filtered.value.filter(p => p.status === 'in_progress').length,
-    pending:      filtered.value.filter(p => ['draft', 'quoted'].includes(p.status)).length,
+    draft:      props.all_plans.filter(p => p.status === 'draft').length,
+    notStarted: props.all_plans.filter(p => ['quoted', 'approved'].includes(p.status)).length,
+    inProgress: props.all_plans.filter(p => p.status === 'in_progress').length,
+    completed:  props.all_plans.filter(p => p.status === 'completed').length,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const hasFilters = computed(() =>
     !!(search.value || filterStatus.value || filterBranch.value || filterDoctor.value ||
-       dateFrom.value || dateTo.value || filterInProgress.value || filterHasSchedule.value)
+       dateFrom.value || dateTo.value || filterInProgress.value || filterHasSchedule.value ||
+       activeStatusGroup.value)
 );
 
 function clearFilters() {
@@ -472,7 +502,8 @@ function clearFilters() {
     dateTo.value          = '';
     filterInProgress.value  = false;
     filterHasSchedule.value = false;
-    activePreset.value    = '';
+    activeStatusGroup.value = '';
+    activePreset.value      = '';
 }
 
 // ── Export CSV ─────────────────────────────────────────────────────────────────
