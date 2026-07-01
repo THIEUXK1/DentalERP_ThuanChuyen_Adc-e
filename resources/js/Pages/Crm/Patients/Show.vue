@@ -166,6 +166,7 @@
                 v-if="activeTab === 'treatment'"
                 :treatment-plans="treatmentPlans"
                 :appointments="appointments"
+                :pending-deletions="pendingDeletions"
             />
 
             <!-- ── Tab: Sơ đồ răng ───────────────────────────────────────────── -->
@@ -244,6 +245,7 @@ const props = defineProps({
     financial:          Object,
     treatmentPlans:     Array,
     appointments:       Array,
+    pendingDeletions:   { type: Object, default: () => ({}) },
     activities:         Array,
     clinicalNotes:      Array,
     toothConditions:    Array,

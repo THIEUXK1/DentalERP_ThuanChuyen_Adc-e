@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
+use App\Models\PendingDeletion;
 use App\Models\PriceList;
 use App\Models\TreatmentPlan;
 use App\Services\InvoiceService;
@@ -337,17 +338,22 @@ class TreatmentPlanController extends Controller
             ->with('success', 'Đã cập nhật kế hoạch điều trị.');
     }
 
-    public function destroy(TreatmentPlan $treatmentPlan): RedirectResponse
+    public function destroy(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
     {
         $this->authorize('treatment_plans.edit');
 
-        if ($treatmentPlan->status !== TreatmentPlanStatus::Draft) {
-            return back()->with('error', 'Chỉ có thể xóa kế hoạch ở trạng thái Nháp.');
-        }
+        $request->validate(['reason' => 'required|string|max:500']);
 
-        $treatmentPlan->delete();
+        PendingDeletion::create([
+            'deletable_type' => TreatmentPlan::class,
+            'deletable_id'   => $treatmentPlan->id,
+            'reason'         => $request->reason,
+            'user_id'        => auth()->id(),
+            'label'          => $treatmentPlan->code,
+            'execute_at'     => now()->addMinutes(10),
+        ]);
 
-        return back()->with('success', 'Đã xóa kế hoạch.');
+        return back()->with('success', 'Kế hoạch sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
     }
 
     public function transition(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse

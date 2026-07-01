@@ -10,6 +10,7 @@ use App\Models\DentalChair;
 use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
+use App\Models\PendingDeletion;
 use App\Services\AppointmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -141,13 +142,22 @@ class AppointmentController extends Controller
         return back()->with('success', 'Đã lưu ghi chú.');
     }
 
-    public function destroy(Appointment $appointment): RedirectResponse
+    public function destroy(Request $request, Appointment $appointment): RedirectResponse
     {
         $this->authorize('appointments.manage');
 
-        $appointment->delete();
+        $request->validate(['reason' => 'required|string|max:500']);
 
-        return back()->with('success', 'Đã xóa lịch hẹn.');
+        PendingDeletion::create([
+            'deletable_type' => Appointment::class,
+            'deletable_id'   => $appointment->id,
+            'reason'         => $request->reason,
+            'user_id'        => auth()->id(),
+            'label'          => $appointment->code,
+            'execute_at'     => now()->addMinutes(10),
+        ]);
+
+        return back()->with('success', 'Lịch hẹn sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
     }
 
     public function transition(Request $request, Appointment $appointment): RedirectResponse

@@ -17,6 +17,7 @@ use App\Models\Employee;
 use App\Models\Patient;
 use App\Models\PatientInvoice;
 use App\Models\PatientPayment;
+use App\Models\PendingDeletion;
 use App\Models\TreatmentPlan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -300,6 +301,7 @@ class PatientController extends Controller
             ],
             'treatmentPlans'    => $treatmentPlans,
             'appointments'      => $appointments,
+            'pendingDeletions'  => $this->pendingDeletionsMap($patient),
             'activities'        => $activities,
             'clinicalNotes'     => $clinicalNotes,
             'toothConditions'   => $toothConditions,
@@ -314,6 +316,38 @@ class PatientController extends Controller
             'relationshipTypes' => collect(RelationshipType::cases())->map(fn ($r) => ['value' => $r->value, 'label' => $r->label()]),
             'allPatients'       => Patient::where('id', '!=', $patient->id)->where('is_active', true)->orderBy('full_name')->get()->map(fn ($p) => ['id' => $p->id, 'name' => $p->full_name, 'code' => $p->code, 'phone' => $p->phone]),
         ]);
+    }
+
+    private function pendingDeletionsMap(Patient $patient): array
+    {
+        $apptIds = Appointment::where('patient_id', $patient->id)->pluck('id');
+        $planIds = TreatmentPlan::where('patient_id', $patient->id)->pluck('id');
+
+        $rows = PendingDeletion::query()
+            ->whereNull('cancelled_at')
+            ->whereNull('executed_at')
+            ->where(function ($q) use ($apptIds, $planIds) {
+                $q->where(function ($q2) use ($apptIds) {
+                    $q2->where('deletable_type', Appointment::class)
+                        ->whereIn('deletable_id', $apptIds);
+                })->orWhere(function ($q2) use ($planIds) {
+                    $q2->where('deletable_type', TreatmentPlan::class)
+                        ->whereIn('deletable_id', $planIds);
+                });
+            })
+            ->get();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $key = $row->deletable_type . ':' . $row->deletable_id;
+            $map[$key] = [
+                'id'         => $row->id,
+                'reason'     => $row->reason,
+                'execute_at' => $row->execute_at->toIso8601String(),
+                'user_id'    => $row->user_id,
+            ];
+        }
+        return $map;
     }
 
     public function edit(Patient $patient): Response

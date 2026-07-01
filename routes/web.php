@@ -66,6 +66,7 @@ use App\Http\Controllers\Lab\LabController;
 use App\Http\Controllers\Lab\LabOrderController;
 use App\Http\Controllers\Lab\LabWarrantyController;
 use App\Http\Controllers\NotificationController;
+use App\Http\Controllers\PendingDeletionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Reports\ReportController;
 use App\Http\Controllers\Schedule\AppointmentController;
@@ -244,6 +245,9 @@ Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(functi
         ->name('appointments.quick-reschedule')->middleware('can:appointments.manage');
     Route::patch('appointments/{appointment}/notes', [AppointmentController::class, 'updateNotes'])
         ->name('appointments.update-notes')->middleware('can:appointments.manage');
+
+    Route::delete('pending-deletions/{pendingDeletion}/undo', [PendingDeletionController::class, 'undo'])
+        ->name('pending-deletions.undo');
 });
 
 // Core
