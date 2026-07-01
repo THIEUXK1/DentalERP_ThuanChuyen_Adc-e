@@ -95,13 +95,17 @@ class AppointmentController extends Controller
 
         try {
             $this->svc->reschedule($appointment, $data['scheduled_at'], $data['duration_minutes'] ?? 30);
-            $appointment->update([
-                'patient_id' => $data['patient_id'],
-                'doctor_id' => $data['doctor_id'] ?? null,
+            $fields = [
+                'patient_id'      => $data['patient_id'],
+                'doctor_id'       => $data['doctor_id'] ?? null,
                 'dental_chair_id' => $data['dental_chair_id'] ?? null,
-                'service_id' => $data['service_id'] ?? null,
-                'notes' => $data['notes'] ?? null,
-            ]);
+                'service_id'      => $data['service_id'] ?? null,
+                'notes'           => $data['notes'] ?? null,
+            ];
+            if (! empty($data['status'])) {
+                $fields['status'] = $data['status'];
+            }
+            $appointment->update($fields);
         } catch (\RuntimeException $e) {
             return back()->withErrors(['conflict' => $e->getMessage()]);
         }
@@ -192,16 +196,17 @@ class AppointmentController extends Controller
 
         return Inertia::render('Schedule/Appointments/Form', [
             'appointment' => $appointment ? [
-                'id' => $appointment->id,
-                'patient_id' => $appointment->patient_id,
-                'branch_id' => $appointment->branch_id,
-                'doctor_id' => $appointment->doctor_id,
-                'dental_chair_id' => $appointment->dental_chair_id,
-                'service_id' => $appointment->service_id,
-                'lead_id' => $appointment->lead_id,
-                'scheduled_at' => $appointment->scheduled_at->format('Y-m-d\TH:i'),
+                'id'               => $appointment->id,
+                'patient_id'       => $appointment->patient_id,
+                'branch_id'        => $appointment->branch_id,
+                'doctor_id'        => $appointment->doctor_id,
+                'dental_chair_id'  => $appointment->dental_chair_id,
+                'service_id'       => $appointment->service_id,
+                'lead_id'          => $appointment->lead_id,
+                'scheduled_at'     => $appointment->scheduled_at->format('Y-m-d\TH:i'),
                 'duration_minutes' => $appointment->duration_minutes,
-                'notes' => $appointment->notes,
+                'notes'            => $appointment->notes,
+                'status'           => $appointment->status->value,
             ] : array_merge(['patient_id' => null, 'branch_id' => null, 'lead_id' => null, 'doctor_id' => null], $defaults),
             'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
                 ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code]),
@@ -215,21 +220,24 @@ class AppointmentController extends Controller
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
             'services' => DentalService::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'duration_minutes' => $s->duration_minutes]),
+            'statuses' => collect(AppointmentStatus::cases())
+                ->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
         ]);
     }
 
     private function validated(Request $request): array
     {
         return $request->validate([
-            'patient_id' => 'required|exists:patients,id',
-            'branch_id' => 'required|exists:branches,id',
-            'doctor_id' => 'nullable|exists:employees,id',
-            'dental_chair_id' => 'nullable|exists:dental_chairs,id',
-            'service_id' => 'nullable|exists:dental_services,id',
-            'lead_id' => 'nullable|exists:leads,id',
-            'scheduled_at' => 'required|date',
+            'patient_id'       => 'required|exists:patients,id',
+            'branch_id'        => 'required|exists:branches,id',
+            'doctor_id'        => 'nullable|exists:employees,id',
+            'dental_chair_id'  => 'nullable|exists:dental_chairs,id',
+            'service_id'       => 'nullable|exists:dental_services,id',
+            'lead_id'          => 'nullable|exists:leads,id',
+            'scheduled_at'     => 'required|date',
             'duration_minutes' => 'integer|min:5|max:480',
-            'notes' => 'nullable|string',
+            'notes'            => 'nullable|string',
+            'status'           => 'nullable|string',
         ]);
     }
 

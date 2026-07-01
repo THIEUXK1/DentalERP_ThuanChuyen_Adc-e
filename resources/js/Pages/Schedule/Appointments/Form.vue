@@ -63,6 +63,19 @@
                     <textarea v-model="form.notes" rows="2" class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
                 </FormInput>
 
+                <!-- Status — chỉ hiện khi edit -->
+                <div v-if="appointment?.id">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Trạng thái</label>
+                    <div class="flex flex-wrap gap-2">
+                        <button v-for="s in statuses" :key="s.value" type="button"
+                            @click="form.status = s.value"
+                            :class="['px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                                form.status === s.value ? activeClass(s.color) : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50']">
+                            {{ s.label }}
+                        </button>
+                    </div>
+                </div>
+
                 <div class="flex justify-end gap-3 pt-2">
                     <Link :href="route('schedule.appointments.index')" class="px-4 py-2 text-sm text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50">Hủy</Link>
                     <button type="submit" :disabled="form.processing" class="px-4 py-2 text-sm text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50">
@@ -81,7 +94,7 @@ import AppLayout from '@/Components/Layout/AppLayout.vue';
 import FormInput from '@/Components/Shared/FormInput.vue';
 import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
 
-const props = defineProps({ appointment: Object, patients: Array, branches: Array, doctors: Array, chairs: Array, services: Array });
+const props = defineProps({ appointment: Object, patients: Array, branches: Array, doctors: Array, chairs: Array, services: Array, statuses: Array });
 
 const form = useForm({
     patient_id:       props.appointment?.patient_id ?? '',
@@ -93,7 +106,23 @@ const form = useForm({
     scheduled_at:     props.appointment?.scheduled_at ?? '',
     duration_minutes: props.appointment?.duration_minutes ?? 30,
     notes:            props.appointment?.notes ?? '',
+    status:           props.appointment?.status ?? 'booked',
 });
+
+const STATUS_ACTIVE = {
+    gray:   'bg-gray-600 text-white border-gray-600',
+    blue:   'bg-blue-600 text-white border-blue-600',
+    indigo: 'bg-indigo-600 text-white border-indigo-600',
+    yellow: 'bg-yellow-500 text-white border-yellow-500',
+    teal:   'bg-teal-600 text-white border-teal-600',
+    orange: 'bg-orange-500 text-white border-orange-500',
+    red:    'bg-red-600 text-white border-red-600',
+    purple: 'bg-purple-600 text-white border-purple-600',
+    green:  'bg-green-600 text-white border-green-600',
+};
+function activeClass(color) {
+    return STATUS_ACTIVE[color] ?? STATUS_ACTIVE.gray;
+}
 
 const patientOptions  = computed(() => props.patients.map(p => ({ value: p.id, label: `${p.code} — ${p.full_name}`, sublabel: p.phone })));
 const filteredDoctors = computed(() => props.doctors.filter(d => !form.branch_id || d.branch_id == form.branch_id));
