@@ -31,20 +31,20 @@ export const menuConfig = [
         ]
     },
     {
+        label: 'THU NGÂN',
+        items: [
+            { label: 'Hóa đơn', route: 'cashier.invoices.index', icon: 'invoice', permission: 'cashier.view' },
+            { label: 'Công nợ', route: 'cashier.debts.index', icon: 'debt', permission: 'cashier.view' },
+            { label: 'Phiếu chi', route: 'cashier.expenses.index', icon: 'expense', permission: 'expenses.view' }
+        ]
+    },
+    {
         label: 'NHA KHOA CHUYÊN SÂU',
         items: [
             { label: 'Phiếu khám', route: 'dental.examinations.index', icon: 'examination', permission: 'dental.view' },
             { label: 'Thực hiện công đoạn', route: 'dental.examinations.index', icon: 'workflow-step', permission: 'treatment_plans.edit' },
             { label: 'KPI chuyên môn', route: 'dental.kpi.index', icon: 'kpi', permission: 'dental.kpi.view' },
             { label: 'Danh mục bệnh', route: 'dental.conditions.index', icon: 'conditions', permission: 'dental.manage' }
-        ]
-    },
-    {
-        label: 'THU NGÂN',
-        items: [
-            { label: 'Hóa đơn', route: 'cashier.invoices.index', icon: 'invoice', permission: 'cashier.view' },
-            { label: 'Công nợ', route: 'cashier.debts.index', icon: 'debt', permission: 'cashier.view' },
-            { label: 'Phiếu chi', route: 'cashier.expenses.index', icon: 'expense', permission: 'expenses.view' }
         ]
     },
     {

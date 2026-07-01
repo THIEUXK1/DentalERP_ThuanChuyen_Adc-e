@@ -125,6 +125,11 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index')->middleware('can:settings.view');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update')->middleware('can:settings.manage');
     Route::get('clinic-records', [ClinicRecordController::class, 'index'])->name('clinic-records.index')->middleware('can:admin.audit_log');
+    Route::get('clinic-records/template', [ClinicRecordController::class, 'downloadTemplate'])->name('clinic-records.template')->middleware('can:admin.audit_log');
+    Route::post('clinic-records/preview', [ClinicRecordController::class, 'previewImport'])->name('clinic-records.preview')->middleware('can:admin.audit_log');
+    Route::post('clinic-records/import', [ClinicRecordController::class, 'import'])->name('clinic-records.import')->middleware('can:admin.audit_log');
+    Route::post('clinic-records/import-chunk', [ClinicRecordController::class, 'importChunk'])->name('clinic-records.import-chunk')->middleware('can:admin.audit_log');
+    Route::delete('clinic-records/bulk-delete', [ClinicRecordController::class, 'bulkDelete'])->name('clinic-records.bulk-delete')->middleware('can:admin.audit_log');
 });
 
 // Notifications
