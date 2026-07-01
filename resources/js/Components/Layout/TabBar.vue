@@ -1,5 +1,5 @@
 <template>
-    <div v-if="tabs.length > 0" class="relative flex items-stretch bg-gray-100 border-b border-gray-200 select-none">
+    <div v-if="tabs.length > 0" id="tabbar-root" class="relative flex items-stretch bg-gray-100 border-b border-gray-200 select-none">
 
         <!-- Scroll-left button -->
         <button v-if="canScrollLeft" type="button" @click="scroll(-160)"

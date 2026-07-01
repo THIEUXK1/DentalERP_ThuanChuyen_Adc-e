@@ -32,3 +32,20 @@ const props = defineProps({
 
 const collapsed = ref(false);
 </script>
+
+<style>
+@media print {
+    /* Hide sidebar, topbar, tabbar */
+    aside,
+    header,
+    #tabbar-root { display: none !important; }
+
+    /* Remove left margin added by sidebar */
+    .ml-60,
+    .ml-16 { margin-left: 0 !important; }
+
+    /* Remove padding, reset background */
+    main { padding: 0 !important; }
+    body, .min-h-screen { background: #fff !important; }
+}
+</style>
