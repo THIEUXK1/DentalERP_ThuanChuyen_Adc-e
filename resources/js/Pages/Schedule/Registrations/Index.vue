@@ -121,6 +121,10 @@
                             <td class="hidden xl:table-cell px-4 py-3 text-gray-500 max-w-xs truncate">{{ r.notes ?? '—' }}</td>
                             <td class="px-4 py-3 text-right">
                                 <div class="flex items-center justify-end gap-1">
+                                    <button @click="openEdit(r)"
+                                        class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Sửa">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                    </button>
                                     <button @click="printRow(r)"
                                         class="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors" title="In">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
@@ -219,6 +223,68 @@
                         <button type="submit" :disabled="!createForm.patient_id"
                             class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
                             Lưu đăng ký
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit modal -->
+        <div v-if="editModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-xl shadow-xl w-full max-w-md">
+                <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <h3 class="font-semibold text-gray-800">Chỉnh sửa đăng ký</h3>
+                    <button @click="editModal.open = false" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <form @submit.prevent="submitEdit" class="p-5 space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ngày khám</label>
+                            <input type="date" v-model="editForm.registration_date"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Giờ vào</label>
+                            <input type="time" v-model="editForm.visit_time"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Bác sĩ</label>
+                            <select v-model="editForm.doctor_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none">
+                                <option :value="null">— Chưa chọn —</option>
+                                <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Ghế</label>
+                            <select v-model="editForm.dental_chair_id" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none">
+                                <option :value="null">— Chưa chọn —</option>
+                                <option v-for="c in chairs" :key="c.id" :value="c.id">{{ c.name }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Trạng thái</label>
+                        <select v-model="editForm.status" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none">
+                            <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                        <textarea v-model="editForm.notes" rows="2"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+                            placeholder="Ghi chú..." />
+                    </div>
+                    <div class="flex justify-end gap-3 pt-1">
+                        <button type="button" @click="editModal.open = false"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Hủy</button>
+                        <button type="submit"
+                            class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+                            Lưu thay đổi
                         </button>
                     </div>
                 </form>
@@ -367,6 +433,33 @@ function submitCreate() {
     router.post(route('schedule.registrations.store'), createForm.value, {
         preserveScroll: true,
         onSuccess: () => { createModal.value.open = false; },
+    });
+}
+
+// ── Edit modal ───────────────────────────────────────────────────────────
+const editModal = ref({ open: false });
+const editForm = ref({
+    id: null, registration_date: '', visit_time: '',
+    doctor_id: null, dental_chair_id: null, status: 'pending', notes: '',
+});
+
+function openEdit(r) {
+    editForm.value = {
+        id:                r.id,
+        registration_date: r.registration_date,
+        visit_time:        r.visit_time ?? '',
+        doctor_id:         r.doctor_id,
+        dental_chair_id:   r.dental_chair_id,
+        status:            r.status,
+        notes:             r.notes ?? '',
+    };
+    editModal.value.open = true;
+}
+
+function submitEdit() {
+    router.put(route('schedule.registrations.update', editForm.value.id), editForm.value, {
+        preserveScroll: true,
+        onSuccess: () => { editModal.value.open = false; },
     });
 }
 
