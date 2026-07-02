@@ -606,7 +606,7 @@ const VIEW_MODES = [
 const viewMode     = ref(localStorage.getItem('apt_view_mode') || 'list');
 const date         = ref(dayjs().format('YYYY-MM-DD'));
 const search       = ref('');
-const todayOnly    = ref(false);
+const todayOnly    = ref(true);
 const branchId     = ref('');
 const doctorId     = ref('');
 const filterStatus = ref('');
@@ -640,6 +640,7 @@ const filteredAppointments = computed(() => {
             a.scheduled_at.includes(q)
         );
     }
+    list.sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
     return list;
 });
 

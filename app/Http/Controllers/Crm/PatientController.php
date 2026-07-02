@@ -313,6 +313,9 @@ class PatientController extends Controller
                     'estimated_sessions' => $plan->estimated_sessions,
                     'frequency'          => $plan->frequency,
                     'notes'              => $plan->notes,
+                    'transitions'        => collect($plan->status->allowedTransitions())->map(fn ($s) => [
+                        'value' => $s->value,
+                    ])->values()->all(),
                     'items'              => $plan->items->map(fn ($item) => [
                         'id'           => $item->id,
                         'name'         => $item->name,
@@ -404,6 +407,7 @@ class PatientController extends Controller
                 'phone'             => $patient->phone,
                 'email'             => $patient->email,
                 'dob'               => $patient->dob?->format('d/m/Y'),
+                'dob_raw'           => $patient->dob?->format('Y-m-d'),
                 'gender'            => $patient->gender,
                 'address'           => $patient->address,
                 'source'            => $patient->source,
@@ -438,6 +442,8 @@ class PatientController extends Controller
             'attachmentTypes'   => collect(AttachmentType::cases())->map(fn ($t) => ['value' => $t->value, 'label' => $t->label()]),
             'relationshipTypes' => collect(RelationshipType::cases())->map(fn ($r) => ['value' => $r->value, 'label' => $r->label()]),
             'allPatients'       => Patient::where('id', '!=', $patient->id)->where('is_active', true)->orderBy('full_name')->get()->map(fn ($p) => ['id' => $p->id, 'name' => $p->full_name, 'code' => $p->code, 'phone' => $p->phone]),
+            'branches'          => Branch::where('is_active', true)->orderBy('name')->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'sources'           => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
         ]);
     }
 

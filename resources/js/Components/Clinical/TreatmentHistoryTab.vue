@@ -32,12 +32,30 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
                     </svg>
                     <span class="text-xs text-gray-500 font-mono w-8 flex-shrink-0">{{ pi + 1 }}</span>
-                    <span class="text-xs text-gray-500 w-28 flex-shrink-0">{{ plan.created_at }}</span>
                     <span class="text-sm font-medium text-gray-800 flex-1 truncate">{{ plan.code }}</span>
                     <span class="text-xs text-gray-500 hidden sm:block">{{ plan.doctor }}</span>
-                    <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', statusClass(plan.status)]">
-                        {{ plan.status_label }}
-                    </span>
+                    <div class="relative flex-shrink-0" @click.stop>
+                        <button
+                            :class="['inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold transition-opacity',
+                                stageClass(plan.status),
+                                plan.transitions?.length ? 'cursor-pointer hover:opacity-80' : 'cursor-default']"
+                            @click="plan.transitions?.length ? toggleDropdown(plan.id) : null">
+                            {{ stageLabel(plan.status) }}
+                            <svg v-if="plan.transitions?.length" class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+                        <div v-if="openDropdown === plan.id"
+                            class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[160px]">
+                            <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Chuyển sang</p>
+                            <button v-for="t in plan.transitions" :key="t.value"
+                                @click="doTransition(plan.id, t.value)"
+                                class="w-full text-left px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                                <span :class="['w-2 h-2 rounded-full flex-shrink-0', stageDot(t.value)]"></span>
+                                {{ stageLabel(t.value) }}
+                            </button>
+                        </div>
+                    </div>
                     <div class="hidden md:flex items-center gap-3 text-xs ml-2">
                         <span class="text-gray-500">Tổng: <span class="font-semibold text-gray-800">{{ fmt(plan.total_amount) }}</span></span>
                         <span class="text-gray-500">Đã thu: <span class="font-semibold text-emerald-600">{{ fmt(plan.amount_paid) }}</span></span>
@@ -59,7 +77,7 @@
                     <!-- Normal: link + trash -->
                     <template v-else>
                         <Link :href="route('clinical.treatment-plans.show', plan.id)"
-                            class="flex-shrink-0 text-indigo-500 hover:text-indigo-700 text-xs hidden sm:flex items-center gap-1"
+                            class="flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors hidden sm:inline-flex"
                             @click.stop>
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
@@ -91,23 +109,13 @@
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Mục tiêu</p>
                             <p class="text-gray-800 font-medium">{{ plan.treatment_goal }}</p>
                         </div>
-                        <div v-if="plan.priority">
-                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ưu tiên</p>
-                            <span :class="['inline-flex px-2 py-0.5 rounded-full font-medium', priorityClass(plan.priority)]">
-                                {{ priorityLabel(plan.priority) }}
-                            </span>
-                        </div>
                         <div v-if="plan.start_date">
-                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Bắt đầu dự kiến</p>
+                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ngày điều trị</p>
                             <p class="text-gray-800 font-medium">{{ plan.start_date }}</p>
                         </div>
                         <div v-if="plan.expected_end_date">
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Hoàn thành dự kiến</p>
                             <p class="text-gray-800 font-medium">{{ plan.expected_end_date }}</p>
-                        </div>
-                        <div v-if="plan.estimated_sessions">
-                            <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Số buổi</p>
-                            <p class="text-gray-800 font-medium">{{ plan.estimated_sessions }} buổi</p>
                         </div>
                         <div v-if="plan.frequency">
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Tần suất</p>
@@ -171,86 +179,6 @@
         </div>
     </div>
 
-    <!-- ── Lịch hẹn ──────────────────────────────────────────────────────── -->
-    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
-            <h3 class="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-                </svg>
-                Lịch hẹn liên quan
-            </h3>
-            <span class="text-xs text-gray-400">{{ appointments.length }} lịch hẹn</span>
-        </div>
-
-        <div v-if="appointments.length === 0" class="flex flex-col items-center justify-center py-8 text-gray-400">
-            <svg class="w-8 h-8 mb-2 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
-            </svg>
-            <p class="text-sm">Chưa có lịch hẹn</p>
-        </div>
-
-        <div v-else class="overflow-x-auto">
-            <table class="w-full text-xs">
-                <thead>
-                    <tr class="bg-gray-50 border-b border-gray-100">
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium w-8">#</th>
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium">Mã lịch</th>
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium">Ngày giờ hẹn</th>
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden sm:table-cell">Bác sĩ</th>
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Dịch vụ</th>
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Thời lượng</th>
-                        <th class="px-4 py-2 text-center text-gray-500 font-medium">Trạng thái</th>
-                        <th class="px-4 py-2 text-left text-gray-500 font-medium hidden lg:table-cell">Ghi chú</th>
-                        <th class="px-4 py-2 w-8"></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-gray-50">
-                    <tr v-for="(appt, idx) in appointments" :key="appt.id"
-                        :class="['transition-colors', pendingKey('App\\Models\\Appointment', appt.id) ? 'bg-red-50/60' : 'hover:bg-sky-50/30']">
-                        <td class="px-4 py-2 text-gray-400">{{ idx + 1 }}</td>
-                        <td class="px-4 py-2 font-mono text-gray-700 font-medium">{{ appt.code }}</td>
-                        <td class="px-4 py-2">
-                            <p class="font-medium text-gray-800">{{ appt.scheduled_date }}</p>
-                            <p class="text-gray-400">{{ appt.scheduled_time }}</p>
-                        </td>
-                        <td class="px-4 py-2 text-gray-600 hidden sm:table-cell">{{ appt.doctor }}</td>
-                        <td class="px-4 py-2 text-gray-600 hidden md:table-cell">{{ appt.service }}</td>
-                        <td class="px-4 py-2 text-gray-500 hidden md:table-cell">{{ appt.duration_minutes ? appt.duration_minutes + ' phút' : '—' }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', apptStatusClass(appt.status)]">
-                                {{ appt.status_label }}
-                            </span>
-                        </td>
-                        <td class="px-4 py-2 text-gray-400 hidden lg:table-cell max-w-xs truncate">{{ appt.notes || '—' }}</td>
-                        <td class="px-4 py-2 text-center">
-                            <template v-if="pendingKey('App\\Models\\Appointment', appt.id)">
-                                <div class="flex items-center gap-1.5 justify-end">
-                                    <span class="text-xs text-red-500 font-medium whitespace-nowrap">
-                                        Xóa sau {{ countdown(pendingKey('App\\Models\\Appointment', appt.id).execute_at) }}
-                                    </span>
-                                    <button @click="undo(pendingKey('App\\Models\\Appointment', appt.id).id)"
-                                        class="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 hover:bg-amber-200 font-medium transition-colors whitespace-nowrap">
-                                        Hoàn tác
-                                    </button>
-                                </div>
-                            </template>
-                            <template v-else>
-                                <button @click="openDeleteAppt(appt)"
-                                    class="text-gray-300 hover:text-red-500 transition-colors"
-                                    title="Xóa lịch hẹn">
-                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                    </svg>
-                                </button>
-                            </template>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
     <!-- Delete confirm modal -->
     <DeleteConfirmModal
         :show="modal.show"
@@ -270,15 +198,29 @@ import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
 
 const props = defineProps({
     treatmentPlans:   { type: Array,  default: () => [] },
-    appointments:     { type: Array,  default: () => [] },
     pendingDeletions: { type: Object, default: () => ({}) },
 });
 
 // Countdown ticker
 const now = ref(Date.now());
 let timer = null;
-onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
-onUnmounted(() => clearInterval(timer));
+onMounted(() => {
+    timer = setInterval(() => { now.value = Date.now(); }, 1000);
+    document.addEventListener('click', closeDropdown);
+});
+onUnmounted(() => {
+    clearInterval(timer);
+    document.removeEventListener('click', closeDropdown);
+});
+
+// Status transition dropdown
+const openDropdown = ref(null);
+function toggleDropdown(planId) { openDropdown.value = openDropdown.value === planId ? null : planId; }
+function closeDropdown() { openDropdown.value = null; }
+function doTransition(planId, status) {
+    openDropdown.value = null;
+    router.post(route('clinical.treatment-plans.transition', planId), { status }, { preserveScroll: true });
+}
 
 // Lookup a pending deletion entry for a given model key
 function pendingKey(type, id) {
@@ -303,13 +245,6 @@ const modal = reactive({
     show: false, title: '', subtitle: '',
     route: null, id: null,
 });
-
-function openDeleteAppt(appt) {
-    modal.show     = true;
-    modal.title    = `Xóa lịch hẹn ${appt.code}`;
-    modal.subtitle = `Ngày hẹn: ${appt.scheduled_date} ${appt.scheduled_time}`;
-    modal.route    = route('schedule.appointments.destroy', appt.id);
-}
 
 function openDeletePlan(plan) {
     modal.show     = true;
@@ -339,18 +274,29 @@ function togglePlan(id) {
 function fmt(val) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val ?? 0);
 }
-function statusClass(status) {
-    const map = { draft: 'bg-gray-100 text-gray-600', approved: 'bg-blue-100 text-blue-700', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600' };
-    return map[status] ?? 'bg-gray-100 text-gray-600';
+function stageLabel(status) {
+    if (status === 'cancelled') return 'Đã hủy';
+    if (status === 'completed') return 'Hoàn thành';
+    if (status === 'in_progress') return 'Đang điều trị';
+    if (['quoted', 'approved'].includes(status)) return 'Chưa điều trị';
+    return 'Nháp';
+}
+function stageClass(status) {
+    if (status === 'cancelled') return 'bg-red-100 text-red-600';
+    if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
+    if (status === 'in_progress') return 'bg-indigo-100 text-indigo-700';
+    if (['quoted', 'approved'].includes(status)) return 'bg-amber-100 text-amber-700';
+    return 'bg-gray-100 text-gray-600';
+}
+function stageDot(status) {
+    if (status === 'cancelled') return 'bg-red-500';
+    if (status === 'completed') return 'bg-emerald-500';
+    if (status === 'in_progress') return 'bg-indigo-500';
+    if (['quoted', 'approved'].includes(status)) return 'bg-amber-500';
+    return 'bg-gray-400';
 }
 function itemStatusClass(status) {
     const map = { pending: 'bg-gray-100 text-gray-600', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600' };
-    return map[status] ?? 'bg-gray-100 text-gray-600';
-}
-function priorityLabel(p) { return { normal: 'Bình thường', urgent: 'Cần xử lý sớm', emergency: 'Cấp cứu' }[p] ?? p; }
-function priorityClass(p) { return { normal: 'bg-gray-100 text-gray-600', urgent: 'bg-amber-100 text-amber-700', emergency: 'bg-red-100 text-red-700' }[p] ?? 'bg-gray-100 text-gray-600'; }
-function apptStatusClass(status) {
-    const map = { booked: 'bg-gray-100 text-gray-600', confirmed: 'bg-blue-100 text-blue-700', checked_in: 'bg-teal-100 text-teal-700', in_treatment: 'bg-indigo-100 text-indigo-700', completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600', no_show: 'bg-orange-100 text-orange-700', rescheduled: 'bg-yellow-100 text-yellow-700' };
     return map[status] ?? 'bg-gray-100 text-gray-600';
 }
 </script>

@@ -218,6 +218,7 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
 Route::middleware(['auth'])->prefix('cashier')->name('cashier.')->group(function () {
     Route::resource('invoices', PatientInvoiceController::class)->only(['index', 'show'])->middleware('can:cashier.view');
     Route::post('invoices/{invoice}/payments', [PatientPaymentController::class, 'store'])->name('invoices.payments.store')->middleware('can:cashier.manage');
+    Route::patch('payments/{payment}/method', [PatientPaymentController::class, 'updateMethod'])->name('payments.update-method')->middleware('can:cashier.manage');
     Route::post('invoices/{invoice}/discount', [PatientInvoiceController::class, 'discount'])->name('invoices.discount')->middleware('can:cashier.approve_discount');
     Route::post('invoices/{invoice}/cancel', [PatientInvoiceController::class, 'cancel'])->name('invoices.cancel')->middleware('can:cashier.manage');
     Route::get('invoices/{invoice}/receipt', [PatientInvoiceController::class, 'pdf'])->name('invoices.receipt')->middleware('can:cashier.view');

@@ -45,7 +45,7 @@
                 </div>
 
                 <!-- Action button bar -->
-                <ActionButtonBar :patient-id="patient.id" />
+                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" />
 
                 <!-- Financial summary bar -->
                 <FinancialSummaryBar
@@ -273,6 +273,12 @@
             <TreatmentHistoryTab
                 v-if="activeTab === 'treatment'"
                 :treatment-plans="treatmentPlans"
+                :pending-deletions="pendingDeletions"
+            />
+
+            <!-- ── Tab: Lịch hẹn ─────────────────────────────────────────────── -->
+            <AppointmentHistoryTab
+                v-if="activeTab === 'appointments'"
                 :appointments="appointments"
                 :pending-deletions="pendingDeletions"
             />
@@ -326,6 +332,10 @@
                 />
             </div>
         </div>
+
+        <PatientEditModal v-if="showEditModal"
+            :patient="patient" :branches="branches" :sources="sources"
+            @close="showEditModal = false" />
     </AppLayout>
 </template>
 
@@ -338,12 +348,14 @@ import FinancialSummaryBar from '@/Components/Shared/FinancialSummaryBar.vue';
 import LastVisitBanner from '@/Components/Shared/LastVisitBanner.vue';
 import ActionButtonBar from '@/Components/Shared/ActionButtonBar.vue';
 import TreatmentHistoryTab from '@/Components/Clinical/TreatmentHistoryTab.vue';
+import AppointmentHistoryTab from '@/Components/Clinical/AppointmentHistoryTab.vue';
 import DentalChartTab from '@/Components/Clinical/DentalChartTab.vue';
 import ClinicalNotesTab from '@/Components/Clinical/ClinicalNotesTab.vue';
 import AttachmentsTab from './components/AttachmentsTab.vue';
 import ConsentFormsTab from './components/ConsentFormsTab.vue';
 import RelationshipsSection from './components/RelationshipsSection.vue';
 import TreatmentTimeline from './components/TreatmentTimeline.vue';
+import PatientEditModal from './components/PatientEditModal.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
 
@@ -370,13 +382,16 @@ const props = defineProps({
     attachmentTypes:    Array,
     relationshipTypes:  Array,
     allPatients:        Array,
+    branches:           Array,
+    sources:            Array,
 });
 
-const activeTab    = ref('info');
+const activeTab      = ref('info');
+const showEditModal  = ref(false);
 
 onMounted(() => {
     const hash = window.location.hash.replace('#', '');
-    const tabKeys = ['info', 'invoices', 'treatment', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
+    const tabKeys = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
     if (hash && tabKeys.includes(hash)) {
         activeTab.value = hash;
     }
@@ -388,7 +403,8 @@ const actForm      = useForm({ type: 'note', content: '', patient_id: props.pati
 const tabs = computed(() => [
     { key: 'info',         label: 'Thông tin' },
     { key: 'invoices',     label: 'Hóa đơn', count: props.invoices?.length ?? 0 },
-    { key: 'treatment',    label: 'Điều trị', count: (props.treatmentPlans?.length ?? 0) + (props.appointments?.length ?? 0) },
+    { key: 'treatment',    label: 'Điều trị', count: props.treatmentPlans?.length ?? 0 },
+    { key: 'appointments', label: 'Lịch hẹn', count: props.appointments?.length ?? 0 },
     { key: 'chart',        label: 'Sơ đồ răng' },
     { key: 'clinical',     label: 'Lâm sàng', count: props.clinicalNotes?.length ?? 0 },
     { key: 'attachments',  label: 'Tài liệu', count: props.attachments?.length ?? 0 },

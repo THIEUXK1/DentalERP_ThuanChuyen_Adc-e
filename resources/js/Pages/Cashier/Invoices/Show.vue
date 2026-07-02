@@ -15,14 +15,6 @@
                                 class="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
                                 Đợt {{ invoice.installment_index + 1 }}
                             </span>
-                            <Link v-if="invoice.plan_id"
-                                :href="route('clinical.treatment-plans.show', invoice.plan_id)"
-                                class="inline-flex items-center gap-1 text-xs text-indigo-500 hover:text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                                </svg>
-                                {{ invoice.plan_code }}
-                            </Link>
                         </div>
                         <h2 class="text-xl font-bold text-gray-900">{{ invoice.patient }}</h2>
                         <p class="text-sm text-gray-500 mt-0.5">
@@ -33,8 +25,16 @@
                         </p>
                     </div>
                     <div class="flex gap-2 flex-shrink-0 flex-wrap">
+                        <Link v-if="invoice.plan_id"
+                            :href="route('clinical.treatment-plans.show', invoice.plan_id)"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-indigo-300 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-indigo-700">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                            Kế hoạch {{ invoice.plan_code }}
+                        </Link>
                         <a :href="route('cashier.invoices.receipt', invoice.id)" target="_blank"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+                            class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
                             </svg>
@@ -279,9 +279,14 @@
                                 <tr v-for="p in payments" :key="p.id" class="hover:bg-gray-50">
                                     <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ p.payment_date }}</td>
                                     <td class="px-4 py-3">
-                                        <span :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium', methodBadgeClass(p.method)]">
+                                        <button @click="openMethodModal(p)"
+                                            :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-75 transition-opacity cursor-pointer', methodBadgeClass(p.method)]"
+                                            title="Bấm để sửa hình thức">
                                             {{ methodIcon(p.method) }} {{ p.method_label }}
-                                        </span>
+                                            <svg class="w-2.5 h-2.5 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
                                     </td>
                                     <td class="px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap"
                                         :class="p.amount < 0 ? 'text-red-600' : 'text-emerald-700'">
@@ -483,6 +488,56 @@
             </div>
         </div>
     </Teleport>
+
+    <!-- ── Edit payment method modal ───────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="methodModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+                <div class="px-5 pt-5 pb-4 border-b border-amber-200 bg-amber-50 rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        </svg>
+                        <h3 class="font-semibold text-base text-amber-800">Sửa hình thức thanh toán</h3>
+                    </div>
+                </div>
+                <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                        ⚠ Thay đổi hình thức thanh toán sẽ ảnh hưởng đến báo cáo tài chính. Chỉ thực hiện khi nhập sai.
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 mb-2 font-medium">Chọn hình thức mới</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button v-for="m in methods" :key="m.value"
+                                @click="methodModal.selected = m.value"
+                                :class="['flex flex-col items-center gap-1 px-2 py-2 rounded-lg border text-xs font-medium transition-all',
+                                    methodModal.selected === m.value
+                                        ? methodActiveClass(m.value)
+                                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50']">
+                                <span class="text-base">{{ m.icon }}</span>
+                                {{ m.label }}
+                            </button>
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input v-model="methodModal.confirmed" type="checkbox" class="w-4 h-4 accent-amber-600 cursor-pointer" />
+                        <span class="text-xs font-medium text-gray-700">Tôi xác nhận muốn thay đổi hình thức thanh toán</span>
+                    </label>
+                </div>
+                <div class="px-5 pb-5 flex justify-end gap-2">
+                    <button @click="methodModal.open = false"
+                        class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        Hủy bỏ
+                    </button>
+                    <button @click="submitMethodChange"
+                        :disabled="!methodModal.confirmed || methodModal.selected === methodModal.current"
+                        class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                        Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup>
@@ -512,6 +567,22 @@ const discountAmount = ref(props.invoice.discount);
 const showCancelModal  = ref(false);
 const cancelReason     = ref('');
 const cancelReasonError = ref('');
+
+// ── Edit payment method ────────────────────────────────────────────────────
+const methodModal = ref({ open: false, paymentId: null, current: '', selected: '', confirmed: false });
+
+function openMethodModal(p) {
+    methodModal.value = { open: true, paymentId: p.id, current: p.method, selected: p.method, confirmed: false };
+}
+function submitMethodChange() {
+    if (!methodModal.value.confirmed || methodModal.value.selected === methodModal.value.current) return;
+    router.patch(route('cashier.payments.update-method', methodModal.value.paymentId), {
+        method: methodModal.value.selected,
+    }, {
+        onSuccess: () => { methodModal.value.open = false; },
+        preserveScroll: true,
+    });
+}
 
 function formatDate(dateStr) {
     if (!dateStr) return '';

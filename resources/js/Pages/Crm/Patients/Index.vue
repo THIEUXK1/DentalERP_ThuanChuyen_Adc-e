@@ -8,13 +8,13 @@
                     <h2 class="text-xl font-bold text-gray-900">Danh sách khách hàng</h2>
                     <p class="text-sm text-gray-500 mt-0.5">Quản lý toàn bộ hồ sơ bệnh nhân</p>
                 </div>
-                <Link v-if="can('patients.create')" :href="route('patients.create')"
+                <button v-if="can('patients.create')" @click="showCreateModal = true"
                     class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 font-medium shadow-sm">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
                     Thêm khách hàng
-                </Link>
+                </button>
             </div>
 
             <!-- ── Stats bar ───────────────────────────────────────────── -->
@@ -248,6 +248,10 @@
             </div>
 
         </div>
+
+        <PatientCreateModal v-if="showCreateModal"
+            :branches="branches" :sources="sources"
+            @close="showCreateModal = false" />
     </AppLayout>
 </template>
 
@@ -256,9 +260,12 @@ import { ref, computed, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import { usePermission } from '@/composables/usePermission';
+import PatientCreateModal from './components/PatientCreateModal.vue';
 
 const { hasPermission: can } = usePermission();
 const props = defineProps({ all_patients: Array, branches: Array, sources: Array });
+
+const showCreateModal = ref(false);
 
 // ── Restore state from URL → sessionStorage → default ───────────
 const _q  = new URLSearchParams(window.location.search);

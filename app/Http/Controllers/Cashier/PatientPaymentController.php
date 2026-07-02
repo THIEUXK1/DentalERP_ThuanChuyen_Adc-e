@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Cashier;
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Models\PatientInvoice;
+use App\Models\PatientPayment;
 use App\Services\InvoiceService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,5 +43,18 @@ class PatientPaymentController extends Controller
         }
 
         return back()->with('success', 'Đã ghi nhận thanh toán.');
+    }
+
+    public function updateMethod(Request $request, PatientPayment $payment): RedirectResponse
+    {
+        $this->authorize('cashier.manage');
+
+        $data = $request->validate([
+            'method' => 'required|in:'.implode(',', array_column(PaymentMethod::cases(), 'value')),
+        ]);
+
+        $payment->update(['method' => $data['method']]);
+
+        return back()->with('success', 'Đã cập nhật hình thức thanh toán.');
     }
 }

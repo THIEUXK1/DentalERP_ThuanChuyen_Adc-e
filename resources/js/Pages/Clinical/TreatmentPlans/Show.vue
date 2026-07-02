@@ -12,7 +12,10 @@
                             <span class="font-mono text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{{ plan.code }}</span>
                             <StatusBadge :color="plan.status_color">{{ plan.status_label }}</StatusBadge>
                         </div>
-                        <h2 class="text-xl font-bold text-gray-900">{{ plan.patient }}</h2>
+                        <Link :href="route('patients.show', plan.patient_id)"
+                            class="text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                            {{ plan.patient }}
+                        </Link>
                         <p class="text-sm text-gray-500 mt-0.5">
                             <span v-if="plan.doctor">🦷 {{ plan.doctor }}</span>
                             <span v-if="plan.consultant" class="ml-3">💬 {{ plan.consultant }}</span>
@@ -20,7 +23,9 @@
                         </p>
                     </div>
                     <div class="flex gap-2 flex-shrink-0">
-                        <Link :href="route('cashier.invoices.index', { plan_id: plan.id })"
+                        <Link :href="plan.primary_invoice_id
+                                ? route('cashier.invoices.show', plan.primary_invoice_id)
+                                : route('cashier.invoices.index', { plan_id: plan.id })"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-indigo-700 font-medium">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
@@ -91,8 +96,16 @@
                         </p>
                     </div>
 
+                    <!-- Locked notice when payments exist -->
+                    <div v-if="plan.has_payments" class="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
+                        <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                        Danh sách dịch vụ đã bị khóa vì hóa đơn đã có lịch sử thanh toán.
+                    </div>
+
                     <!-- Add item form — Bambu style -->
-                    <div v-if="plan.is_editable && can('treatment_plans.edit')" class="bg-white rounded-xl border border-indigo-100 p-4">
+                    <div v-if="plan.is_editable && can('treatment_plans.edit') && !plan.has_payments" class="bg-white rounded-xl border border-indigo-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -274,7 +287,7 @@
                                         <button v-if="item.status !== 'completed' && plan.status === 'in_progress'"
                                             @click="completeItem(item.id)"
                                             class="text-emerald-600 hover:text-emerald-800 text-xs font-medium mr-2 hover:underline">✓ Xong</button>
-                                        <button v-if="plan.is_editable"
+                                        <button v-if="plan.is_editable && !plan.has_payments"
                                             @click="removeItem(item.id)"
                                             class="text-red-400 hover:text-red-600 text-xs hover:underline">Xóa</button>
                                     </td>
@@ -340,18 +353,11 @@
                                                 Trạng thái hiện tại
                                             </p>
                                         </div>
-                                        <template v-if="currentStepIdx < idx && canGoToStep(idx)">
-                                            <span v-if="stage.key === 'completed' && !allItemsCompleted"
-                                                :title="`Còn ${pendingItemCount} dịch vụ chưa hoàn thành`"
-                                                class="text-xs px-2.5 py-1 rounded-lg font-medium border border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed flex-shrink-0 select-none">
-                                                Chuyển →
-                                            </span>
-                                            <button v-else
-                                                @click="doTransition(stage.targetStatus)"
-                                                :class="['text-xs px-2.5 py-1 rounded-lg font-medium border transition-colors flex-shrink-0', stage.btnClass]">
-                                                Chuyển →
-                                            </button>
-                                        </template>
+                                        <button v-if="currentStepIdx < idx && canGoToStep(idx)"
+                                            @click="confirmTransition(stage.targetStatus, stage.label)"
+                                            :class="['text-xs px-2.5 py-1 rounded-lg font-medium border transition-colors flex-shrink-0', stage.btnClass]">
+                                            Chuyển →
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -359,7 +365,7 @@
 
                         <!-- Hủy kế hoạch -->
                         <div v-if="canCancel" class="border-t border-gray-100 mt-2 pt-3">
-                            <button @click="doTransition('cancelled')"
+                            <button @click="confirmTransition('cancelled', 'Đã hủy')"
                                 class="w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 font-medium transition-colors">
                                 Hủy kế hoạch
                             </button>
@@ -435,6 +441,11 @@
                                                 instInvoice(idx).status === 'partial_paid' ? 'bg-amber-100 text-amber-700' :
                                                 'bg-gray-100 text-gray-500'
                                             ]">{{ instInvoice(idx).status_label }}</span>
+                                            <Link v-if="instInvoice(idx)?.id"
+                                                :href="route('cashier.invoices.show', instInvoice(idx).id)"
+                                                class="text-[10px] text-indigo-500 hover:text-indigo-700 underline">
+                                                Xem HĐ →
+                                            </Link>
                                         </div>
                                         <p class="text-gray-700 font-medium mt-0.5">{{ inst.due_date || 'Chưa có ngày' }}</p>
                                         <p v-if="inst.note" class="text-gray-400 mt-0.5">{{ inst.note }}</p>
@@ -458,6 +469,22 @@
                                 <span class="text-indigo-700 tabular-nums">{{ formatVnd(scheduleTotal) }}</span>
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Delete plan -->
+                    <div v-if="can('treatment_plans.edit')" class="bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Vùng nguy hiểm</h3>
+                        <div v-if="plan.has_payments"
+                            class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
+                            <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                            </svg>
+                            <span>Không thể xóa kế hoạch đã có lịch sử thanh toán.</span>
+                        </div>
+                        <button v-else @click="showDeleteModal = true"
+                            class="w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 font-medium transition-colors">
+                            Xóa kế hoạch điều trị
+                        </button>
                     </div>
                 </div>
             </div>
@@ -510,16 +537,16 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Số lượng *</label>
                                         <input v-model="detailForm.quantity" type="number" min="1"
-                                            :readonly="!plan.is_editable"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-gray-50"
-                                            :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Đơn giá (₫) *</label>
                                         <input v-model="detailForm.unit_price" type="number" min="0"
-                                            :readonly="!plan.is_editable"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                 </div>
 
@@ -528,9 +555,9 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Giảm giá (₫)</label>
                                         <input v-model="detailForm.discount" type="number" min="0"
-                                            :readonly="!plan.is_editable"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Thành tiền</label>
@@ -544,9 +571,9 @@
                                 <div>
                                     <label class="text-xs text-gray-500 mb-1 block">Vị trí răng</label>
                                     <input v-model="detailForm.tooth_number" type="text" placeholder="VD: 11,12,21"
-                                        :readonly="!plan.is_editable"
+                                        :readonly="!canEditItems"
                                         class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                        :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                        :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                 </div>
 
                                 <!-- Giai đoạn + Số buổi -->
@@ -554,16 +581,16 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Giai đoạn / Đợt</label>
                                         <input v-model="detailForm.stage_name" type="text" placeholder="VD: Giai đoạn 1"
-                                            :readonly="!plan.is_editable"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Số buổi dự kiến</label>
                                         <input v-model="detailForm.estimated_sessions" type="number" min="1" placeholder="VD: 3"
-                                            :readonly="!plan.is_editable"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                 </div>
 
@@ -571,7 +598,7 @@
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Người thực hiện</label>
-                                        <select v-if="plan.is_editable" v-model="detailForm.responsible_doctor_id"
+                                        <select v-if="canEditItems" v-model="detailForm.responsible_doctor_id"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                                             <option :value="null">-- Chọn bác sĩ --</option>
                                             <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -582,7 +609,7 @@
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Trợ thủ</label>
-                                        <select v-if="plan.is_editable" v-model="detailForm.assistant_doctor_id"
+                                        <select v-if="canEditItems" v-model="detailForm.assistant_doctor_id"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                                             <option :value="null">-- Chọn trợ thủ --</option>
                                             <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
@@ -597,24 +624,24 @@
                                 <div>
                                     <label class="text-xs text-gray-500 mb-1 block">Chẩn đoán</label>
                                     <input v-model="detailForm.diagnosis" type="text" placeholder="Chẩn đoán..."
-                                        :readonly="!plan.is_editable"
+                                        :readonly="!canEditItems"
                                         class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                        :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'" />
+                                        :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                 </div>
 
                                 <!-- Ghi chú -->
                                 <div>
                                     <label class="text-xs text-gray-500 mb-1 block">Ghi chú</label>
                                     <textarea v-model="detailForm.notes" rows="3" placeholder="Ghi chú..."
-                                        :readonly="!plan.is_editable"
+                                        :readonly="!canEditItems"
                                         class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-                                        :class="plan.is_editable ? '' : 'bg-gray-50 text-gray-500'"></textarea>
+                                        :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'"></textarea>
                                 </div>
                             </div>
 
                             <!-- Footer actions -->
                             <div class="px-5 py-4 border-t border-gray-100 bg-gray-50 flex items-center gap-2">
-                                <button v-if="plan.is_editable" @click="saveDetail" :disabled="detailForm.processing"
+                                <button v-if="canEditItems" @click="saveDetail" :disabled="detailForm.processing"
                                     class="flex-1 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
                                     Lưu thay đổi
                                 </button>
@@ -623,7 +650,7 @@
                                     class="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">
                                     ✓ Xong
                                 </button>
-                                <button v-if="plan.is_editable"
+                                <button v-if="plan.is_editable && !plan.has_payments"
                                     @click="removeItem(detailItem.id); closeDetail()"
                                     class="px-4 py-2 text-sm border border-red-200 text-red-500 rounded-lg hover:bg-red-50 font-medium">
                                     Xóa
@@ -637,6 +664,120 @@
                     </Transition>
                 </div>
             </Transition>
+        </Teleport>
+
+        <!-- ── Transition confirmation modal ──────────────────────────────── -->
+        <Teleport to="body">
+            <div v-if="transitionModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+                    <!-- Header -->
+                    <div :class="['px-5 pt-5 pb-4 border-b rounded-t-2xl',
+                        transitionModal.isCancelling ? 'bg-red-50 border-red-200' : 'bg-indigo-50 border-indigo-200']">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 flex-shrink-0"
+                                :class="transitionModal.isCancelling ? 'text-red-500' : 'text-indigo-500'"
+                                fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path v-if="transitionModal.isCancelling" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                                <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <h3 :class="['font-semibold text-base', transitionModal.isCancelling ? 'text-red-800' : 'text-indigo-800']">
+                                {{ transitionModal.isCancelling ? 'Xác nhận hủy kế hoạch' : `Chuyển sang: ${transitionModal.label}` }}
+                            </h3>
+                        </div>
+                    </div>
+
+                    <!-- Body -->
+                    <div class="px-5 py-4 space-y-3 text-sm text-gray-700">
+                        <!-- Cancel warning -->
+                        <div v-if="transitionModal.isCancelling"
+                            class="bg-red-50 border border-red-200 rounded-lg p-3 space-y-1.5">
+                            <p class="font-medium text-red-700">⚠ Cảnh báo:</p>
+                            <ul class="text-red-600 space-y-1 text-xs list-disc list-inside">
+                                <li>Hóa đơn liên quan sẽ bị xóa</li>
+                                <li>Các khoản thanh toán đã ghi sẽ bị xóa</li>
+                                <li>Không thể khôi phục sau khi hủy</li>
+                            </ul>
+                        </div>
+
+                        <!-- Completed with pending items -->
+                        <div v-else-if="transitionModal.status === 'completed' && pendingItemCount > 0"
+                            class="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                            <p class="font-medium text-amber-700">⚠ Còn {{ pendingItemCount }} dịch vụ chưa hoàn thành.</p>
+                            <p class="text-amber-600 text-xs">Kế hoạch sẽ được đánh dấu hoàn thành dù còn dịch vụ đang dở.</p>
+                            <label class="flex items-center gap-2 cursor-pointer mt-1">
+                                <input v-model="transitionConfirmed" type="checkbox" class="w-4 h-4 accent-amber-600 cursor-pointer" />
+                                <span class="text-xs font-medium text-amber-800">Tôi xác nhận muốn hoàn thành kế hoạch này</span>
+                            </label>
+                        </div>
+
+                        <!-- Skip step warning -->
+                        <div v-else-if="transitionModal.isSkipping"
+                            class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                            <p class="font-medium text-amber-700">⚠ Bỏ qua bước trung gian</p>
+                            <p class="text-amber-600 text-xs mt-1">Kế hoạch sẽ nhảy thẳng từ <strong>{{ plan.status_label }}</strong> sang <strong>{{ transitionModal.label }}</strong>.</p>
+                        </div>
+
+                        <p>Bạn có chắc muốn thực hiện thao tác này không?</p>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="px-5 pb-5 flex justify-end gap-2">
+                        <button @click="transitionModal.open = false"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            Hủy bỏ
+                        </button>
+                        <button @click="executeTransition"
+                            :disabled="transitionModal.status === 'completed' && pendingItemCount > 0 && !transitionConfirmed"
+                            :class="['px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed',
+                                transitionModal.isCancelling ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700']">
+                            {{ transitionModal.isCancelling ? 'Xác nhận hủy' : 'Xác nhận chuyển' }}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
+        <!-- ── Delete plan modal ──────────────────────────────────────────── -->
+        <Teleport to="body">
+            <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+                <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+                    <div class="px-5 pt-5 pb-4 border-b border-red-200 bg-red-50 rounded-t-2xl">
+                        <div class="flex items-center gap-2">
+                            <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                            </svg>
+                            <h3 class="font-semibold text-base text-red-800">Xóa kế hoạch điều trị</h3>
+                        </div>
+                    </div>
+                    <div class="px-5 py-4 space-y-3 text-sm text-gray-700">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-600 space-y-1">
+                            <p class="font-medium text-red-700">⚠ Cảnh báo:</p>
+                            <ul class="list-disc list-inside space-y-1">
+                                <li>Kế hoạch sẽ bị xóa sau 10 phút</li>
+                                <li>Bạn có thể hoàn tác trong thời gian đó</li>
+                            </ul>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Lý do xóa <span class="text-red-500">*</span></label>
+                            <textarea v-model="deleteReason" rows="3" placeholder="Nhập lý do xóa kế hoạch..."
+                                class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:outline-none resize-none"></textarea>
+                            <p v-if="deleteError" class="text-red-500 text-xs mt-1">{{ deleteError }}</p>
+                        </div>
+                    </div>
+                    <div class="px-5 pb-5 flex justify-end gap-2">
+                        <button @click="showDeleteModal = false; deleteReason = ''; deleteError = ''"
+                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            Hủy bỏ
+                        </button>
+                        <button @click="submitDelete" :disabled="!deleteReason.trim()"
+                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
+                            Xác nhận xóa
+                        </button>
+                    </div>
+                </div>
+            </div>
         </Teleport>
     </AppLayout>
 </template>
@@ -706,6 +847,8 @@ const currentStepIdx = computed(() => {
 function canGoToStep(idx) {
     return props.transitions.some(t => t.value === STAGES[idx].targetStatus);
 }
+
+const canEditItems = computed(() => props.plan.is_editable && !props.plan.has_payments);
 
 const allItemsCompleted = computed(() =>
     props.items.length > 0 && props.items.every(i => i.status === 'completed')
@@ -852,6 +995,30 @@ function changeItemStatus(id, status) {
     router.patch(route('clinical.treatment-plan-items.update-status', id), { status }, { preserveScroll: true, preserveState: true });
 }
 
+// ── Transition confirmation ───────────────────────────────────────────────
+const STATUS_ORDER = ['draft', 'quoted', 'approved', 'in_progress', 'completed'];
+const transitionModal    = ref({ open: false, status: '', label: '', isCancelling: false, isSkipping: false });
+const transitionConfirmed = ref(false);
+
+function confirmTransition(status, label) {
+    const fromIdx      = STATUS_ORDER.indexOf(props.plan.status);
+    const toIdx        = STATUS_ORDER.indexOf(status);
+    const isCancelling = status === 'cancelled';
+    transitionModal.value = {
+        open: true,
+        status,
+        label,
+        isCancelling,
+        isSkipping: !isCancelling && toIdx - fromIdx > 1,
+    };
+    transitionConfirmed.value = false;
+}
+
+function executeTransition() {
+    transitionModal.value.open = false;
+    doTransition(transitionModal.value.status);
+}
+
 function doTransition(status) {
     router.post(route('clinical.treatment-plans.transition', props.plan.id), { status });
 }
@@ -862,5 +1029,19 @@ function doApprove() {
 
 function saveFinancials() {
     updateForm.put(route('clinical.treatment-plans.update', props.plan.id));
+}
+
+// ── Delete plan ───────────────────────────────────────────────────────────
+const showDeleteModal = ref(false);
+const deleteReason    = ref('');
+const deleteError     = ref('');
+
+function submitDelete() {
+    if (!deleteReason.value.trim()) return;
+    router.delete(route('clinical.treatment-plans.destroy', props.plan.id), {
+        data: { reason: deleteReason.value },
+        onError: (errors) => { deleteError.value = errors.reason ?? 'Có lỗi xảy ra.'; },
+        onSuccess: () => { showDeleteModal.value = false; deleteReason.value = ''; deleteError.value = ''; },
+    });
 }
 </script>

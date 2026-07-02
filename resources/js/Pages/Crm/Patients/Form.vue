@@ -142,7 +142,14 @@
                                 <p>SĐT: <strong>{{ warnings.full_duplicate.phone }}</strong></p>
                                 <p>Mã hồ sơ: <span class="font-mono font-semibold">{{ warnings.full_duplicate.code }}</span></p>
                             </div>
-                            <p class="mt-2 font-medium text-red-600">Đây rất có thể là hồ sơ trùng lặp. Bạn có chắc muốn tạo mới?</p>
+                            <div class="mt-2 flex items-center justify-between gap-2">
+                                <p class="font-medium text-red-600">Đây rất có thể là hồ sơ trùng lặp. Bạn có chắc muốn tạo mới?</p>
+                                <a :href="`/patients/${warnings.full_duplicate.id}`" target="_blank"
+                                    class="inline-flex items-center gap-1 shrink-0 px-3 py-1.5 text-xs font-medium bg-red-600 text-white rounded-lg hover:bg-red-700">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                    Xem hồ sơ
+                                </a>
+                            </div>
                         </div>
 
                         <!-- Chỉ trùng tên -->
@@ -153,6 +160,13 @@
                                 <p>Họ tên: <strong>{{ warnings.name_duplicate.name }}</strong></p>
                                 <p>SĐT: <strong>{{ warnings.name_duplicate.phone || '(chưa có)' }}</strong></p>
                                 <p>Mã hồ sơ: <span class="font-mono font-semibold">{{ warnings.name_duplicate.code }}</span></p>
+                            </div>
+                            <div class="mt-2 flex justify-end">
+                                <a :href="`/patients/${warnings.name_duplicate.id}`" target="_blank"
+                                    class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+                                    Xem hồ sơ
+                                </a>
                             </div>
                         </div>
 

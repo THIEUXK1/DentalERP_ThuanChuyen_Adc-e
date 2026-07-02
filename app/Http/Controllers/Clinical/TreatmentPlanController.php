@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
+use App\Models\PatientPayment;
 use App\Models\PendingDeletion;
 use App\Models\PriceList;
 use App\Models\TreatmentPlan;
@@ -187,9 +188,10 @@ class TreatmentPlanController extends Controller
         // Map installment_index → invoice info for installments that have payments
         $installmentInvoiceMap = $treatmentPlan->invoices()
             ->whereNotNull('installment_index')
-            ->get(['installment_index', 'status', 'amount_paid', 'total'])
+            ->get(['id', 'installment_index', 'status', 'amount_paid', 'total'])
             ->keyBy('installment_index')
             ->map(fn ($inv) => [
+                'id'           => $inv->id,
                 'status'       => $inv->status->value,
                 'status_label' => $inv->status->label(),
                 'status_color' => $inv->status->color(),
@@ -197,6 +199,10 @@ class TreatmentPlanController extends Controller
                 'total'        => $inv->total,
                 'locked'       => $inv->amount_paid > 0,
             ]);
+
+        $primaryInvoice = $treatmentPlan->invoices()
+            ->whereNull('installment_index')
+            ->first(['id']);
 
         return Inertia::render('Clinical/TreatmentPlans/Show', [
             'plan' => [
@@ -229,6 +235,8 @@ class TreatmentPlanController extends Controller
                 'estimated_sessions'=> $treatmentPlan->estimated_sessions,
                 'frequency'        => $treatmentPlan->frequency,
                 'priority'         => $treatmentPlan->priority,
+                'has_payments'        => PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $treatmentPlan->id))->where('amount', '>', 0)->exists(),
+                'primary_invoice_id'  => $primaryInvoice?->id,
             ],
             'items' => $treatmentPlan->items->map(fn ($i) => [
                 'id'           => $i->id,
@@ -370,6 +378,14 @@ class TreatmentPlanController extends Controller
         $this->authorize('treatment_plans.edit');
 
         $request->validate(['reason' => 'required|string|max:500']);
+
+        $hasPayments = PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $treatmentPlan->id))
+            ->where('amount', '>', 0)
+            ->exists();
+
+        if ($hasPayments) {
+            return back()->withErrors(['reason' => 'Không thể xóa kế hoạch điều trị đã có lịch sử thanh toán.']);
+        }
 
         PendingDeletion::create([
             'deletable_type' => TreatmentPlan::class,
