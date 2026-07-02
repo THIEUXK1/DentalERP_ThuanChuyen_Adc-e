@@ -267,7 +267,7 @@ const _ss = (() => { try { return JSON.parse(sessionStorage.getItem('patients_fi
 const search      = ref(_q.has('search')    ? _q.get('search')                                              : (_ss.search   ?? ''));
 const branchId    = ref(_q.has('branch_id') ? Number(_q.get('branch_id'))                                   : (_ss.branchId ?? ''));
 const source      = ref(_q.has('source')    ? _q.get('source')                                              : (_ss.source   ?? ''));
-const perPage     = ref(_q.has('per_page')  ? (_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page'))) : (_ss.perPage ?? 20));
+const perPage     = ref(_q.has('per_page')  ? (_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page'))) : (_ss.perPage ?? 120));
 const currentPage = ref(Number(_q.get('page') ?? 1));
 const viewMode    = ref('table');
 
@@ -276,6 +276,7 @@ const perPageOptions = [
     { value: 20,    label: '20 / trang' },
     { value: 50,    label: '50 / trang' },
     { value: 100,   label: '100 / trang' },
+    { value: 120,   label: '120 / trang' },
     { value: 'all', label: 'Tất cả' },
 ];
 
@@ -291,7 +292,10 @@ const filteredPatients = computed(() => {
         return true;
     });
 
-    return [...list].sort((a, b) => b.id - a.id);
+    return [...list].sort((a, b) => {
+        if (a.has_registration !== b.has_registration) return a.has_registration ? -1 : 1;
+        return b.id - a.id;
+    });
 });
 
 // ── Pagination ───────────────────────────────────────────────────
@@ -340,7 +344,7 @@ watch([search, branchId, source, perPage, currentPage], () => {
     if (search.value)                    p.set('search',    search.value);
     if (branchId.value !== '')           p.set('branch_id', String(branchId.value));
     if (source.value)                    p.set('source',    source.value);
-    if (String(perPage.value) !== '20')  p.set('per_page',  String(perPage.value));
+    if (String(perPage.value) !== '120') p.set('per_page',  String(perPage.value));
     if (currentPage.value > 1)           p.set('page',      String(currentPage.value));
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
@@ -352,12 +356,12 @@ watch([search, branchId, source, perPage, currentPage], () => {
 
 // ── Helpers ───────────────────────────────────────────────────────
 const hasActiveFilters = computed(() =>
-    !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== '20')
+    !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== '120')
 );
 
 function clearFilters() {
     search.value = ''; branchId.value = ''; source.value = '';
-    perPage.value = 20;
+    perPage.value = 120;
     sessionStorage.removeItem('patients_filter');
 }
 

@@ -131,6 +131,8 @@ function closeTab(url) {
         const next = tabs.value[Math.max(0, idx - 1)];
         next.active = true;
         if (!restorePage(next.url)) router.visit(next.url);
+    } else if (wasActive && !tabs.value.length) {
+        router.visit('/dashboard');
     }
     save(tabs.value);
 }

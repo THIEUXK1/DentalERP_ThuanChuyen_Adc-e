@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Appointment;
+use App\Models\ScheduleRegistration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -78,6 +79,11 @@ class Patient extends Model
     public function appointments()
     {
         return $this->hasMany(Appointment::class)->orderByDesc('scheduled_at');
+    }
+
+    public function scheduleRegistrations()
+    {
+        return $this->hasMany(ScheduleRegistration::class);
     }
 
     public function attachments()

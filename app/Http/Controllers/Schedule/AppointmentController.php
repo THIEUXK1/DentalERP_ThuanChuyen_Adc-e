@@ -21,35 +21,6 @@ class AppointmentController extends Controller
 {
     public function __construct(private AppointmentService $svc) {}
 
-    public function registrationIndex(): Response
-    {
-        $this->authorize('appointments.view');
-
-        return Inertia::render('Schedule/Registrations/Index', [
-            'all_appointments' => Appointment::with(['patient', 'doctor', 'chair'])
-                ->orderBy('scheduled_at')
-                ->get()
-                ->map(fn ($a) => [
-                    'id'             => $a->id,
-                    'code'           => $a->code,
-                    'patient'        => $a->patient?->full_name ?? '—',
-                    'patient_id'     => $a->patient_id,
-                    'patient_phone'  => $a->patient?->phone ?? null,
-                    'doctor'         => $a->doctor?->full_name ?? '—',
-                    'chair'          => $a->chair?->name ?? '—',
-                    'scheduled_at'   => $a->scheduled_at->format('Y-m-d H:i'),
-                    'scheduled_date' => $a->scheduled_at->format('Y-m-d'),
-                    'scheduled_time' => $a->scheduled_at->format('H:i'),
-                    'status'         => $a->status->value,
-                    'status_label'   => $a->status->label(),
-                    'status_color'   => $a->status->color(),
-                    'notes'          => $a->notes,
-                ]),
-            'statuses' => collect(AppointmentStatus::cases())
-                ->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
-        ]);
-    }
-
     public function index(): Response
     {
         $this->authorize('appointments.view');

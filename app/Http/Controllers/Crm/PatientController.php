@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Crm;
 
-use App\Enums\AppointmentStatus;
 use App\Enums\AttachmentType;
 use App\Enums\ContactType;
 use App\Enums\InvoiceStatus;
@@ -20,8 +19,8 @@ use App\Models\Patient;
 use App\Models\PatientInvoice;
 use App\Models\PatientPayment;
 use App\Models\PendingDeletion;
+use App\Models\ScheduleRegistration;
 use App\Models\TreatmentPlan;
-use App\Services\AppointmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -30,13 +29,15 @@ use Inertia\Response;
 
 class PatientController extends Controller
 {
-    public function __construct(private AppointmentService $appointmentSvc) {}
-
     public function index(Request $request): Response
     {
         $this->authorize('patients.view');
 
         $excludedStatuses = ['cancelled', 'no_show', 'completed', 'in_treatment'];
+
+        $registeredPatientIds = ScheduleRegistration::whereIn('status', ['pending', 'in_treatment'])
+            ->pluck('patient_id')
+            ->flip();
 
         return Inertia::render('Crm/Patients/Index', [
             'all_patients' => Patient::with('branch')
@@ -64,6 +65,7 @@ class PatientController extends Controller
                     'next_appointment_display'=> $p->appointments_min_scheduled_at
                         ? \Carbon\Carbon::parse($p->appointments_min_scheduled_at)->format('d/m H:i')
                         : null,
+                    'has_registration'        => isset($registeredPatientIds[$p->id]),
                 ]),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
@@ -75,36 +77,30 @@ class PatientController extends Controller
     {
         $this->authorize('appointments.view');
 
-        $appointments = $patient->appointments()
+        $registrations = $patient->scheduleRegistrations()
             ->with(['doctor', 'chair'])
-            ->orderByDesc('scheduled_at')
+            ->orderByDesc('registration_date')
+            ->orderByDesc('created_at')
             ->get()
-            ->map(fn ($a) => [
-                'id'              => $a->id,
-                'code'            => $a->code,
-                'scheduled_at'    => $a->scheduled_at->format('d/m/Y H:i'),
-                'doctor'          => $a->doctor?->full_name ?? '—',
-                'chair'           => $a->chair?->name ?? '—',
-                'status'          => $a->status->value,
-                'status_label'    => $a->status->label(),
-                'status_color'    => $a->status->color(),
-                'notes'           => $a->notes,
-                'duration_minutes'=> $a->duration_minutes,
+            ->map(fn ($r) => [
+                'id'           => $r->id,
+                'code'         => $r->code,
+                'scheduled_at' => $r->registration_date->format('d/m/Y') . ($r->visit_time ? ' ' . substr($r->visit_time, 0, 5) : ''),
+                'doctor'       => $r->doctor?->full_name ?? '—',
+                'chair'        => $r->chair?->name ?? '—',
+                'status'       => $r->status,
+                'status_label' => $r->statusLabel(),
+                'status_color' => $r->statusColor(),
+                'notes'        => $r->notes,
+                'duration_minutes' => null,
             ]);
 
-        $quickStatuses = collect([
-            ['status' => AppointmentStatus::Booked,      'label' => null],
-            ['status' => AppointmentStatus::Confirmed,   'label' => null],
-            ['status' => AppointmentStatus::Pending,     'label' => 'Đang chờ'],
-            ['status' => AppointmentStatus::CheckedIn,   'label' => null],
-            ['status' => AppointmentStatus::InTreatment, 'label' => null],
-            ['status' => AppointmentStatus::Completed,   'label' => null],
-            ['status' => AppointmentStatus::Cancelled,   'label' => null],
-        ])->map(fn ($item) => [
-            'value' => $item['status']->value,
-            'label' => $item['label'] ?? $item['status']->label(),
-            'color' => $item['status']->color(),
-        ]);
+        $quickStatuses = [
+            ['value' => 'pending',      'label' => 'Đang chờ',   'color' => 'yellow'],
+            ['value' => 'in_treatment', 'label' => 'Đang làm',   'color' => 'teal'],
+            ['value' => 'completed',    'label' => 'Hoàn thành', 'color' => 'green'],
+            ['value' => 'cancelled',    'label' => 'Đã hủy',     'color' => 'red'],
+        ];
 
         return Inertia::render('Crm/Patients/AppointmentRegister', [
             'patient' => [
@@ -114,7 +110,7 @@ class PatientController extends Controller
                 'phone'     => $patient->phone,
                 'branch_id' => $patient->branch_id,
             ],
-            'appointments' => $appointments,
+            'appointments' => $registrations,
             'doctors'  => Employee::doctors()->where('is_active', true)->get()
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name, 'branch_id' => $e->branch_id]),
             'chairs'   => DentalChair::where('is_active', true)->get()
@@ -128,53 +124,33 @@ class PatientController extends Controller
         $this->authorize('appointments.create');
 
         $data = $request->validate([
-            'scheduled_time'   => 'required|date_format:H:i',
-            'duration_minutes' => 'integer|min:5|max:480',
-            'doctor_id'        => 'nullable|exists:employees,id',
-            'dental_chair_id'  => 'nullable|exists:dental_chairs,id',
-            'notes'            => 'nullable|string|max:2000',
-            'arrived_on_time'  => 'boolean',
-            'status'           => 'required|string',
-            'redirect_after'   => 'nullable|string',
+            'scheduled_time'  => 'required|date_format:H:i',
+            'doctor_id'       => 'nullable|exists:employees,id',
+            'dental_chair_id' => 'nullable|exists:dental_chairs,id',
+            'notes'           => 'nullable|string|max:2000',
+            'status'          => 'required|in:pending,in_treatment,completed,cancelled',
+            'redirect_after'  => 'nullable|string',
         ]);
-
-        $scheduledAt = today()->format('Y-m-d') . ' ' . $data['scheduled_time'] . ':00';
 
         try {
-            $this->appointmentSvc->checkConflict([
-                'scheduled_at'    => $scheduledAt,
-                'duration_minutes'=> $data['duration_minutes'] ?? 30,
-                'doctor_id'       => $data['doctor_id'] ?? null,
-                'dental_chair_id' => $data['dental_chair_id'] ?? null,
+            ScheduleRegistration::create([
+                'code'              => ScheduleRegistration::generateCode(),
+                'patient_id'        => $patient->id,
+                'branch_id'         => $patient->branch_id ?? auth()->user()->branch_id ?? null,
+                'doctor_id'         => $data['doctor_id'] ?? null,
+                'dental_chair_id'   => $data['dental_chair_id'] ?? null,
+                'registration_date' => today()->format('Y-m-d'),
+                'visit_time'        => $data['scheduled_time'],
+                'status'            => $data['status'],
+                'notes'             => $data['notes'] ?? null,
+                'created_by'        => auth()->id(),
             ]);
-        } catch (\RuntimeException $e) {
-            return back()->withErrors(['conflict' => $e->getMessage()]);
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            return back()->withErrors(['scheduled_time' => 'Mã đăng ký bị trùng, vui lòng thử lại.'])->withInput();
         }
 
-        $notes = $data['notes'] ?? '';
-        if (! empty($data['arrived_on_time'])) {
-            $notes = '✓ Đến đúng hẹn' . ($notes ? ' — ' . $notes : '');
-        }
-
-        Appointment::create([
-            'code'             => Appointment::generateCode(),
-            'patient_id'       => $patient->id,
-            'branch_id'        => $patient->branch_id,
-            'doctor_id'        => $data['doctor_id'] ?? null,
-            'dental_chair_id'  => $data['dental_chair_id'] ?? null,
-            'scheduled_at'     => $scheduledAt,
-            'duration_minutes' => $data['duration_minutes'] ?? 30,
-            'status'           => $data['status'],
-            'notes'            => $notes ?: null,
-            'created_by'       => auth()->id(),
-        ]);
-
-        if (($data['redirect_after'] ?? 'stay') === 'exit') {
-            return redirect()->route('patients.index')->with('success', 'Đã đăng ký khám thành công.');
-        }
-
-        return redirect()->route('patients.register-appointment', $patient)
-            ->with('success', 'Đã lưu lịch khám.');
+        return redirect()->route('schedule.registrations.index')
+            ->with('success', 'Đã đăng ký khám thành công.');
     }
 
     public function create(): Response

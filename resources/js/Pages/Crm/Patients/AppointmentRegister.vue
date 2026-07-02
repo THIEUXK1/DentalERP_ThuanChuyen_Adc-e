@@ -24,9 +24,9 @@
                 </svg>
                 {{ $page.props.flash.success }}
             </div>
-            <div v-if="errors.conflict"
+            <div v-if="errors.conflict || errors.scheduled_time"
                 class="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-red-700 text-sm">
-                ⚠ {{ errors.conflict }}
+                ⚠ {{ errors.conflict || errors.scheduled_time }}
             </div>
 
             <!-- ── Registration form ──────────────────────────────────────── -->
@@ -76,7 +76,9 @@
 
                     <!-- Row 3: status -->
                     <div>
-                        <label class="text-xs font-medium text-gray-600 mb-1 block">Trạng thái *</label>
+                        <label class="text-xs font-medium text-gray-600 mb-1 block">
+                            Trạng thái <span class="text-red-500">*</span>
+                        </label>
                         <div class="flex flex-wrap gap-2">
                             <button v-for="s in statuses" :key="s.value" type="button"
                                 @click="form.status = s.value"
@@ -87,6 +89,7 @@
                                 {{ s.label }}
                             </button>
                         </div>
+                        <p v-if="!form.status" class="mt-1 text-xs text-red-500">Vui lòng chọn trạng thái</p>
                     </div>
 
                     <!-- Row 4: arrived on time checkbox -->
@@ -107,12 +110,12 @@
 
                     <!-- ── Action buttons ──────────────────────────────────── -->
                     <div class="flex items-center gap-2 pt-2 border-t border-gray-100 flex-wrap">
-                        <button type="button" @click="submit('stay')" :disabled="form.processing"
-                            class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                        <button type="button" @click="submit('stay')" :disabled="form.processing || !form.status"
+                            class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium">
                             💾 Lưu
                         </button>
-                        <button type="button" @click="submit('exit')" :disabled="form.processing"
-                            class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 font-medium">
+                        <button type="button" @click="submit('exit')" :disabled="form.processing || !form.status"
+                            class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium">
                             ✅ Lưu và thoát
                         </button>
                         <button type="button" @click="printPage"
@@ -170,10 +173,6 @@
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center gap-1.5 justify-end">
-                                        <Link :href="route('schedule.appointments.edit', a.id)"
-                                            class="px-2 py-1 text-xs bg-gray-50 text-gray-600 rounded hover:bg-gray-100">
-                                            Sửa
-                                        </Link>
                                         <button @click="printAppointment(a)"
                                             class="px-2 py-1 text-xs bg-blue-50 text-blue-600 rounded hover:bg-blue-100">
                                             In
@@ -198,17 +197,11 @@
                 <h4 class="font-semibold text-gray-900">Xác nhận xóa</h4>
                 <p class="text-sm text-gray-600">
                     Xóa lịch khám <strong>{{ deleteTarget.code }}</strong> — {{ deleteTarget.scheduled_at }}?
-                    <br>Lý do xóa sẽ được ghi lại.
                 </p>
-                <div>
-                    <label class="text-xs font-medium text-gray-600 mb-1 block">Lý do xóa *</label>
-                    <input v-model="deleteReason" type="text" placeholder="Nhập lý do..."
-                        class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:outline-none" />
-                </div>
                 <div class="flex gap-2 justify-end">
                     <button @click="deleteTarget = null" class="px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50">Hủy</button>
-                    <button @click="doDelete" :disabled="!deleteReason.trim()"
-                        class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-40">
+                    <button @click="doDelete"
+                        class="px-3 py-1.5 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700">
                         Xóa
                     </button>
                 </div>
@@ -246,7 +239,7 @@ const form = useForm({
     dental_chair_id:  null,
     notes:            '',
     arrived_on_time:  false,
-    status:           'booked',
+    status:           'pending',
     redirect_after:   'stay',
 });
 
@@ -310,19 +303,15 @@ function printAppointment(a) {
 
 // ── Delete ─────────────────────────────────────────────────────────────────
 const deleteTarget = ref(null);
-const deleteReason  = ref('');
 
 function confirmDelete(a) {
     deleteTarget.value = a;
-    deleteReason.value  = '';
 }
 
 function doDelete() {
-    if (!deleteReason.value.trim()) return;
-    router.delete(route('schedule.appointments.destroy', deleteTarget.value.id), {
-        data: { reason: deleteReason.value },
+    router.delete(route('schedule.registrations.destroy', deleteTarget.value.id), {
         preserveScroll: true,
-        onSuccess: () => { deleteTarget.value = null; deleteReason.value = ''; },
+        onSuccess: () => { deleteTarget.value = null; },
     });
 }
 </script>

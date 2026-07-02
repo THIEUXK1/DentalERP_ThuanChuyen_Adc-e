@@ -70,6 +70,7 @@ use App\Http\Controllers\PendingDeletionController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Reports\ReportController;
 use App\Http\Controllers\Schedule\AppointmentController;
+use App\Http\Controllers\Schedule\RegistrationController;
 use Illuminate\Support\Facades\Route;
 
 // Redirect root to login
@@ -259,8 +260,16 @@ Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(functi
     Route::patch('appointments/{appointment}/notes', [AppointmentController::class, 'updateNotes'])
         ->name('appointments.update-notes')->middleware('can:appointments.manage');
 
-    Route::get('registrations', [AppointmentController::class, 'registrationIndex'])
+    Route::get('registrations', [RegistrationController::class, 'index'])
         ->name('registrations.index')->middleware('can:appointments.view');
+    Route::post('registrations', [RegistrationController::class, 'store'])
+        ->name('registrations.store')->middleware('can:appointments.create');
+    Route::put('registrations/{registration}', [RegistrationController::class, 'update'])
+        ->name('registrations.update')->middleware('can:appointments.create');
+    Route::patch('registrations/{registration}', [RegistrationController::class, 'update'])
+        ->name('registrations.patch')->middleware('can:appointments.create');
+    Route::delete('registrations/{registration}', [RegistrationController::class, 'destroy'])
+        ->name('registrations.destroy')->middleware('can:appointments.create');
 
     Route::delete('pending-deletions/{pendingDeletion}/undo', [PendingDeletionController::class, 'undo'])
         ->name('pending-deletions.undo');
