@@ -11,6 +11,16 @@ class TreatmentPlan extends Model
 {
     use LogsActivity;
 
+    protected static function booted(): void
+    {
+        static::deleting(function (TreatmentPlan $plan) {
+            $plan->invoices()->each(function ($invoice) {
+                $invoice->payments()->delete();
+                $invoice->delete();
+            });
+        });
+    }
+
     protected $fillable = [
         'code', 'patient_id', 'doctor_id', 'consultant_id', 'branch_id',
         'appointment_id', 'status', 'total_amount', 'discount_amount',

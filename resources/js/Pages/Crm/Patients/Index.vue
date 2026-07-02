@@ -78,15 +78,6 @@
                     </select>
                 </div>
                 <div>
-                    <label class="text-xs text-gray-500 mb-1 block">Sắp xếp</label>
-                    <select v-model="sortBy"
-                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
-                        <option value="next_appointment">🗓 Lịch hẹn gần nhất</option>
-                        <option value="created_at">📅 Ngày tạo mới nhất</option>
-                        <option value="name">🔤 Tên A→Z</option>
-                    </select>
-                </div>
-                <div>
                     <label class="text-xs text-gray-500 mb-1 block">Hiển thị</label>
                     <select v-model="perPage"
                         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -276,7 +267,6 @@ const _ss = (() => { try { return JSON.parse(sessionStorage.getItem('patients_fi
 const search      = ref(_q.has('search')    ? _q.get('search')                                              : (_ss.search   ?? ''));
 const branchId    = ref(_q.has('branch_id') ? Number(_q.get('branch_id'))                                   : (_ss.branchId ?? ''));
 const source      = ref(_q.has('source')    ? _q.get('source')                                              : (_ss.source   ?? ''));
-const sortBy      = ref(_q.has('sort')      ? _q.get('sort')                                                : (_ss.sortBy   ?? 'created_at'));
 const perPage     = ref(_q.has('per_page')  ? (_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page'))) : (_ss.perPage ?? 20));
 const currentPage = ref(Number(_q.get('page') ?? 1));
 const viewMode    = ref('table');
@@ -301,21 +291,7 @@ const filteredPatients = computed(() => {
         return true;
     });
 
-    return [...list].sort((a, b) => {
-        if (sortBy.value === 'next_appointment') {
-            // Có lịch hẹn lên trước, null xuống cuối; cùng có thì gần nhất lên đầu
-            if (a.next_appointment_at && b.next_appointment_at)
-                return a.next_appointment_at < b.next_appointment_at ? -1 : 1;
-            if (a.next_appointment_at) return -1;
-            if (b.next_appointment_at) return 1;
-            return b.id - a.id;
-        }
-        if (sortBy.value === 'name') {
-            return a.full_name.localeCompare(b.full_name, 'vi');
-        }
-        // created_at: mới nhất lên đầu
-        return b.id - a.id;
-    });
+    return [...list].sort((a, b) => b.id - a.id);
 });
 
 // ── Pagination ───────────────────────────────────────────────────
@@ -324,7 +300,7 @@ const totalPages = computed(() =>
 );
 
 // Reset to page 1 when filter/per_page changes
-watch([search, branchId, source, sortBy, perPage], () => { currentPage.value = 1; });
+watch([search, branchId, source, perPage], () => { currentPage.value = 1; });
 
 // Clamp page if it goes out of range
 watch(totalPages, (n) => { if (currentPage.value > n) currentPage.value = n; });
@@ -359,31 +335,29 @@ const pageNumbers = computed(() => {
 });
 
 // ── Sync URL without reload ──────────────────────────────────────
-watch([search, branchId, source, sortBy, perPage, currentPage], () => {
+watch([search, branchId, source, perPage, currentPage], () => {
     const p = new URLSearchParams();
     if (search.value)                    p.set('search',    search.value);
     if (branchId.value !== '')           p.set('branch_id', String(branchId.value));
     if (source.value)                    p.set('source',    source.value);
-    if (sortBy.value !== 'created_at')   p.set('sort',      sortBy.value);
     if (String(perPage.value) !== '20')  p.set('per_page',  String(perPage.value));
     if (currentPage.value > 1)           p.set('page',      String(currentPage.value));
     const qs = p.toString();
     history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
     sessionStorage.setItem('patients_filter', JSON.stringify({
         search: search.value, branchId: branchId.value, source: source.value,
-        sortBy: sortBy.value, perPage: perPage.value,
+        perPage: perPage.value,
     }));
 });
 
 // ── Helpers ───────────────────────────────────────────────────────
 const hasActiveFilters = computed(() =>
-    !!(search.value || branchId.value !== '' || source.value ||
-       sortBy.value !== 'created_at' || String(perPage.value) !== '20')
+    !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== '20')
 );
 
 function clearFilters() {
     search.value = ''; branchId.value = ''; source.value = '';
-    sortBy.value = 'created_at'; perPage.value = 20;
+    perPage.value = 20;
     sessionStorage.removeItem('patients_filter');
 }
 
