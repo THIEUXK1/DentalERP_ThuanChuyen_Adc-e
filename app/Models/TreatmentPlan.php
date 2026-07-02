@@ -15,6 +15,7 @@ class TreatmentPlan extends Model
     {
         static::deleting(function (TreatmentPlan $plan) {
             $plan->invoices()->each(function ($invoice) {
+                $invoice->debt()?->delete();
                 $invoice->payments()->delete();
                 $invoice->delete();
             });
@@ -59,8 +60,10 @@ class TreatmentPlan extends Model
 
     public function recalcTotals(): void
     {
-        $total = $this->items()->sum('subtotal');
-        $this->update(['total_amount' => $total]);
+        $this->update([
+            'total_amount'    => $this->items()->sum('subtotal'),
+            'discount_amount' => $this->items()->sum('discount'),
+        ]);
     }
 
     public function patient()

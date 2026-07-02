@@ -58,7 +58,7 @@
                             : 'bg-white border-amber-200 hover:border-amber-400']">
                     <p :class="['text-xs font-medium', activeStatusGroup === 'not_started' ? 'text-amber-100' : 'text-amber-600']">Chưa điều trị</p>
                     <p :class="['text-2xl font-bold mt-0.5', activeStatusGroup === 'not_started' ? 'text-white' : 'text-amber-700']">{{ summary.notStarted }}</p>
-                    <p :class="['text-xs mt-0.5', activeStatusGroup === 'not_started' ? 'text-amber-100' : 'text-amber-400']">đã duyệt / báo giá</p>
+                    <p :class="['text-xs mt-0.5', activeStatusGroup === 'not_started' ? 'text-amber-100' : 'text-amber-400']">chờ điều trị</p>
                 </button>
                 <!-- Đang điều trị -->
                 <button @click="toggleStatusGroup('in_progress')"
@@ -147,6 +147,12 @@
                             :class="['text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors',
                                 filterHasSchedule ? 'bg-emerald-600 text-white border-emerald-600' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50']">
                             📅 Có lịch TT
+                        </button>
+                        <!-- Quick: dữ liệu lỗi -->
+                        <button @click="filterDataIssue = !filterDataIssue"
+                            :class="['text-xs px-2.5 py-1.5 rounded-lg border font-medium transition-colors',
+                                filterDataIssue ? 'bg-rose-600 text-white border-rose-600' : 'border-rose-200 text-rose-600 hover:bg-rose-50']">
+                            ⚠ Dữ liệu lỗi
                         </button>
                         <!-- Clear all -->
                         <button v-if="hasFilters" @click="clearFilters"
@@ -347,6 +353,7 @@ const dateFrom         = ref('');
 const dateTo           = ref('');
 const filterInProgress  = ref(false);
 const filterHasSchedule = ref(false);
+const filterDataIssue   = ref(false);
 const activeStatusGroup = ref('');
 const sortBy           = ref('');
 const sortDir          = ref('desc');
@@ -354,7 +361,7 @@ const activePreset     = ref('');
 
 watch(viewMode, v => localStorage.setItem('tp_view', v));
 watch(perPage,  v => localStorage.setItem('tp_per', String(v)));
-watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, activeStatusGroup, perPage],
+watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, filterDataIssue, activeStatusGroup, perPage],
     () => { page.value = 1; });
 
 // ── Date presets ─────────────────────────────────────────────────────────────
@@ -405,11 +412,12 @@ const filtered = computed(() => {
     if (dateFrom.value)      list = list.filter(p => p.created_at_raw >= dateFrom.value);
     if (dateTo.value)        list = list.filter(p => p.created_at_raw <= dateTo.value);
     if (activeStatusGroup.value === 'draft')       list = list.filter(p => p.status === 'draft');
-    else if (activeStatusGroup.value === 'not_started') list = list.filter(p => ['quoted', 'approved'].includes(p.status));
+    else if (activeStatusGroup.value === 'not_started') list = list.filter(p => p.status === 'approved');
     else if (activeStatusGroup.value === 'in_progress') list = list.filter(p => p.status === 'in_progress');
     else if (activeStatusGroup.value === 'completed')   list = list.filter(p => p.status === 'completed');
     if (filterInProgress.value)  list = list.filter(p => p.status === 'in_progress');
     if (filterHasSchedule.value) list = list.filter(p => p.payment_schedule_count > 0);
+    if (filterDataIssue.value)   list = list.filter(p => p.has_data_issue);
     if (search.value.trim()) {
         const q = search.value.toLowerCase();
         list = list.filter(p =>
@@ -481,7 +489,7 @@ const pageNumbers = computed(() => {
 // ── Summary ────────────────────────────────────────────────────────────────────
 const summary = computed(() => ({
     draft:      props.all_plans.filter(p => p.status === 'draft').length,
-    notStarted: props.all_plans.filter(p => ['quoted', 'approved'].includes(p.status)).length,
+    notStarted: props.all_plans.filter(p => p.status === 'approved').length,
     inProgress: props.all_plans.filter(p => p.status === 'in_progress').length,
     completed:  props.all_plans.filter(p => p.status === 'completed').length,
 }));
@@ -490,7 +498,7 @@ const summary = computed(() => ({
 const hasFilters = computed(() =>
     !!(search.value || filterStatus.value || filterBranch.value || filterDoctor.value ||
        dateFrom.value || dateTo.value || filterInProgress.value || filterHasSchedule.value ||
-       activeStatusGroup.value)
+       filterDataIssue.value || activeStatusGroup.value)
 );
 
 function clearFilters() {
@@ -502,6 +510,7 @@ function clearFilters() {
     dateTo.value          = '';
     filterInProgress.value  = false;
     filterHasSchedule.value = false;
+    filterDataIssue.value   = false;
     activeStatusGroup.value = '';
     activePreset.value      = '';
 }

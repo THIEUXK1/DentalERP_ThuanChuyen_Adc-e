@@ -31,6 +31,13 @@ class TreatmentPlanController extends Controller
     {
         $this->authorize('treatment_plans.view');
 
+        // IDs của các plan có item bị lỗi (amount ≠ qty*unit_price - discount)
+        $issueIds = \DB::table('treatment_plan_items')
+            ->whereRaw('amount != (quantity * unit_price - discount)')
+            ->pluck('treatment_plan_id')
+            ->unique()
+            ->flip();
+
         return Inertia::render('Clinical/TreatmentPlans/Index', [
             'all_plans' => TreatmentPlan::with(['patient', 'doctor', 'branch'])
                 ->orderByDesc('id')
@@ -51,6 +58,7 @@ class TreatmentPlanController extends Controller
                     'net_total'    => $p->net_total,
                     'payment_schedule_total' => collect($p->payment_schedule ?? [])->sum('amount'),
                     'payment_schedule_count' => count($p->payment_schedule ?? []),
+                    'has_data_issue' => isset($issueIds[$p->id]),
                     'notes'        => $p->notes ?? '',
                     'created_at'   => $p->created_at->format('d/m/Y'),
                     'created_at_raw' => $p->created_at->toDateString(),
@@ -138,7 +146,7 @@ class TreatmentPlanController extends Controller
                     'tooth_number' => $itemData['tooth_number'] ?? null,
                     'quantity' => $itemData['quantity'],
                     'unit_price' => $itemData['unit_price'],
-                    'subtotal' => $itemData['amount'],
+                    'subtotal' => $itemData['quantity'] * $itemData['unit_price'],
                     'discount' => $itemData['discount'] ?? 0,
                     'amount' => $itemData['amount'],
                     'estimated_sessions' => $itemData['estimated_sessions'] ?? null,
@@ -211,7 +219,9 @@ class TreatmentPlanController extends Controller
                 'patient'          => $treatmentPlan->patient->full_name,
                 'patient_id'       => $treatmentPlan->patient_id,
                 'doctor'           => $treatmentPlan->doctor?->full_name ?? '—',
+                'doctor_id'        => $treatmentPlan->doctor_id,
                 'consultant'       => $treatmentPlan->consultant?->full_name ?? '—',
+                'consultant_id'    => $treatmentPlan->consultant_id,
                 'branch'           => $treatmentPlan->branch->name,
                 'status'           => $treatmentPlan->status->value,
                 'status_label'     => $treatmentPlan->status->label(),
@@ -264,7 +274,6 @@ class TreatmentPlanController extends Controller
             'priceLists' => PriceList::where('is_active', true)->get()
                 ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name]),
             'transitions' => collect($allowed)->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-            'canApprove'  => auth()->user()?->can('treatment_plans.approve'),
             'doctors'     => Employee::doctors()->where('is_active', true)->get()
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
         ]);
@@ -283,7 +292,7 @@ class TreatmentPlanController extends Controller
     {
         $this->authorize('treatment_plans.edit');
 
-        if (! $treatmentPlan->status->isEditable()) {
+        if (! $treatmentPlan->status->isEditable() && $request->input('action') !== 'update_staff') {
             return back()->with('error', 'Không thể sửa kế hoạch đã duyệt.');
         }
 
@@ -335,7 +344,7 @@ class TreatmentPlanController extends Controller
                         'diagnosis'          => $itemData['diagnosis'] ?? null,
                         'quantity'           => $itemData['quantity'],
                         'unit_price'         => $itemData['unit_price'],
-                        'subtotal'           => $itemData['amount'],
+                        'subtotal'           => $itemData['quantity'] * $itemData['unit_price'],
                         'discount'           => $itemData['discount'] ?? 0,
                         'amount'             => $itemData['amount'],
                         'estimated_sessions' => $itemData['estimated_sessions'] ?? null,
@@ -396,7 +405,8 @@ class TreatmentPlanController extends Controller
             'execute_at'     => now()->addMinutes(10),
         ]);
 
-        return back()->with('success', 'Kế hoạch sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
+        return redirect()->route('patients.show', $treatmentPlan->patient_id)
+            ->with('success', 'Kế hoạch sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
     }
 
     public function transition(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse

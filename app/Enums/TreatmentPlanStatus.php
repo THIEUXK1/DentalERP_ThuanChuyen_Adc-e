@@ -5,7 +5,6 @@ namespace App\Enums;
 enum TreatmentPlanStatus: string
 {
     case Draft = 'draft';
-    case Quoted = 'quoted';
     case Approved = 'approved';
     case InProgress = 'in_progress';
     case Completed = 'completed';
@@ -15,8 +14,7 @@ enum TreatmentPlanStatus: string
     {
         return match ($this) {
             self::Draft => 'Nháp',
-            self::Quoted => 'Đã báo giá',
-            self::Approved => 'Đã duyệt',
+            self::Approved => 'Chưa điều trị',
             self::InProgress => 'Đang điều trị',
             self::Completed => 'Hoàn thành',
             self::Cancelled => 'Đã hủy',
@@ -27,8 +25,7 @@ enum TreatmentPlanStatus: string
     {
         return match ($this) {
             self::Draft => 'gray',
-            self::Quoted => 'blue',
-            self::Approved => 'teal',
+            self::Approved => 'amber',
             self::InProgress => 'indigo',
             self::Completed => 'green',
             self::Cancelled => 'red',
@@ -39,9 +36,8 @@ enum TreatmentPlanStatus: string
     {
         return match ($this) {
             self::Draft      => [self::Approved, self::InProgress, self::Completed, self::Cancelled],
-            self::Quoted     => [self::Approved, self::InProgress, self::Completed],
-            self::Approved   => [self::InProgress, self::Completed],
-            self::InProgress => [self::Completed],
+            self::Approved   => [self::InProgress, self::Completed, self::Cancelled],
+            self::InProgress => [self::Completed, self::Cancelled],
             self::Completed  => [],
             self::Cancelled  => [],
         };
@@ -49,6 +45,6 @@ enum TreatmentPlanStatus: string
 
     public function isEditable(): bool
     {
-        return in_array($this, [self::Draft, self::Quoted, self::Approved]);
+        return in_array($this, [self::Draft, self::Approved]);
     }
 }

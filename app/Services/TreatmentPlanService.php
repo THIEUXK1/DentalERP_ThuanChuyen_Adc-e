@@ -122,12 +122,12 @@ class TreatmentPlanService
 
     public function approve(TreatmentPlan $plan): void
     {
-        if ($plan->status !== TreatmentPlanStatus::Quoted) {
-            throw new \RuntimeException('Chỉ có thể duyệt kế hoạch ở trạng thái Đã báo giá.');
+        if ($plan->status !== TreatmentPlanStatus::Draft) {
+            throw new \RuntimeException('Chỉ có thể chuyển kế hoạch Nháp sang Chưa điều trị.');
         }
 
         if ($plan->items()->count() === 0) {
-            throw new \RuntimeException('Kế hoạch phải có ít nhất 1 dịch vụ trước khi duyệt.');
+            throw new \RuntimeException('Kế hoạch phải có ít nhất 1 dịch vụ trước khi chuyển.');
         }
 
         DB::transaction(fn () => $plan->update([

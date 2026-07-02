@@ -40,7 +40,7 @@
                             </svg>
                             In phiếu thu
                         </a>
-                        <button v-if="invoice.status !== 'cancelled' && invoice.status !== 'paid' && invoice.amount_paid === 0"
+                        <button v-if="!isPlanBeingDeleted && invoice.status !== 'cancelled' && invoice.status !== 'paid' && invoice.amount_paid === 0"
                             @click="doCancel"
                             class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -86,6 +86,24 @@
                 </div>
             </div>
 
+            <!-- ── Cảnh báo KHDT đang bị xóa ──────────────────────────────────── -->
+            <div v-if="isPlanBeingDeleted"
+                class="mt-3 flex items-center justify-between gap-4 bg-red-50 border border-red-300 rounded-xl px-5 py-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-semibold text-red-800">Kế hoạch điều trị đang trong thời gian xóa!</p>
+                        <p class="text-xs text-red-600 mt-0.5">Hóa đơn sẽ bị xóa sau <strong>{{ countdownPlan() }}</strong>. Mọi thao tác đã bị khóa cho đến khi hoàn tác.</p>
+                    </div>
+                </div>
+                <button @click="undoPlanDeletion"
+                    class="flex-shrink-0 px-4 py-2 text-sm font-medium bg-amber-100 text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-200 transition-colors whitespace-nowrap">
+                    Hoàn tác xóa
+                </button>
+            </div>
+
             <!-- ── Main 3-col grid ───────────────────────────────────────────── -->
             <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4">
 
@@ -93,7 +111,7 @@
                 <div class="lg:col-span-2 xl:col-span-3 space-y-4">
 
                     <!-- ── Payment form ────────────────────────────────────────── -->
-                    <div v-if="invoice.status !== 'paid' && invoice.status !== 'cancelled'"
+                    <div v-if="!isPlanBeingDeleted && invoice.status !== 'paid' && invoice.status !== 'cancelled'"
                         class="bg-white rounded-xl border border-indigo-100 p-5">
                         <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -206,7 +224,7 @@
                                         <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Răng</th>
                                         <th class="px-4 py-2.5 text-right font-medium">SL</th>
                                         <th class="px-4 py-2.5 text-right font-medium">Đơn giá</th>
-                                        <th class="px-4 py-2.5 text-right font-medium hidden md:table-cell">CK</th>
+                                        <th class="px-4 py-2.5 text-right font-medium hidden md:table-cell">Giảm giá</th>
                                         <th class="px-4 py-2.5 text-right font-medium">Thành tiền</th>
                                         <th class="px-4 py-2.5 text-left font-medium hidden lg:table-cell">Trạng thái</th>
                                     </tr>
@@ -229,7 +247,7 @@
                                         <td class="px-4 py-2.5 text-right tabular-nums text-rose-500 hidden md:table-cell">
                                             {{ item.discount > 0 ? '-' + formatVnd(item.discount) : '—' }}
                                         </td>
-                                        <td class="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-800">{{ formatVnd(item.amount) }}</td>
+                                        <td class="px-4 py-2.5 text-right tabular-nums font-semibold text-gray-800">{{ formatVnd(item.quantity * item.unit_price - (item.discount ?? 0)) }}</td>
                                         <td class="px-4 py-2.5 hidden lg:table-cell">
                                             <StatusBadge :color="item.status_color" class="text-xs">{{ item.status_label }}</StatusBadge>
                                         </td>
@@ -243,7 +261,7 @@
                                         <td class="hidden md:table-cell"></td>
                                         <td class="hidden md:table-cell"></td>
                                         <td class="px-4 py-2.5 text-right font-bold text-gray-900 tabular-nums">
-                                            {{ formatVnd(planItems.reduce((s, i) => s + i.amount, 0)) }}
+                                            {{ formatVnd(planItems.reduce((s, i) => s + i.quantity * i.unit_price - (i.discount ?? 0), 0)) }}
                                         </td>
                                         <td class="hidden lg:table-cell"></td>
                                     </tr>
@@ -310,11 +328,11 @@
                         <div class="space-y-2 text-sm">
                             <div class="flex justify-between">
                                 <span class="text-gray-500">Tổng dịch vụ</span>
-                                <span class="tabular-nums">{{ formatVnd(invoice.subtotal) }}</span>
+                                <span class="tabular-nums">{{ formatVnd(itemsGross) }}</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-gray-500">Giảm giá</span>
-                                <span class="text-rose-600 tabular-nums">-{{ formatVnd(invoice.discount) }}</span>
+                                <span class="text-rose-600 tabular-nums">-{{ formatVnd(itemsDiscount) }}</span>
                             </div>
                             <div class="flex justify-between border-t pt-2">
                                 <span class="text-gray-700 font-medium">Thực thu</span>
@@ -541,7 +559,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
@@ -558,11 +576,41 @@ const props = defineProps({
     methods: Array,
     canRefund: Boolean,
     canDiscount: Boolean,
+    plan_pending_deletion: { type: Object, default: null },
 });
+
+const now = ref(Date.now());
+let _timer = null;
+onMounted(() => { _timer = setInterval(() => { now.value = Date.now(); }, 1000); });
+onUnmounted(() => { clearInterval(_timer); });
+
+const isPlanBeingDeleted = computed(() => {
+    if (!props.plan_pending_deletion) return false;
+    return new Date(props.plan_pending_deletion.execute_at).getTime() > now.value;
+});
+
+function countdownPlan() {
+    const ms = new Date(props.plan_pending_deletion.execute_at).getTime() - now.value;
+    if (ms <= 0) return '0:00';
+    const m = Math.floor(ms / 60000);
+    const s = Math.floor((ms % 60000) / 1000);
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function undoPlanDeletion() {
+    router.delete(route('pending-deletions.undo', props.plan_pending_deletion.id), { preserveScroll: true });
+}
 
 const planItems      = props.plan_items ?? [];
 const planSchedule   = props.plan_payment_schedule ?? [];
 const discountAmount = ref(props.invoice.discount);
+
+const itemsGross    = computed(() => planItems.length > 0
+    ? planItems.reduce((s, i) => s + i.quantity * i.unit_price, 0)
+    : props.invoice.subtotal);
+const itemsDiscount = computed(() => planItems.length > 0
+    ? planItems.reduce((s, i) => s + (i.discount ?? 0), 0)
+    : props.invoice.discount);
 
 const showCancelModal  = ref(false);
 const cancelReason     = ref('');

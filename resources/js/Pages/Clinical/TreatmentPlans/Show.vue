@@ -39,13 +39,6 @@
                             </svg>
                             PDF
                         </a>
-                        <button v-if="canApprove && plan.status === 'quoted'" @click="doApprove"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm bg-teal-600 text-white rounded-lg hover:bg-teal-700">
-                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                            </svg>
-                            Duyệt kế hoạch
-                        </button>
                     </div>
                 </div>
 
@@ -64,11 +57,6 @@
                     <div class="flex items-center gap-2">
                         <span class="text-slate-400 text-xs">Thực thu</span>
                         <span class="font-bold text-emerald-400 tabular-nums text-base">{{ formatVnd(plan.net_total) }}</span>
-                    </div>
-                    <div class="h-4 w-px bg-slate-600 hidden sm:block self-center"></div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-slate-400 text-xs">Đặt cọc</span>
-                        <span class="font-bold text-amber-300 tabular-nums">{{ formatVnd(plan.deposit_amount) }}</span>
                     </div>
                     <span v-if="plan.approved_at"
                         class="ml-auto text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2.5 py-1 rounded-full font-medium self-center">
@@ -146,7 +134,7 @@
                             <div>
                                 <label class="text-xs text-gray-500 mb-1 block">Thành tiền</label>
                                 <div class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm font-semibold text-indigo-700 tabular-nums">
-                                    {{ formatVnd((addForm.unit_price || 0) * (addForm.quantity || 1)) }}
+                                    {{ formatVnd((addForm.unit_price || 0) * (addForm.quantity || 1) - (addForm.discount || 0)) }}
                                 </div>
                             </div>
                         </div>
@@ -195,12 +183,6 @@
                                 <input v-model="addForm.diagnosis" type="text" placeholder="Chẩn đoán dịch vụ này..."
                                     class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                             </div>
-                        </div>
-                        <!-- Notes -->
-                        <div class="mb-3">
-                            <label class="text-xs text-gray-500 mb-1 block">Ghi chú</label>
-                            <input v-model="addForm.notes" type="text" placeholder="Ghi chú nội dung điều trị..."
-                                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                         </div>
                         <div class="flex justify-end">
                             <button @click="submitAddItem" :disabled="addForm.processing"
@@ -266,7 +248,7 @@
                                         <span v-if="item.discount" class="text-rose-500">-{{ formatVnd(item.discount) }}</span>
                                         <span v-else class="text-gray-300">—</span>
                                     </td>
-                                    <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.amount || item.subtotal) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.quantity * item.unit_price - (item.discount ?? 0)) }}</td>
                                     <td class="px-4 py-3 text-center">
                                         <!-- Inline status radio for in_progress plans -->
                                         <div v-if="plan.status === 'in_progress' && item.status !== 'completed'" class="flex gap-1 justify-center flex-wrap">
@@ -295,7 +277,7 @@
                                 <!-- Total row -->
                                 <tr class="bg-gray-50 border-t border-gray-200">
                                     <td colspan="6" class="px-4 py-3 text-right text-gray-500 text-xs font-medium">Tổng:</td>
-                                    <td class="px-4 py-3 text-right font-bold text-gray-900 tabular-nums">{{ formatVnd(plan.total_amount) }}</td>
+                                    <td class="px-4 py-3 text-right font-bold text-gray-900 tabular-nums">{{ formatVnd(tableTotal) }}</td>
                                     <td colspan="2"></td>
                                 </tr>
                             </tbody>
@@ -372,35 +354,32 @@
                         </div>
                     </div>
 
-                    <!-- Discount + Deposit + Notes edit -->
-                    <div v-if="plan.is_editable" class="bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Giảm giá / Đặt cọc / Ghi chú</h3>
+
+                    <!-- Nhân sự phụ trách -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                        <h3 class="text-sm font-semibold text-gray-700 mb-3">Nhân sự phụ trách</h3>
                         <div class="space-y-2.5">
                             <div>
-                                <label class="text-xs text-gray-500 mb-1 block">Giảm giá (₫)</label>
-                                <input v-model="updateForm.discount_amount" type="number" min="0"
-                                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none tabular-nums" />
+                                <label class="text-xs text-gray-500 mb-1 block">Bác sĩ</label>
+                                <select v-model="staffForm.doctor_id"
+                                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                    <option :value="null">-- Chọn bác sĩ --</option>
+                                    <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                                </select>
                             </div>
                             <div>
-                                <label class="text-xs text-gray-500 mb-1 block">Đặt cọc (₫)</label>
-                                <input v-model="updateForm.deposit_amount" type="number" min="0"
-                                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none tabular-nums" />
+                                <label class="text-xs text-gray-500 mb-1 block">Tư vấn viên</label>
+                                <select v-model="staffForm.consultant_id"
+                                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                                    <option :value="null">-- Chọn tư vấn viên --</option>
+                                    <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                                </select>
                             </div>
-                            <div>
-                                <label class="text-xs text-gray-500 mb-1 block">Ghi chú kế hoạch</label>
-                                <textarea v-model="updateForm.notes" rows="3" placeholder="Nhập ghi chú..."
-                                    class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"></textarea>
-                            </div>
-                            <button @click="saveFinancials" :disabled="updateForm.processing"
+                            <button @click="saveStaff" :disabled="staffForm.processing"
                                 class="w-full py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
                                 Lưu
                             </button>
                         </div>
-                    </div>
-                    <!-- Notes readonly when not editable -->
-                    <div v-else-if="plan.notes" class="bg-white rounded-xl border border-gray-200 p-4">
-                        <h3 class="text-sm font-semibold text-gray-700 mb-2">Ghi chú</h3>
-                        <p class="text-sm text-gray-600 whitespace-pre-wrap">{{ plan.notes }}</p>
                     </div>
 
                     <!-- Payment schedule -->
@@ -629,14 +608,6 @@
                                         :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                 </div>
 
-                                <!-- Ghi chú -->
-                                <div>
-                                    <label class="text-xs text-gray-500 mb-1 block">Ghi chú</label>
-                                    <textarea v-model="detailForm.notes" rows="3" placeholder="Ghi chú..."
-                                        :readonly="!canEditItems"
-                                        class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none"
-                                        :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'"></textarea>
-                                </div>
                             </div>
 
                             <!-- Footer actions -->
@@ -795,7 +766,7 @@ const { hasPermission: can } = usePermission();
 const { formatVnd } = useCurrency();
 const props = defineProps({
     plan: Object, items: Array, services: Array,
-    priceLists: Array, transitions: Array, canApprove: Boolean,
+    priceLists: Array, transitions: Array,
     doctors: Array,
 });
 
@@ -811,7 +782,7 @@ const STAGES = [
     },
     {
         key: 'not_started', label: 'Chưa điều trị', targetStatus: 'approved',
-        statuses: ['quoted', 'approved'],
+        statuses: ['approved'],
         dotClass:   'border-amber-500 bg-amber-500 text-white',
         labelClass: 'text-amber-700',
         subClass:   'text-amber-500',
@@ -838,7 +809,7 @@ const STAGES = [
 const currentStepIdx = computed(() => {
     const s = props.plan.status;
     if (s === 'draft')                        return 0;
-    if (['quoted', 'approved'].includes(s))   return 1;
+    if (s === 'approved')                      return 1;
     if (s === 'in_progress')                  return 2;
     if (s === 'completed')                    return 3;
     return -1; // cancelled
@@ -849,6 +820,8 @@ function canGoToStep(idx) {
 }
 
 const canEditItems = computed(() => props.plan.is_editable && !props.plan.has_payments);
+
+const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price - (i.discount ?? 0)), 0));
 
 const allItemsCompleted = computed(() =>
     props.items.length > 0 && props.items.every(i => i.status === 'completed')
@@ -927,6 +900,16 @@ const updateForm = useForm({
     notes:           props.plan.notes ?? '',
 });
 
+const staffForm = useForm({
+    doctor_id:     props.plan.doctor_id ?? null,
+    consultant_id: props.plan.consultant_id ?? null,
+    action:        'update_staff',
+});
+
+function saveStaff() {
+    staffForm.put(route('clinical.treatment-plans.update', props.plan.id));
+}
+
 // Item status options for inline change
 const itemStatuses = [
     { value: 'pending',     label: 'Chờ',       activeClass: 'bg-gray-100 border-gray-300 text-gray-600' },
@@ -996,7 +979,7 @@ function changeItemStatus(id, status) {
 }
 
 // ── Transition confirmation ───────────────────────────────────────────────
-const STATUS_ORDER = ['draft', 'quoted', 'approved', 'in_progress', 'completed'];
+const STATUS_ORDER = ['draft', 'approved', 'in_progress', 'completed'];
 const transitionModal    = ref({ open: false, status: '', label: '', isCancelling: false, isSkipping: false });
 const transitionConfirmed = ref(false);
 
@@ -1023,9 +1006,6 @@ function doTransition(status) {
     router.post(route('clinical.treatment-plans.transition', props.plan.id), { status });
 }
 
-function doApprove() {
-    router.post(route('clinical.treatment-plans.approve', props.plan.id));
-}
 
 function saveFinancials() {
     updateForm.put(route('clinical.treatment-plans.update', props.plan.id));

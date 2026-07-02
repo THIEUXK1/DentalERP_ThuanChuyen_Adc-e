@@ -84,7 +84,7 @@
                             </svg>
                             Xem
                         </Link>
-                        <button @click.stop="openDeletePlan(plan)"
+                        <button v-if="!plan.amount_paid" @click.stop="openDeletePlan(plan)"
                             class="flex-shrink-0 text-gray-300 hover:text-red-500 transition-colors"
                             title="Xóa kế hoạch">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -278,21 +278,21 @@ function stageLabel(status) {
     if (status === 'cancelled') return 'Đã hủy';
     if (status === 'completed') return 'Hoàn thành';
     if (status === 'in_progress') return 'Đang điều trị';
-    if (['quoted', 'approved'].includes(status)) return 'Chưa điều trị';
+    if (status === 'approved') return 'Chưa điều trị';
     return 'Nháp';
 }
 function stageClass(status) {
     if (status === 'cancelled') return 'bg-red-100 text-red-600';
     if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
     if (status === 'in_progress') return 'bg-indigo-100 text-indigo-700';
-    if (['quoted', 'approved'].includes(status)) return 'bg-amber-100 text-amber-700';
+    if (status === 'approved') return 'bg-amber-100 text-amber-700';
     return 'bg-gray-100 text-gray-600';
 }
 function stageDot(status) {
     if (status === 'cancelled') return 'bg-red-500';
     if (status === 'completed') return 'bg-emerald-500';
     if (status === 'in_progress') return 'bg-indigo-500';
-    if (['quoted', 'approved'].includes(status)) return 'bg-amber-500';
+    if (status === 'approved') return 'bg-amber-500';
     return 'bg-gray-400';
 }
 function itemStatusClass(status) {

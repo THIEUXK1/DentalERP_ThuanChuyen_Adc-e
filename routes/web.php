@@ -116,6 +116,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::delete('pending-deletions/{pendingDeletion}/undo', [PendingDeletionController::class, 'undo'])
+        ->name('pending-deletions.undo');
 });
 
 // Admin
@@ -273,9 +276,6 @@ Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(functi
         ->name('registrations.patch')->middleware('can:appointments.create');
     Route::delete('registrations/{registration}', [RegistrationController::class, 'destroy'])
         ->name('registrations.destroy')->middleware('can:appointments.create');
-
-    Route::delete('pending-deletions/{pendingDeletion}/undo', [PendingDeletionController::class, 'undo'])
-        ->name('pending-deletions.undo');
 });
 
 // Core

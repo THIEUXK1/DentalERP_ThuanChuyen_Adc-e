@@ -7,6 +7,8 @@ use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\PatientInvoice;
+use App\Models\PendingDeletion;
+use App\Models\TreatmentPlan;
 use App\Services\InvoiceService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
@@ -72,6 +74,22 @@ class PatientInvoiceController extends Controller
 
         $plan = $invoice->treatmentPlan;
 
+        $planPendingDeletion = null;
+        if ($plan) {
+            $pending = PendingDeletion::where('deletable_type', TreatmentPlan::class)
+                ->where('deletable_id', $plan->id)
+                ->whereNull('cancelled_at')
+                ->whereNull('executed_at')
+                ->where('execute_at', '>', now())
+                ->first();
+            if ($pending) {
+                $planPendingDeletion = [
+                    'id'         => $pending->id,
+                    'execute_at' => $pending->execute_at->toIso8601String(),
+                ];
+            }
+        }
+
         return Inertia::render('Cashier/Invoices/Show', [
             'invoice' => [
                 'id'               => $invoice->id,
@@ -133,6 +151,7 @@ class PatientInvoiceController extends Controller
             'methods' => collect(PaymentMethod::cases())->map(fn ($m) => ['value' => $m->value, 'label' => $m->label()]),
             'canRefund' => auth()->user()?->can('cashier.approve_refund'),
             'canDiscount' => auth()->user()?->can('cashier.approve_discount'),
+            'plan_pending_deletion' => $planPendingDeletion,
         ]);
     }
 
