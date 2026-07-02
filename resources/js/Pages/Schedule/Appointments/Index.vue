@@ -292,10 +292,35 @@
                     class="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
                     {{ hasActiveFilters || todayOnly ? 'Không tìm thấy lịch hẹn phù hợp' : 'Chưa có lịch hẹn nào' }}
                 </div>
-                <div v-else class="space-y-1.5">
+                <!-- Bulk action bar -->
+                <div v-if="selectedIds.size > 0"
+                    class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+                    <span class="text-sm font-medium text-indigo-700">Đã chọn {{ selectedIds.size }} lịch hẹn</span>
+                    <button @click="selectedIds = new Set()" class="text-xs text-gray-500 hover:text-gray-700 underline">Bỏ chọn</button>
+                    <div class="ml-auto flex items-center gap-2">
+                        <select v-model="bulkStatus" class="border border-indigo-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                            <option value="">-- Chọn trạng thái --</option>
+                            <option v-for="s in QUICK_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
+                        </select>
+                        <button @click="doBulkTransition"
+                            :disabled="!bulkStatus"
+                            class="px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-40">
+                            Áp dụng
+                        </button>
+                    </div>
+                </div>
+
+                <div class="space-y-1.5">
                     <div v-for="a in paginatedAppointments" :key="a.id"
                         :class="['flex items-stretch bg-white rounded-xl border hover:shadow-sm transition-all overflow-hidden', statusBorder(a.status)]">
-                        <div :class="['w-1.5 flex-shrink-0', statusStripe(a.status)]"></div>
+                        <!-- Checkbox -->
+                        <label class="flex items-center pl-3 cursor-pointer flex-shrink-0" @click.stop>
+                            <input type="checkbox"
+                                :checked="selectedIds.has(a.id)"
+                                @change="toggleSelect(a.id)"
+                                class="w-4 h-4 accent-indigo-600 cursor-pointer" />
+                        </label>
+                        <div :class="['w-1.5 flex-shrink-0 ml-2', statusStripe(a.status)]"></div>
                         <Link :href="route('schedule.appointments.show', a.id)" class="flex flex-1 items-center gap-4 px-4 py-3 min-w-0">
                             <div class="w-16 text-center flex-shrink-0">
                                 <p class="text-xs font-semibold text-gray-500">{{ displayDate(a.scheduled_at) }}</p>
@@ -317,13 +342,42 @@
                                 </p>
                                 <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 inline-block max-w-xs truncate">📝 {{ a.notes }}</p>
                             </div>
-                            <span :class="['flex-shrink-0 inline-flex items-center px-3 py-1 rounded-full text-xs font-bold', statusBadge(a.status)]">{{ a.status_label }}</span>
                             <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0">
                                 <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
                                 <span class="text-xs text-gray-400">{{ a.branch }}</span>
                             </div>
                         </Link>
-                        <div v-if="can('appointments.manage')" class="flex items-center pr-3 flex-shrink-0">
+                        <!-- Status dropdown (outside Link) -->
+                        <div class="relative flex items-center px-3 flex-shrink-0" @click.stop>
+                            <button
+                                :class="['inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold hover:opacity-75 transition-opacity', statusBadge(a.status)]"
+                                @click="toggleStatusDrop(a.id)">
+                                {{ a.status_label }}
+                                <svg class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </button>
+                            <div v-if="statusDrop === a.id"
+                                class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]">
+                                <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Đổi trạng thái</p>
+                                <button v-for="s in QUICK_STATUSES" :key="s.value"
+                                    @click="doStatusTransition(a.id, s.value)"
+                                    :class="['w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2',
+                                        a.status === s.value ? 'font-bold text-gray-800' : 'text-gray-600']">
+                                    <span :class="['w-2 h-2 rounded-full flex-shrink-0', statusStripe(s.value)]"></span>
+                                    {{ s.label }}
+                                    <svg v-if="a.status === s.value" class="w-3 h-3 ml-auto text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div v-if="can('appointments.manage')" class="flex items-center gap-1.5 pr-3 flex-shrink-0">
+                            <button v-if="canQuickRegister(a)" @click.prevent="quickRegister(a)" :disabled="quickRegisteringId === a.id"
+                                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-teal-700 border border-teal-200 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors disabled:opacity-50">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                Đăng ký khám nhanh
+                            </button>
                             <button @click.prevent="openReschedule(a)"
                                 class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -392,13 +446,20 @@
                             </div>
                             <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 truncate">📝 {{ a.notes }}</p>
                         </Link>
-                        <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white">
+                        <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white gap-1.5">
                             <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
-                            <button v-if="can('appointments.manage')" @click="openReschedule(a)"
-                                class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                                Rời lịch
-                            </button>
+                            <div v-if="can('appointments.manage')" class="flex items-center gap-1.5">
+                                <button v-if="canQuickRegister(a)" @click="quickRegister(a)" :disabled="quickRegisteringId === a.id"
+                                    class="flex items-center gap-1 px-2 py-1 text-xs text-teal-700 border border-teal-200 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors disabled:opacity-50">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                    Đăng ký nhanh
+                                </button>
+                                <button @click="openReschedule(a)"
+                                    class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                    Rời lịch
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -568,7 +629,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { router, Link, useForm } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
@@ -927,6 +988,52 @@ function onServiceChange() {
 function submitCreate() {
     createForm.post(route('schedule.appointments.store'), {
         onSuccess: () => { showCreate.value = false; },
+    });
+}
+
+// ── Inline status transition ────────────────────────────────────
+const QUICK_STATUSES = [
+    { value: 'booked',     label: 'Đang hẹn' },
+    { value: 'checked_in', label: 'Đã đến' },
+    { value: 'cancelled',  label: 'Hủy hẹn' },
+];
+const statusDrop = ref(null);
+function toggleStatusDrop(id) { statusDrop.value = statusDrop.value === id ? null : id; }
+function doStatusTransition(id, status) {
+    statusDrop.value = null;
+    router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true });
+}
+function closeStatusDrop() { statusDrop.value = null; }
+onMounted(() => document.addEventListener('click', closeStatusDrop));
+onUnmounted(() => document.removeEventListener('click', closeStatusDrop));
+
+// ── Bulk selection ──────────────────────────────────────────────
+let selectedIds = ref(new Set());
+const bulkStatus = ref('');
+function toggleSelect(id) {
+    const s = new Set(selectedIds.value);
+    s.has(id) ? s.delete(id) : s.add(id);
+    selectedIds.value = s;
+}
+function doBulkTransition() {
+    if (!bulkStatus.value || selectedIds.value.size === 0) return;
+    const ids = [...selectedIds.value];
+    const status = bulkStatus.value;
+    selectedIds.value = new Set();
+    bulkStatus.value = '';
+    ids.forEach(id => router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true }));
+}
+
+// ── Quick register (check-in) ───────────────────────────────────
+const QUICK_REGISTER_STATUSES = ['booked', 'confirmed'];
+const quickRegisteringId = ref(null);
+function canQuickRegister(a) { return QUICK_REGISTER_STATUSES.includes(a.status); }
+function quickRegister(a) {
+    if (quickRegisteringId.value) return;
+    quickRegisteringId.value = a.id;
+    router.post(route('schedule.appointments.quick-register', a.id), {}, {
+        preserveScroll: true,
+        onFinish: () => { quickRegisteringId.value = null; },
     });
 }
 

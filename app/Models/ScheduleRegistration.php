@@ -10,7 +10,7 @@ class ScheduleRegistration extends Model
     use \Illuminate\Database\Eloquent\SoftDeletes;
 
     protected $fillable = [
-        'code', 'patient_id', 'branch_id', 'doctor_id', 'dental_chair_id',
+        'code', 'patient_id', 'appointment_id', 'branch_id', 'doctor_id', 'dental_chair_id',
         'registration_date', 'visit_time', 'status', 'pending_since', 'notes', 'created_by',
     ];
 
@@ -37,8 +37,9 @@ class ScheduleRegistration extends Model
         });
     }
 
-    public function patient(): BelongsTo  { return $this->belongsTo(Patient::class); }
-    public function doctor(): BelongsTo   { return $this->belongsTo(Employee::class, 'doctor_id'); }
+    public function patient(): BelongsTo     { return $this->belongsTo(Patient::class); }
+    public function appointment(): BelongsTo { return $this->belongsTo(Appointment::class); }
+    public function doctor(): BelongsTo      { return $this->belongsTo(Employee::class, 'doctor_id'); }
     public function chair(): BelongsTo    { return $this->belongsTo(DentalChair::class, 'dental_chair_id'); }
     public function branch(): BelongsTo   { return $this->belongsTo(Branch::class); }
     public function creator(): BelongsTo  { return $this->belongsTo(User::class, 'created_by'); }

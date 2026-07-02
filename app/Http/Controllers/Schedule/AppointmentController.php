@@ -11,9 +11,11 @@ use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
 use App\Models\PendingDeletion;
+use App\Models\ScheduleRegistration;
 use App\Services\AppointmentService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -162,6 +164,41 @@ class AppointmentController extends Controller
         ]);
 
         return back()->with('success', 'Lịch hẹn sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
+    }
+
+    public function quickRegister(Appointment $appointment): RedirectResponse
+    {
+        $this->authorize('appointments.manage');
+
+        if ($appointment->registration()->exists()) {
+            return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');
+        }
+
+        try {
+            DB::transaction(function () use ($appointment) {
+                ScheduleRegistration::create([
+                    'code' => ScheduleRegistration::generateCode(),
+                    'patient_id' => $appointment->patient_id,
+                    'appointment_id' => $appointment->id,
+                    'branch_id' => $appointment->branch_id,
+                    'doctor_id' => $appointment->doctor_id,
+                    'dental_chair_id' => $appointment->dental_chair_id,
+                    'registration_date' => $appointment->scheduled_at->toDateString(),
+                    'visit_time' => $appointment->scheduled_at->format('H:i'),
+                    'status' => 'pending',
+                    'notes' => $appointment->notes,
+                    'created_by' => auth()->id(),
+                ]);
+
+                $this->svc->transition($appointment, AppointmentStatus::CheckedIn);
+            });
+        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+            return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', "Đã đăng ký khám nhanh cho lịch hẹn {$appointment->code}.");
     }
 
     public function transition(Request $request, Appointment $appointment): RedirectResponse

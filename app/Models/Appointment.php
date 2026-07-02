@@ -70,6 +70,11 @@ class Appointment extends Model
         return $this->belongsTo(DentalService::class);
     }
 
+    public function registration()
+    {
+        return $this->hasOne(ScheduleRegistration::class);
+    }
+
     public function lead()
     {
         return $this->belongsTo(Lead::class);

@@ -260,6 +260,8 @@ Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(functi
         ->name('appointments.quick-reschedule')->middleware('can:appointments.manage');
     Route::patch('appointments/{appointment}/notes', [AppointmentController::class, 'updateNotes'])
         ->name('appointments.update-notes')->middleware('can:appointments.manage');
+    Route::post('appointments/{appointment}/quick-register', [AppointmentController::class, 'quickRegister'])
+        ->name('appointments.quick-register')->middleware('can:appointments.manage');
 
     Route::get('registrations', [RegistrationController::class, 'index'])
         ->name('registrations.index')->middleware('can:appointments.view');

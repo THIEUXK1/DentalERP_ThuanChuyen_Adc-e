@@ -136,7 +136,7 @@
                 <div class="space-y-4">
 
                     <!-- Chuyển trạng thái -->
-                    <div v-if="can('appointments.manage') && transitions.length > 0"
+                    <div v-if="can('appointments.manage') && quickTransitions.length > 0"
                         class="bg-white rounded-xl border border-gray-200 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -145,8 +145,13 @@
                             Cập nhật trạng thái
                         </h3>
                         <div class="space-y-2">
-                            <button v-for="t in transitions" :key="t.value" @click="doTransition(t.value)"
-                                class="w-full px-3 py-2 text-xs text-left bg-white border border-gray-200 rounded-lg hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700 transition-colors font-medium">
+                            <button v-for="t in quickTransitions" :key="t.value" @click="doTransition(t.value)"
+                                :class="['w-full px-3 py-2 text-xs text-left border rounded-lg transition-colors font-medium',
+                                    t.value === 'cancelled'
+                                        ? 'bg-white border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300'
+                                        : t.value === 'checked_in'
+                                            ? 'bg-white border-teal-200 text-teal-700 hover:bg-teal-50 hover:border-teal-300'
+                                            : 'bg-white border-gray-200 hover:bg-indigo-50 hover:border-indigo-300 hover:text-indigo-700']">
                                 → {{ t.label }}
                             </button>
                         </div>
@@ -194,7 +199,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
@@ -206,6 +211,12 @@ const { hasPermission: can } = usePermission();
 const props = defineProps({ appointment: Object, transitions: Array });
 
 // ── Transitions ─────────────────────────────────────────────────
+const QUICK_STATUSES = ['booked', 'checked_in', 'cancelled'];
+const QUICK_LABELS   = { booked: 'Đang hẹn', checked_in: 'Đã đến', cancelled: 'Hủy hẹn' };
+const quickTransitions = computed(() =>
+    (props.transitions ?? []).filter(t => QUICK_STATUSES.includes(t.value))
+                              .map(t => ({ ...t, label: QUICK_LABELS[t.value] ?? t.label }))
+);
 const showCancel = ref(false);
 const cancelForm = useForm({ status: 'cancelled', cancel_reason: '' });
 
