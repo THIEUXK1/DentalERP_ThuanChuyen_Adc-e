@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Cashier;
 
+use App\Enums\DebtStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
 use App\Models\PatientDebt;
@@ -14,6 +15,10 @@ class DebtController extends Controller
     public function index(Request $request): Response
     {
         $this->authorize('cashier.view');
+
+        // Auto-fix inconsistent records: remaining=0 but status not updated
+        PatientDebt::whereIn('status', ['pending', 'partial'])->where('remaining', '<=', 0)
+            ->update(['status' => DebtStatus::Paid->value]);
 
         $query = PatientDebt::with(['patient', 'invoice'])
             ->whereIn('status', ['pending', 'partial'])

@@ -241,6 +241,7 @@ Route::middleware(['auth'])->prefix('clinical')->name('clinical.')->group(functi
     Route::delete('templates/{template}', [ClinicalTemplateController::class, 'destroy'])->name('templates.destroy')->middleware('can:clinical_notes.create');
     Route::get('templates/search', [ClinicalTemplateController::class, 'search'])->name('templates.search')->middleware('can:clinical_notes.create');
 
+    Route::get('treatment-plans/data', [TreatmentPlanController::class, 'data'])->name('treatment-plans.data')->middleware('can:treatment_plans.view');
     Route::resource('treatment-plans', TreatmentPlanController::class)->middleware('can:treatment_plans.view');
     Route::post('treatment-plans/{treatmentPlan}/items', [TreatmentPlanItemController::class, 'store'])->name('treatment-plans.items.store')->middleware('can:treatment_plans.edit');
     Route::put('treatment-plan-items/{treatmentPlanItem}', [TreatmentPlanItemController::class, 'update'])->name('treatment-plan-items.update')->middleware('can:treatment_plans.edit');
@@ -256,6 +257,7 @@ Route::middleware(['auth'])->prefix('clinical')->name('clinical.')->group(functi
 
 // Schedule
 Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(function () {
+    Route::get('appointments/data', [AppointmentController::class, 'data'])->name('appointments.data')->middleware('can:appointments.view');
     Route::resource('appointments', AppointmentController::class)->middleware('can:appointments.view');
     Route::post('appointments/{appointment}/transition', [AppointmentController::class, 'transition'])
         ->name('appointments.transition')->middleware('can:appointments.manage');

@@ -13,6 +13,7 @@ use App\Models\Patient;
 use App\Models\PendingDeletion;
 use App\Models\ScheduleRegistration;
 use App\Services\AppointmentService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -28,10 +29,6 @@ class AppointmentController extends Controller
         $this->authorize('appointments.view');
 
         return Inertia::render('Schedule/Appointments/Index', [
-            'all_appointments' => Appointment::with(['patient', 'doctor', 'chair', 'service'])
-                ->orderByDesc('scheduled_at')
-                ->get()
-                ->map(fn ($a) => $this->dto($a)),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'doctors' => Employee::doctors()->where('is_active', true)->get()
@@ -44,6 +41,18 @@ class AppointmentController extends Controller
                 ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code, 'branch_id' => $p->branch_id]),
             'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
         ]);
+    }
+
+    public function data(): JsonResponse
+    {
+        $this->authorize('appointments.view');
+
+        $appointments = Appointment::with(['patient', 'doctor', 'chair', 'service'])
+            ->orderByDesc('scheduled_at')
+            ->get()
+            ->map(fn ($a) => $this->dto($a));
+
+        return response()->json($appointments);
     }
 
     public function create(Request $request): Response

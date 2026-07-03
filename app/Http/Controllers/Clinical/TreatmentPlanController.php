@@ -17,6 +17,7 @@ use App\Services\TreatmentPlanService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Inertia\Inertia;
 
@@ -31,42 +32,51 @@ class TreatmentPlanController extends Controller
     {
         $this->authorize('treatment_plans.view');
 
-        // IDs của các plan có item bị lỗi (amount ≠ qty*unit_price - discount)
+        return Inertia::render('Clinical/TreatmentPlans/Index', [
+            'statuses' => collect(TreatmentPlanStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
+            'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'doctors'  => Employee::doctors()->where('is_active', true)->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+        ]);
+    }
+
+    public function data(): JsonResponse
+    {
+        $this->authorize('treatment_plans.view');
+
         $issueIds = \DB::table('treatment_plan_items')
             ->whereRaw('amount != (quantity * unit_price - discount)')
             ->pluck('treatment_plan_id')
             ->unique()
             ->flip();
 
-        return Inertia::render('Clinical/TreatmentPlans/Index', [
-            'all_plans' => TreatmentPlan::with(['patient', 'doctor', 'branch'])
-                ->orderByDesc('id')
-                ->get()
-                ->map(fn ($p) => [
-                    'id'           => $p->id,
-                    'code'         => $p->code,
-                    'patient'      => $p->patient->full_name,
-                    'patient_id'   => $p->patient_id,
-                    'doctor'       => $p->doctor?->full_name ?? '—',
-                    'doctor_id'    => $p->doctor_id,
-                    'branch'       => $p->branch->name,
-                    'branch_id'    => $p->branch_id,
-                    'status'       => $p->status->value,
-                    'status_label' => $p->status->label(),
-                    'status_color' => $p->status->color(),
-                    'total_amount' => $p->total_amount,
-                    'net_total'    => $p->net_total,
-                    'payment_schedule_total' => collect($p->payment_schedule ?? [])->sum('amount'),
-                    'payment_schedule_count' => count($p->payment_schedule ?? []),
-                    'has_data_issue' => isset($issueIds[$p->id]),
-                    'notes'        => $p->notes ?? '',
-                    'created_at'   => $p->created_at->format('d/m/Y'),
-                    'created_at_raw' => $p->created_at->toDateString(),
-                ]),
-            'statuses' => collect(TreatmentPlanStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
-            'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
-            'doctors'  => Employee::doctors()->where('is_active', true)->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
-        ]);
+        $plans = TreatmentPlan::with(['patient', 'doctor', 'branch'])
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($p) => [
+                'id'           => $p->id,
+                'code'         => $p->code,
+                'patient'      => $p->patient->full_name,
+                'patient_id'   => $p->patient_id,
+                'doctor'       => $p->doctor?->full_name ?? '—',
+                'doctor_id'    => $p->doctor_id,
+                'branch'       => $p->branch->name,
+                'branch_id'    => $p->branch_id,
+                'status'       => $p->status->value,
+                'status_label' => $p->status->label(),
+                'status_color' => $p->status->color(),
+                'total_amount' => $p->total_amount,
+                'net_total'    => $p->net_total,
+                'payment_schedule_total' => collect($p->payment_schedule ?? [])->sum('amount'),
+                'payment_schedule_count' => count($p->payment_schedule ?? []),
+                'has_data_issue' => isset($issueIds[$p->id]),
+                'notes'        => $p->notes ?? '',
+                'start_date'     => $p->start_date?->format('d/m/Y') ?? '—',
+                'start_date_raw' => $p->start_date?->toDateString() ?? '',
+                'created_at'   => $p->created_at->format('d/m/Y'),
+                'created_at_raw' => $p->created_at->toDateString(),
+            ]);
+
+        return response()->json($plans);
     }
 
     public function create(Request $request): \Inertia\Response

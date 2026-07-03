@@ -169,7 +169,7 @@
             <!-- ── Controls ─────────────────────────────────────────────── -->
             <div class="flex items-center justify-between text-xs text-gray-500">
                 <span>Hiển thị <strong class="text-gray-700">{{ paginated.length }}</strong> / {{ filtered.length }}
-                    <span v-if="filtered.length < all_plans.length" class="text-gray-400">(tổng {{ all_plans.length }})</span>
+                    <span v-if="filtered.length < allPlans.length" class="text-gray-400">(tổng {{ allPlans.length }})</span>
                 </span>
                 <select v-model="perPage"
                     class="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
@@ -181,79 +181,109 @@
                 </select>
             </div>
 
+            <!-- ── Loading ────────────────────────────────────────────────── -->
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+                <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                <p class="text-sm">Đang tải dữ liệu...</p>
+            </div>
+
+            <!-- ── Error ──────────────────────────────────────────────────── -->
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+                <p class="text-sm font-medium">Không thể tải dữ liệu</p>
+                <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
+            </div>
+
             <!-- ── Empty ─────────────────────────────────────────────────── -->
-            <div v-if="filtered.length === 0"
+            <div v-else-if="filtered.length === 0"
                 class="bg-white rounded-xl border border-gray-200 py-12 text-center text-gray-400">
                 {{ hasFilters ? 'Không tìm thấy kế hoạch phù hợp' : 'Chưa có kế hoạch điều trị nào' }}
             </div>
 
             <!-- ── LIST VIEW ─────────────────────────────────────────────── -->
-            <div v-else-if="viewMode === 'list'" class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-600 text-xs">
+            <div v-else-if="!loading && !loadError && viewMode === 'list'" class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 border-b border-gray-200">
                         <tr>
-                            <th class="px-4 py-3 text-left">
-                                <button @click="toggleSort('code')" class="flex items-center gap-1 font-medium hover:text-gray-900">
-                                    Mã <SortIcon :field="'code'" :current="sortBy" :dir="sortDir"/>
-                                </button>
-                            </th>
-                            <th class="px-4 py-3 text-left">
-                                <button @click="toggleSort('patient')" class="flex items-center gap-1 font-medium hover:text-gray-900">
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                <button @click="toggleSort('patient')" class="flex items-center gap-1 hover:text-gray-800">
                                     Khách hàng <SortIcon :field="'patient'" :current="sortBy" :dir="sortDir"/>
                                 </button>
                             </th>
-                            <th class="px-4 py-3 text-left hidden sm:table-cell">
-                                <button @click="toggleSort('doctor')" class="flex items-center gap-1 font-medium hover:text-gray-900">
-                                    Bác sĩ <SortIcon :field="'doctor'" :current="sortBy" :dir="sortDir"/>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden md:table-cell">
+                                <button @click="toggleSort('doctor')" class="flex items-center gap-1 hover:text-gray-800">
+                                    Bác sĩ / Chi nhánh <SortIcon :field="'doctor'" :current="sortBy" :dir="sortDir"/>
                                 </button>
                             </th>
-                            <th class="px-4 py-3 text-left hidden lg:table-cell font-medium">Chi nhánh</th>
-                            <th class="px-4 py-3 text-right">
-                                <button @click="toggleSort('net_total')" class="flex items-center gap-1 font-medium hover:text-gray-900 ml-auto">
-                                    Giá trị KH <SortIcon :field="'net_total'" :current="sortBy" :dir="sortDir"/>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Trạng thái</th>
+                            <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide hidden sm:table-cell">
+                                <button @click="toggleSort('start_date_raw')" class="flex items-center gap-1 hover:text-gray-800">
+                                    Ngày điều trị <SortIcon :field="'start_date_raw'" :current="sortBy" :dir="sortDir"/>
                                 </button>
                             </th>
-                            <th class="px-4 py-3 text-right hidden xl:table-cell">
-                                <button @click="toggleSort('payment_schedule_total')" class="flex items-center gap-1 font-medium hover:text-gray-900 ml-auto">
+                            <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                <button @click="toggleSort('net_total')" class="flex items-center gap-1 hover:text-gray-800 ml-auto">
+                                    Giá trị <SortIcon :field="'net_total'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
+                            <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide hidden xl:table-cell">
+                                <button @click="toggleSort('payment_schedule_total')" class="flex items-center gap-1 hover:text-gray-800 ml-auto">
                                     Lịch TT <SortIcon :field="'payment_schedule_total'" :current="sortBy" :dir="sortDir"/>
                                 </button>
                             </th>
-                            <th class="px-4 py-3 text-left font-medium">Trạng thái</th>
-                            <th class="px-4 py-3 text-left hidden md:table-cell">
-                                <button @click="toggleSort('created_at_raw')" class="flex items-center gap-1 font-medium hover:text-gray-900">
-                                    Ngày tạo <SortIcon :field="'created_at_raw'" :current="sortBy" :dir="sortDir"/>
-                                </button>
-                            </th>
-                            <th class="px-4 py-3 w-16"></th>
+                            <th class="px-5 py-3 w-14"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        <tr v-for="p in paginated" :key="p.id" class="hover:bg-gray-50 transition-colors">
-                            <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ p.code }}</td>
-                            <td class="px-4 py-3 font-medium text-gray-900">
-                                <Link :href="route('clinical.treatment-plans.show', p.id)" class="hover:text-primary-600">
+                        <tr v-for="p in paginated" :key="p.id"
+                            class="hover:bg-indigo-50/30 transition-colors group">
+                            <!-- Khách hàng + mã -->
+                            <td class="px-5 py-4">
+                                <Link :href="route('clinical.treatment-plans.show', p.id)"
+                                    class="font-semibold text-gray-900 hover:text-indigo-600 transition-colors text-sm leading-snug block">
                                     {{ p.patient }}
                                 </Link>
+                                <span class="font-mono text-[11px] text-gray-400 mt-0.5 block">{{ p.code }}</span>
                             </td>
-                            <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ p.doctor }}</td>
-                            <td class="px-4 py-3 text-gray-500 text-xs hidden lg:table-cell">{{ p.branch }}</td>
-                            <td class="px-4 py-3 text-right font-medium text-gray-800 tabular-nums whitespace-nowrap">
-                                {{ formatVnd(p.net_total) }}
+                            <!-- Bác sĩ + chi nhánh -->
+                            <td class="px-5 py-4 hidden md:table-cell">
+                                <p class="text-sm text-gray-700">{{ p.doctor }}</p>
+                                <p class="text-xs text-gray-400 mt-0.5">{{ p.branch }}</p>
                             </td>
-                            <td class="px-4 py-3 text-right hidden xl:table-cell whitespace-nowrap">
-                                <template v-if="p.payment_schedule_count > 0">
-                                    <span class="font-semibold text-emerald-700 tabular-nums">{{ formatVnd(p.payment_schedule_total) }}</span>
-                                    <span class="ml-1 text-xs text-gray-400">({{ p.payment_schedule_count }} đợt)</span>
-                                </template>
-                                <span v-else class="text-gray-300 text-xs">—</span>
-                            </td>
-                            <td class="px-4 py-3">
+                            <!-- Trạng thái -->
+                            <td class="px-5 py-4">
                                 <StatusBadge :color="p.status_color">{{ p.status_label }}</StatusBadge>
                             </td>
-                            <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell whitespace-nowrap">{{ p.created_at }}</td>
-                            <td class="px-4 py-3 text-right">
+                            <!-- Ngày điều trị -->
+                            <td class="px-5 py-4 hidden sm:table-cell">
+                                <span :class="p.start_date === '—' ? 'text-gray-300 text-sm' : 'text-sm text-gray-700'">
+                                    {{ p.start_date }}
+                                </span>
+                            </td>
+                            <!-- Giá trị -->
+                            <td class="px-5 py-4 text-right whitespace-nowrap">
+                                <span class="text-sm font-bold text-gray-800 tabular-nums">{{ formatVnd(p.net_total) }}</span>
+                            </td>
+                            <!-- Lịch TT -->
+                            <td class="px-5 py-4 text-right hidden xl:table-cell whitespace-nowrap">
+                                <template v-if="p.payment_schedule_count > 0">
+                                    <span class="text-sm font-semibold text-emerald-700 tabular-nums">{{ formatVnd(p.payment_schedule_total) }}</span>
+                                    <span class="block text-[11px] text-gray-400 mt-0.5">{{ p.payment_schedule_count }} đợt</span>
+                                </template>
+                                <span v-else class="text-gray-300 text-sm">—</span>
+                            </td>
+                            <!-- Xem -->
+                            <td class="px-5 py-4 text-right">
                                 <Link :href="route('clinical.treatment-plans.show', p.id)"
-                                    class="text-primary-600 text-xs font-medium hover:underline">Xem →</Link>
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-medium opacity-0 group-hover:opacity-100 transition-all hover:bg-indigo-100 whitespace-nowrap">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                                    </svg>
+                                    Xem
+                                </Link>
                             </td>
                         </tr>
                     </tbody>
@@ -261,7 +291,7 @@
             </div>
 
             <!-- ── GRID VIEW ─────────────────────────────────────────────── -->
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div v-else-if="!loading && !loadError" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
                 <Link v-for="p in paginated" :key="p.id"
                     :href="route('clinical.treatment-plans.show', p.id)"
                     class="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-md transition-all p-4 flex flex-col gap-2">
@@ -291,8 +321,9 @@
                             <span class="text-xs text-gray-400">Lịch TT ({{ p.payment_schedule_count }} đợt)</span>
                             <span class="text-sm font-semibold text-emerald-600 tabular-nums">{{ formatVnd(p.payment_schedule_total) }}</span>
                         </div>
-                        <div class="text-right">
-                            <span class="text-xs text-gray-400">{{ p.created_at }}</span>
+                        <div v-if="p.start_date !== '—'" class="flex items-center justify-between">
+                            <span class="text-xs text-gray-400">Ngày điều trị</span>
+                            <span class="text-xs text-gray-600 font-medium">{{ p.start_date }}</span>
                         </div>
                     </div>
                 </Link>
@@ -323,7 +354,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
@@ -339,7 +370,29 @@ const SortIcon = {
 
 const { hasPermission: can } = usePermission();
 const { formatVnd } = useCurrency();
-const props = defineProps({ all_plans: Array, statuses: Array, branches: Array, doctors: Array });
+const props = defineProps({ statuses: Array, branches: Array, doctors: Array });
+
+// ── Data fetch ────────────────────────────────────────────────────────────────
+const allPlans  = ref([]);
+const loading   = ref(true);
+const loadError = ref(false);
+
+async function loadData() {
+    loading.value   = true;
+    loadError.value = false;
+    try {
+        const res = await fetch(route('clinical.treatment-plans.data'), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        allPlans.value = await res.json();
+    } catch {
+        loadError.value = true;
+    } finally {
+        loading.value = false;
+    }
+}
+
+onMounted(loadData);
 
 // ── State ────────────────────────────────────────────────────────────────────
 const viewMode         = ref(localStorage.getItem('tp_view') || 'list');
@@ -405,7 +458,7 @@ watch([dateFrom, dateTo], () => {
 
 // ── Filtering ─────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
-    let list = props.all_plans;
+    let list = allPlans.value;
     if (filterStatus.value)  list = list.filter(p => p.status === filterStatus.value);
     if (filterBranch.value)  list = list.filter(p => p.branch_id == filterBranch.value);
     if (filterDoctor.value)  list = list.filter(p => p.doctor_id == filterDoctor.value);
@@ -488,10 +541,10 @@ const pageNumbers = computed(() => {
 
 // ── Summary ────────────────────────────────────────────────────────────────────
 const summary = computed(() => ({
-    draft:      props.all_plans.filter(p => p.status === 'draft').length,
-    notStarted: props.all_plans.filter(p => p.status === 'approved').length,
-    inProgress: props.all_plans.filter(p => p.status === 'in_progress').length,
-    completed:  props.all_plans.filter(p => p.status === 'completed').length,
+    draft:      allPlans.value.filter(p => p.status === 'draft').length,
+    notStarted: allPlans.value.filter(p => p.status === 'approved').length,
+    inProgress: allPlans.value.filter(p => p.status === 'in_progress').length,
+    completed:  allPlans.value.filter(p => p.status === 'completed').length,
 }));
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -517,11 +570,11 @@ function clearFilters() {
 
 // ── Export CSV ─────────────────────────────────────────────────────────────────
 function exportCsv() {
-    const headers = ['Mã KH','Khách hàng','Bác sĩ','Chi nhánh','Giá trị KH','Tổng lịch TT','Số đợt','Trạng thái','Ngày tạo'];
+    const headers = ['Mã KH','Khách hàng','Bác sĩ','Chi nhánh','Giá trị KH','Tổng lịch TT','Số đợt','Trạng thái','Ngày điều trị','Ngày tạo'];
     const rows = sorted.value.map(p => [
         p.code, p.patient, p.doctor, p.branch,
         p.net_total, p.payment_schedule_total, p.payment_schedule_count,
-        p.status_label, p.created_at,
+        p.status_label, p.start_date, p.created_at,
     ]);
     const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });

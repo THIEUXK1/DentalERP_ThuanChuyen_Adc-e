@@ -10,10 +10,6 @@ export const menuConfig = [
         items: [
             { label: 'Khách hàng', route: 'patients.index', icon: 'users', permission: 'patients.view' },
             { label: 'Khách tiềm năng', route: 'crm.leads.index', icon: 'lead', permission: 'leads.view' },
-            { label: 'Công việc Follow-up', route: 'crm.tasks.index', icon: 'follow-up', permission: 'leads.view' },
-            { label: 'Mẫu tin nhắn', route: 'crm.messages.templates', icon: 'message-template', permission: 'leads.manage' },
-            { label: 'Lịch sử tin nhắn', route: 'crm.messages.log', icon: 'message-log', permission: 'leads.manage' },
-            { label: 'Quy tắc CSKH', route: 'crm.care-rules.index', icon: 'care-rules', permission: 'leads.manage' }
         ]
     },
     {
@@ -36,6 +32,15 @@ export const menuConfig = [
             { label: 'Hóa đơn', route: 'cashier.invoices.index', icon: 'invoice', permission: 'cashier.view' },
             { label: 'Công nợ', route: 'cashier.debts.index', icon: 'debt', permission: 'cashier.view' },
             { label: 'Phiếu chi', route: 'cashier.expenses.index', icon: 'expense', permission: 'expenses.view' }
+        ]
+    },
+    {
+        label: 'CHĂM SÓC KHÁCH HÀNG',
+        items: [
+            { label: 'Công việc Follow-up', route: 'crm.tasks.index', icon: 'follow-up', permission: 'leads.view' },
+            { label: 'Mẫu tin nhắn', route: 'crm.messages.templates', icon: 'message-template', permission: 'leads.manage' },
+            { label: 'Lịch sử tin nhắn', route: 'crm.messages.log', icon: 'message-log', permission: 'leads.manage' },
+            { label: 'Quy tắc CSKH', route: 'crm.care-rules.index', icon: 'care-rules', permission: 'leads.manage' }
         ]
     },
     {

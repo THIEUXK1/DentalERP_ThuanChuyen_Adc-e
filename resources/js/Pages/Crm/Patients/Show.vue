@@ -194,8 +194,8 @@
                             <tr>
                                 <th class="px-4 py-2.5 text-left font-medium">Mã HĐ</th>
                                 <th class="px-4 py-2.5 text-left font-medium">Kế hoạch</th>
-                                <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ngày</th>
-                                <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Đến hạn</th>
+                                <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ngày tạo</th>
+                                <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Ngày TT</th>
                                 <th class="px-4 py-2.5 text-right font-medium">Tổng tiền</th>
                                 <th class="px-4 py-2.5 text-right font-medium hidden md:table-cell">Đã TT</th>
                                 <th class="px-4 py-2.5 text-right font-medium">Còn nợ</th>
@@ -222,9 +222,12 @@
                                     <span v-else class="text-gray-300 text-xs">—</span>
                                 </td>
                                 <td class="px-4 py-2.5 text-xs text-gray-400 hidden sm:table-cell">{{ inv.created_at }}</td>
-                                <td class="px-4 py-2.5 text-xs hidden md:table-cell"
-                                    :class="inv.due_date_raw && inv.due_date_raw < new Date().toISOString().split('T')[0] && inv.amount_due > 0 ? 'text-red-600 font-medium' : 'text-gray-400'">
-                                    {{ inv.due_date ?? '—' }}
+                                <td class="px-4 py-2.5 hidden md:table-cell">
+                                    <span v-if="inv.last_payment_date" class="text-xs text-emerald-600 font-medium">
+                                        {{ inv.last_payment_date }}
+                                        <span v-if="inv.payment_count > 1" class="ml-1 text-gray-400 font-normal">({{ inv.payment_count }} lần)</span>
+                                    </span>
+                                    <span v-else class="text-xs text-gray-300">—</span>
                                 </td>
                                 <td class="px-4 py-2.5 text-right font-medium text-gray-800 tabular-nums">{{ formatVnd(inv.total) }}</td>
                                 <td class="px-4 py-2.5 text-right text-emerald-600 tabular-nums hidden md:table-cell">{{ formatVnd(inv.amount_paid) }}</td>
@@ -386,7 +389,7 @@ const props = defineProps({
     sources:            Array,
 });
 
-const activeTab      = ref('info');
+const activeTab      = ref('treatment');
 const showEditModal  = ref(false);
 
 const TAB_KEYS = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];

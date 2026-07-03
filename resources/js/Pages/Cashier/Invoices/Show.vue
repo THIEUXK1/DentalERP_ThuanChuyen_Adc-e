@@ -16,7 +16,10 @@
                                 Đợt {{ invoice.installment_index + 1 }}
                             </span>
                         </div>
-                        <h2 class="text-xl font-bold text-gray-900">{{ invoice.patient }}</h2>
+                        <Link :href="route('patients.show', invoice.patient_id)"
+                            class="text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                            {{ invoice.patient }}
+                        </Link>
                         <p class="text-sm text-gray-500 mt-0.5">
                             {{ invoice.patient_phone }}
                             <span class="mx-1.5 text-gray-300">·</span>
@@ -140,19 +143,9 @@
                         <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-4">
                             <div class="sm:col-span-1">
                                 <label class="text-xs text-gray-500 mb-1.5 block font-medium">Số tiền thu (₫) *</label>
-                                <div class="flex gap-2">
-                                    <input v-model="payForm.amount" type="number" :min="canRefund ? undefined : 1"
-                                        :placeholder="`Còn nợ: ${formatVnd(invoice.amount_due)}`"
-                                        class="flex-1 rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none tabular-nums text-right font-semibold"
-                                        @input="debtMode = false" />
-                                    <button @click="setDebtMode"
-                                        :class="['px-3 py-2 rounded-lg text-sm font-medium border transition-colors whitespace-nowrap',
-                                            debtMode
-                                                ? 'bg-rose-100 border-rose-300 text-rose-700'
-                                                : 'border-gray-200 text-gray-500 hover:bg-gray-50']">
-                                        Nợ
-                                    </button>
-                                </div>
+                                <input v-model="payForm.amount" type="number" :min="canRefund ? undefined : 1"
+                                    :placeholder="`Còn nợ: ${formatVnd(invoice.amount_due)}`"
+                                    class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none tabular-nums text-right font-semibold" />
                                 <p class="text-xs text-gray-400 mt-1">
                                     <button @click="fillFullAmount" class="text-indigo-500 hover:text-indigo-700 underline">Thu đủ: {{ formatVnd(invoice.amount_due) }}</button>
                                 </p>
@@ -174,15 +167,7 @@
                             </div>
                         </div>
 
-                        <!-- Debt mode notice -->
-                        <div v-if="debtMode" class="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg">
-                            <p class="text-sm text-rose-700 flex items-center gap-2">
-                                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                                </svg>
-                                <span><strong>Chế độ ghi nợ:</strong> Bệnh nhân nợ toàn bộ {{ formatVnd(invoice.amount_due) }}. Hệ thống sẽ ghi vào sổ công nợ.</span>
-                            </p>
-                        </div>
+
 
                         <p v-if="payForm.errors.amount" class="text-xs text-red-500 mb-3">{{ payForm.errors.amount }}</p>
 
@@ -636,8 +621,6 @@ function formatDate(dateStr) {
     if (!dateStr) return '';
     return dayjs(dateStr).format('DD/MM/YYYY');
 }
-const debtMode       = ref(false);
-
 const methods = (props.methods ?? []).map(m => ({
     ...m,
     icon: { cash: '💵', transfer: '🏦', card: '💳', ewallet: '📱', installment: '📅', voucher: '🎟️' }[m.value] ?? '💰',
@@ -653,25 +636,12 @@ const payForm = useForm({
 
 function fillFullAmount() {
     payForm.amount = props.invoice.amount_due;
-    debtMode.value = false;
-}
-
-function setDebtMode() {
-    debtMode.value = !debtMode.value;
-    if (debtMode.value) {
-        payForm.amount = 0;
-        payForm.notes  = 'Ghi nợ';
-    } else {
-        payForm.amount = '';
-        payForm.notes  = '';
-    }
 }
 
 function submitPayment(printAfter = false) {
     payForm.post(route('cashier.invoices.payments.store', props.invoice.id), {
         onSuccess: () => {
             payForm.reset('amount', 'reference', 'notes');
-            debtMode.value = false;
             if (printAfter) {
                 window.open(route('cashier.invoices.receipt', props.invoice.id), '_blank');
             }

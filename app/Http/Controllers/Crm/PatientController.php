@@ -246,25 +246,30 @@ class PatientController extends Controller
 
         // ── Invoice list for tab ────────────────────────────────────────────
         $patientInvoices = PatientInvoice::where('patient_id', $patient->id)
-            ->with(['treatmentPlan'])
+            ->with(['treatmentPlan', 'payments' => fn ($q) => $q->where('amount', '>', 0)->orderByDesc('payment_date')])
             ->orderByRaw('due_date ASC NULLS LAST, id DESC')
             ->get()
-            ->map(fn ($inv) => [
-                'id'                => $inv->id,
-                'code'              => $inv->code,
-                'status'            => $inv->status->value,
-                'status_label'      => $inv->status->label(),
-                'status_color'      => $inv->status->color(),
-                'total'             => $inv->total,
-                'amount_paid'       => $inv->amount_paid,
-                'amount_due'        => $inv->amountDue(),
-                'due_date'          => $inv->due_date?->format('d/m/Y'),
-                'due_date_raw'      => $inv->due_date?->toDateString(),
-                'installment_index' => $inv->installment_index,
-                'plan_id'           => $inv->treatment_plan_id,
-                'plan_code'         => $inv->treatmentPlan?->code,
-                'created_at'        => $inv->created_at->format('d/m/Y'),
-            ]);
+            ->map(function ($inv) {
+                $lastPayment = $inv->payments->first();
+                return [
+                    'id'                => $inv->id,
+                    'code'              => $inv->code,
+                    'status'            => $inv->status->value,
+                    'status_label'      => $inv->status->label(),
+                    'status_color'      => $inv->status->color(),
+                    'total'             => $inv->total,
+                    'amount_paid'       => $inv->amount_paid,
+                    'amount_due'        => $inv->amountDue(),
+                    'due_date'          => $inv->due_date?->format('d/m/Y'),
+                    'due_date_raw'      => $inv->due_date?->toDateString(),
+                    'installment_index' => $inv->installment_index,
+                    'plan_id'           => $inv->treatment_plan_id,
+                    'plan_code'         => $inv->treatmentPlan?->code,
+                    'created_at'        => $inv->created_at->format('d/m/Y'),
+                    'last_payment_date' => $lastPayment?->payment_date?->format('d/m/Y'),
+                    'payment_count'     => $inv->payments->count(),
+                ];
+            });
 
         // ── Appointments ────────────────────────────────────────────────────
         $appointments = Appointment::where('patient_id', $patient->id)

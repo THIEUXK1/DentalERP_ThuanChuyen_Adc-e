@@ -86,10 +86,25 @@
                 </button>
             </div>
 
+            <!-- ── Loading ────────────────────────────────────────────────── -->
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+                <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                <p class="text-sm">Đang tải lịch hẹn...</p>
+            </div>
+
+            <!-- ── Error ──────────────────────────────────────────────────── -->
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+                <p class="text-sm font-medium">Không thể tải dữ liệu</p>
+                <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
+            </div>
+
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: NGÀY (Day Timeline)
             ══════════════════════════════════════════════════════════════ -->
-            <div v-if="viewMode === 'day'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="viewMode === 'day'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <!-- Stats bar -->
                 <div class="flex items-center gap-4 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
                     <span>{{ dayLayoutItems.length }} lịch hẹn</span>
@@ -141,7 +156,7 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: TUẦN (Week View)
             ══════════════════════════════════════════════════════════════ -->
-            <div v-else-if="viewMode === 'week'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="!loading && !loadError && viewMode === 'week'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <!-- Day headers -->
                 <div class="grid border-b border-gray-200" style="grid-template-columns: 52px repeat(7, 1fr)">
                     <div class="border-r border-gray-100 bg-gray-50"></div>
@@ -213,7 +228,7 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: THÁNG (Month Calendar)
             ══════════════════════════════════════════════════════════════ -->
-            <div v-else-if="viewMode === 'month'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="!loading && !loadError && viewMode === 'month'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <!-- Day of week headers -->
                 <div class="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
                     <div v-for="d in ['T.Hai','T.Ba','T.Tư','T.Năm','T.Sáu','T.Bảy','CN']" :key="d"
@@ -260,7 +275,7 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: DANH SÁCH
             ══════════════════════════════════════════════════════════════ -->
-            <template v-else-if="viewMode === 'list'">
+            <template v-else-if="!loading && !loadError && viewMode === 'list'">
                 <!-- Today toggle (chỉ list) -->
                 <div class="flex items-center gap-3 flex-wrap text-sm">
                     <label class="flex items-center gap-2 cursor-pointer select-none">
@@ -405,7 +420,7 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: LƯỚI
             ══════════════════════════════════════════════════════════════ -->
-            <template v-else-if="viewMode === 'grid'">
+            <template v-else-if="!loading && !loadError && viewMode === 'grid'">
                 <div class="flex justify-end text-xs text-gray-400 px-1">
                     {{ paginatedAppointments.length }} / {{ filteredAppointments.length }} lịch hẹn
                 </div>
@@ -639,7 +654,6 @@ import { usePermission } from '@/composables/usePermission';
 const { hasPermission: can } = usePermission();
 
 const props = defineProps({
-    all_appointments: Array,
     branches: Array,
     doctors: Array,
     chairs: Array,
@@ -647,6 +661,26 @@ const props = defineProps({
     patients: Array,
     statuses: Array,
 });
+
+// ── Data fetch ─────────────────────────────────────────────────
+const allAppointments = ref([]);
+const loading         = ref(true);
+const loadError       = ref(false);
+
+async function loadData() {
+    loading.value   = true;
+    loadError.value = false;
+    try {
+        const res = await fetch(route('schedule.appointments.data'), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        allAppointments.value = await res.json();
+    } catch {
+        loadError.value = true;
+    } finally {
+        loading.value = false;
+    }
+}
 
 // ── Timeline constants ──────────────────────────────────────────
 const DAY_START    = 7      // 07:00
@@ -671,7 +705,7 @@ const todayOnly    = ref(true);
 const branchId     = ref('');
 const doctorId     = ref('');
 const filterStatus = ref('');
-const perPage      = ref(20);
+const perPage      = ref(50);
 const currentPage  = ref(1);
 
 const isCalendarView = computed(() => ['day', 'week', 'month'].includes(viewMode.value));
@@ -683,7 +717,7 @@ function setViewMode(v) {
 
 // ── Base filtered list (branch/doctor/status/search) ───────────
 const filteredAppointments = computed(() => {
-    let list = [...props.all_appointments];
+    let list = [...allAppointments.value];
     if (branchId.value)     list = list.filter(a => String(a.branch_id) === String(branchId.value));
     if (doctorId.value)     list = list.filter(a => String(a.doctor_id) === String(doctorId.value));
     if (filterStatus.value) list = list.filter(a => a.status === filterStatus.value);
@@ -1004,7 +1038,10 @@ function doStatusTransition(id, status) {
     router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true });
 }
 function closeStatusDrop() { statusDrop.value = null; }
-onMounted(() => document.addEventListener('click', closeStatusDrop));
+onMounted(() => {
+    document.addEventListener('click', closeStatusDrop);
+    loadData();
+});
 onUnmounted(() => document.removeEventListener('click', closeStatusDrop));
 
 // ── Bulk selection ──────────────────────────────────────────────
