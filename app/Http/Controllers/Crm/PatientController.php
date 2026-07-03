@@ -309,6 +309,7 @@ class PatientController extends Controller
                     'treatment_goal'     => $plan->treatment_goal,
                     'priority'           => $plan->priority,
                     'start_date'         => $plan->start_date?->format('d/m/Y'),
+                    'start_date_raw'     => $plan->start_date?->format('Y-m-d'),
                     'expected_end_date'  => $plan->expected_end_date?->format('d/m/Y'),
                     'estimated_sessions' => $plan->estimated_sessions,
                     'frequency'          => $plan->frequency,

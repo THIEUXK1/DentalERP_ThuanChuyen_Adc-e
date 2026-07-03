@@ -355,6 +355,36 @@
                     </div>
 
 
+                    <!-- Ngày điều trị -->
+                    <div class="bg-white rounded-xl border border-gray-200 p-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <h3 class="text-sm font-semibold text-gray-700">Ngày điều trị</h3>
+                            <button v-if="!dateEditOpen" @click="dateEditOpen = true"
+                                class="text-gray-400 hover:text-indigo-600 transition-colors" title="Sửa ngày điều trị">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div v-if="!dateEditOpen" class="text-sm text-gray-800 font-medium">
+                            {{ dateForm.start_date || '—' }}
+                        </div>
+                        <div v-else>
+                            <input v-model="dateForm.start_date" type="date"
+                                class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            <div class="mt-2 flex gap-2">
+                                <button @click="saveDate" :disabled="dateForm.processing"
+                                    class="flex-1 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                                    Lưu
+                                </button>
+                                <button @click="dateEditOpen = false"
+                                    class="px-3 py-2 text-sm border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50">
+                                    Hủy
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Nhân sự phụ trách -->
                     <div class="bg-white rounded-xl border border-gray-200 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3">Nhân sự phụ trách</h3>
@@ -899,6 +929,18 @@ const updateForm = useForm({
     deposit_amount:  props.plan.deposit_amount,
     notes:           props.plan.notes ?? '',
 });
+
+const dateEditOpen = ref(false);
+const dateForm = useForm({
+    start_date: props.plan.start_date_raw ?? '',
+    action:     'update_date',
+});
+
+function saveDate() {
+    dateForm.put(route('clinical.treatment-plans.update', props.plan.id), {
+        onSuccess: () => { dateEditOpen.value = false; },
+    });
+}
 
 const staffForm = useForm({
     doctor_id:     props.plan.doctor_id ?? null,

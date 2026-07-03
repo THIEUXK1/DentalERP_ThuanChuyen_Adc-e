@@ -60,7 +60,7 @@
 
             <!-- ── Tab navigation ────────────────────────────────────────────── -->
             <div class="flex gap-1 bg-white border border-gray-200 p-1 rounded-xl w-fit">
-                <button v-for="tab in tabs" :key="tab.key" @click="activeTab = tab.key"
+                <button v-for="tab in tabs" :key="tab.key" @click="setTab(tab.key)"
                     :class="['px-4 py-1.5 text-sm rounded-lg transition-all duration-150 flex items-center gap-1.5',
                         activeTab === tab.key
                             ? 'bg-indigo-600 shadow text-white font-medium'
@@ -389,13 +389,19 @@ const props = defineProps({
 const activeTab      = ref('info');
 const showEditModal  = ref(false);
 
+const TAB_KEYS = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
+
 onMounted(() => {
     const hash = window.location.hash.replace('#', '');
-    const tabKeys = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
-    if (hash && tabKeys.includes(hash)) {
+    if (hash && TAB_KEYS.includes(hash)) {
         activeTab.value = hash;
     }
 });
+
+function setTab(key) {
+    activeTab.value = key;
+    history.replaceState(null, '', '#' + key);
+}
 
 const showActivity = ref(false);
 const actForm      = useForm({ type: 'note', content: '', patient_id: props.patient.id });

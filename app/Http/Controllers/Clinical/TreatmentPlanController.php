@@ -241,6 +241,7 @@ class TreatmentPlanController extends Controller
                 'chief_complaint'  => $treatmentPlan->chief_complaint,
                 'treatment_goal'   => $treatmentPlan->treatment_goal,
                 'start_date'       => $treatmentPlan->start_date?->format('d/m/Y'),
+                'start_date_raw'   => $treatmentPlan->start_date?->format('Y-m-d'),
                 'expected_end_date'=> $treatmentPlan->expected_end_date?->format('d/m/Y'),
                 'estimated_sessions'=> $treatmentPlan->estimated_sessions,
                 'frequency'        => $treatmentPlan->frequency,
@@ -292,7 +293,7 @@ class TreatmentPlanController extends Controller
     {
         $this->authorize('treatment_plans.edit');
 
-        if (! $treatmentPlan->status->isEditable() && $request->input('action') !== 'update_staff') {
+        if (! $treatmentPlan->status->isEditable() && ! in_array($request->input('action'), ['update_staff', 'update_date'])) {
             return back()->with('error', 'Không thể sửa kế hoạch đã duyệt.');
         }
 

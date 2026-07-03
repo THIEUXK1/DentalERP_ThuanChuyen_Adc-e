@@ -109,9 +109,30 @@
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Mục tiêu</p>
                             <p class="text-gray-800 font-medium">{{ plan.treatment_goal }}</p>
                         </div>
-                        <div v-if="plan.start_date">
+                        <div @click.stop>
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ngày điều trị</p>
-                            <p class="text-gray-800 font-medium">{{ plan.start_date }}</p>
+                            <div v-if="!dateEditOpen[plan.id]" class="flex items-center gap-1.5 mt-0.5">
+                                <span class="text-gray-800 font-medium">{{ dateEdits[plan.id] || '—' }}</span>
+                                <button @click="dateEditOpen[plan.id] = true" class="text-gray-400 hover:text-indigo-600 transition-colors" title="Sửa ngày điều trị">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div v-else class="flex items-center gap-1 mt-0.5">
+                                <input type="date" :value="dateEdits[plan.id]"
+                                    @change="dateEdits[plan.id] = $event.target.value"
+                                    class="flex-1 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                <button @click="saveDate(plan.id)"
+                                    class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
+                                    Lưu
+                                </button>
+                                <button @click="dateEditOpen[plan.id] = false" class="text-gray-400 hover:text-gray-600 transition-colors" title="Hủy">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <div v-if="plan.expected_end_date">
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Hoàn thành dự kiến</p>
@@ -192,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
 
@@ -261,6 +282,24 @@ function onModalConfirm(reason) {
 // ── Undo ────────────────────────────────────────────────────────────────────
 function undo(pendingId) {
     router.delete(route('pending-deletions.undo', pendingId), { preserveScroll: true });
+}
+
+// ── Ngày điều trị inline edit ───────────────────────────────────────────────
+const dateEdits = reactive(
+    Object.fromEntries(props.treatmentPlans.map(p => [p.id, p.start_date_raw ?? '']))
+);
+const dateEditOpen = reactive(
+    Object.fromEntries(props.treatmentPlans.map(p => [p.id, false]))
+);
+
+function saveDate(planId) {
+    router.put(route('clinical.treatment-plans.update', planId), {
+        start_date: dateEdits[planId] || null,
+        action: 'update_date',
+    }, {
+        preserveScroll: true,
+        onSuccess: () => { dateEditOpen[planId] = false; },
+    });
 }
 
 // ── Expand/collapse plans ───────────────────────────────────────────────────
