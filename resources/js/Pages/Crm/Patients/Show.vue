@@ -194,7 +194,6 @@
                             <tr>
                                 <th class="px-4 py-2.5 text-left font-medium">Mã HĐ</th>
                                 <th class="px-4 py-2.5 text-left font-medium">Kế hoạch</th>
-                                <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ngày tạo</th>
                                 <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Ngày TT</th>
                                 <th class="px-4 py-2.5 text-right font-medium">Tổng tiền</th>
                                 <th class="px-4 py-2.5 text-right font-medium hidden md:table-cell">Đã TT</th>
@@ -221,7 +220,6 @@
                                     </Link>
                                     <span v-else class="text-gray-300 text-xs">—</span>
                                 </td>
-                                <td class="px-4 py-2.5 text-xs text-gray-400 hidden sm:table-cell">{{ inv.created_at }}</td>
                                 <td class="px-4 py-2.5 hidden md:table-cell">
                                     <span v-if="inv.last_payment_date" class="text-xs text-emerald-600 font-medium">
                                         {{ inv.last_payment_date }}
@@ -254,7 +252,7 @@
                         <!-- Summary footer -->
                         <tfoot class="border-t-2 border-gray-200 bg-gray-50">
                             <tr>
-                                <td colspan="4" class="px-4 py-2.5 text-xs text-gray-500 font-medium hidden md:table-cell">Tổng cộng</td>
+                                <td colspan="3" class="px-4 py-2.5 text-xs text-gray-500 font-medium hidden md:table-cell">Tổng cộng</td>
                                 <td colspan="2" class="px-4 py-2.5 text-xs text-gray-500 font-medium md:hidden">Tổng cộng</td>
                                 <td class="px-4 py-2.5 text-right font-bold text-gray-800 tabular-nums">
                                     {{ formatVnd(invoices.filter(i => i.status !== 'cancelled').reduce((s, i) => s + i.total, 0)) }}

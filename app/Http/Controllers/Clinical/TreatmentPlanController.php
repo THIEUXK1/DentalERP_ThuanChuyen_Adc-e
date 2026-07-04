@@ -8,7 +8,6 @@ use App\Models\Branch;
 use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
-use App\Models\PatientPayment;
 use App\Models\PendingDeletion;
 use App\Models\PriceList;
 use App\Models\TreatmentPlan;
@@ -256,7 +255,7 @@ class TreatmentPlanController extends Controller
                 'estimated_sessions'=> $treatmentPlan->estimated_sessions,
                 'frequency'        => $treatmentPlan->frequency,
                 'priority'         => $treatmentPlan->priority,
-                'has_payments'        => PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $treatmentPlan->id))->where('amount', '>', 0)->exists(),
+                'has_payments'        => $treatmentPlan->hasPayments(),
                 'primary_invoice_id'  => $primaryInvoice?->id,
             ],
             'items' => $treatmentPlan->items->map(fn ($i) => [
@@ -399,9 +398,7 @@ class TreatmentPlanController extends Controller
 
         $request->validate(['reason' => 'required|string|max:500']);
 
-        $hasPayments = PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $treatmentPlan->id))
-            ->where('amount', '>', 0)
-            ->exists();
+        $hasPayments = $treatmentPlan->hasPayments();
 
         if ($hasPayments) {
             return back()->withErrors(['reason' => 'Không thể xóa kế hoạch điều trị đã có lịch sử thanh toán.']);

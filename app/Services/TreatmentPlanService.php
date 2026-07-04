@@ -25,6 +25,9 @@ class TreatmentPlanService
         if (! $plan->status->isEditable()) {
             throw new \RuntimeException('Không thể sửa kế hoạch điều trị ở trạng thái hiện tại.');
         }
+        if ($plan->hasPayments()) {
+            throw new \RuntimeException('Không thể sửa dịch vụ vì hóa đơn đã có lịch sử thanh toán.');
+        }
 
         $service = DentalService::findOrFail($serviceId);
         $basePrice = $this->priceResolver->resolve($service, $priceList);
@@ -63,6 +66,9 @@ class TreatmentPlanService
         if (! $item->plan->status->isEditable()) {
             throw new \RuntimeException('Không thể sửa kế hoạch điều trị ở trạng thái hiện tại.');
         }
+        if ($item->plan->hasPayments()) {
+            throw new \RuntimeException('Không thể sửa dịch vụ vì hóa đơn đã có lịch sử thanh toán.');
+        }
 
         $quantity  = (int) $data['quantity'];
         $unitPrice = (int) $data['unit_price'];
@@ -93,6 +99,9 @@ class TreatmentPlanService
     {
         if (! $item->plan->status->isEditable()) {
             throw new \RuntimeException('Không thể xóa item khi kế hoạch đã duyệt.');
+        }
+        if ($item->plan->hasPayments()) {
+            throw new \RuntimeException('Không thể xóa dịch vụ vì hóa đơn đã có lịch sử thanh toán.');
         }
 
         DB::transaction(function () use ($item) {

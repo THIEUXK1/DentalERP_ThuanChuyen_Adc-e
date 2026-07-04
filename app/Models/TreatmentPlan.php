@@ -58,12 +58,30 @@ class TreatmentPlan extends Model
         return $this->total_amount - $this->discount_amount;
     }
 
+    public function hasPayments(): bool
+    {
+        return PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $this->id))
+            ->where('amount', '>', 0)
+            ->exists();
+    }
+
     public function recalcTotals(): void
     {
         $this->update([
             'total_amount'    => $this->items()->sum('subtotal'),
             'discount_amount' => $this->items()->sum('discount'),
         ]);
+
+        // Keep the unpaid primary invoice (not yet split into installments) in sync
+        // with the plan's totals, since items can only be edited before any payment exists.
+        $this->invoices()
+            ->whereNull('installment_index')
+            ->where('amount_paid', 0)
+            ->update([
+                'subtotal' => $this->total_amount,
+                'discount' => $this->discount_amount,
+                'total'    => $this->net_total,
+            ]);
     }
 
     public function patient()

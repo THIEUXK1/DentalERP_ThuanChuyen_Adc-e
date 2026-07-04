@@ -248,7 +248,7 @@
                                         <span v-if="item.discount" class="text-rose-500">-{{ formatVnd(item.discount) }}</span>
                                         <span v-else class="text-gray-300">—</span>
                                     </td>
-                                    <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.quantity * item.unit_price - (item.discount ?? 0)) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.quantity * item.unit_price) }}</td>
                                     <td class="px-4 py-3 text-center">
                                         <!-- Inline status radio for in_progress plans -->
                                         <div v-if="plan.status === 'in_progress' && item.status !== 'completed'" class="flex gap-1 justify-center flex-wrap">
@@ -851,7 +851,7 @@ function canGoToStep(idx) {
 
 const canEditItems = computed(() => props.plan.is_editable && !props.plan.has_payments);
 
-const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price - (i.discount ?? 0)), 0));
+const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0));
 
 const allItemsCompleted = computed(() =>
     props.items.length > 0 && props.items.every(i => i.status === 'completed')
