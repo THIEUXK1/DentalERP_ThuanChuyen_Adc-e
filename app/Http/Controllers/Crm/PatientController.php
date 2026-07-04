@@ -496,7 +496,8 @@ class PatientController extends Controller
     {
         $this->authorize('patients.edit');
 
-        $data = $this->validated($request, $patient->id);
+        $forceSave = (bool) $request->input('force_save', false);
+        $data = $this->validated($request, $patient->id, $forceSave);
         $patient->update($data);
 
         return redirect()->route('patients.show', $patient)->with('success', 'Đã cập nhật bệnh nhân.');

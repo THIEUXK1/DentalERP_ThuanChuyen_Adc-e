@@ -79,6 +79,12 @@
                         <option value="">Tất cả loại</option>
                         <option v-for="t in record_types" :key="t" :value="t">{{ t }}</option>
                     </select>
+                    <select v-model="form.year"
+                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        @change="applyFilters">
+                        <option value="">Tất cả năm</option>
+                        <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                    </select>
                     <input v-model="form.date_from" type="date"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         @change="applyFilters" />
@@ -444,6 +450,7 @@ const props = defineProps({
     records: Object,
     filters: Object,
     record_types: Array,
+    years: Array,
     total_all: Number,
 });
 
@@ -451,17 +458,19 @@ const props = defineProps({
 const form = reactive({
     search:      props.filters?.search      ?? '',
     record_type: props.filters?.record_type ?? '',
+    year:        props.filters?.year        ?? '',
     date_from:   props.filters?.date_from   ?? '',
     date_to:     props.filters?.date_to     ?? '',
     per_page:    props.filters?.per_page    ?? '50',
 });
 
-const hasFilters = computed(() => form.search || form.record_type || form.date_from || form.date_to);
+const hasFilters = computed(() => form.search || form.record_type || form.year || form.date_from || form.date_to);
 
 function applyFilters() {
     router.get(route('admin.clinic-records.index'), {
         search:      form.search      || undefined,
         record_type: form.record_type || undefined,
+        year:        form.year        || undefined,
         date_from:   form.date_from   || undefined,
         date_to:     form.date_to     || undefined,
         per_page:    form.per_page !== '50' ? form.per_page : undefined,
@@ -469,7 +478,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    form.search = ''; form.record_type = ''; form.date_from = ''; form.date_to = '';
+    form.search = ''; form.record_type = ''; form.year = ''; form.date_from = ''; form.date_to = '';
     applyFilters();
 }
 
@@ -530,6 +539,7 @@ function doBulkDelete() {
             select_all:  true,
             search:      form.search      || undefined,
             record_type: form.record_type || undefined,
+            year:        form.year        || undefined,
             date_from:   form.date_from   || undefined,
             date_to:     form.date_to     || undefined,
           }

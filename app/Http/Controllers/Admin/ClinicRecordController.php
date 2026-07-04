@@ -65,6 +65,7 @@ class ClinicRecordController extends Controller
                 });
             })
             ->when($request->record_type, fn ($q, $v) => $q->where('record_type', $v))
+            ->when($request->year, fn ($q, $v) => $q->whereYear('record_date', $v))
             ->when($request->date_from, fn ($q, $v) => $q->whereDate('record_date', '>=', $v))
             ->when($request->date_to, fn ($q, $v) => $q->whereDate('record_date', '<=', $v))
             ->orderByDesc('record_date')
@@ -76,8 +77,14 @@ class ClinicRecordController extends Controller
 
         return Inertia::render('Admin/ClinicRecords/Index', [
             'records'      => $query->paginate(max($perPage, 1))->withQueryString(),
-            'filters'      => $request->only(['search', 'record_type', 'date_from', 'date_to', 'per_page']),
+            'filters'      => $request->only(['search', 'record_type', 'year', 'date_from', 'date_to', 'per_page']),
             'record_types' => ClinicRecord::distinct()->pluck('record_type')->filter()->values(),
+            'years'        => ClinicRecord::whereNotNull('record_date')
+                ->selectRaw('DISTINCT EXTRACT(YEAR FROM record_date) as y')
+                ->orderByDesc('y')
+                ->pluck('y')
+                ->map(fn ($y) => (int) $y)
+                ->values(),
             'total_all'    => ClinicRecord::count(),
         ]);
     }
@@ -97,6 +104,7 @@ class ClinicRecordController extends Controller
                     });
                 })
                 ->when($request->record_type, fn ($q, $v) => $q->where('record_type', $v))
+                ->when($request->year, fn ($q, $v) => $q->whereYear('record_date', $v))
                 ->when($request->date_from, fn ($q, $v) => $q->whereDate('record_date', '>=', $v))
                 ->when($request->date_to, fn ($q, $v) => $q->whereDate('record_date', '<=', $v));
 
@@ -167,78 +175,105 @@ class ClinicRecordController extends Controller
         $tmpDir = storage_path('app/import_tmp');
         if (! is_dir($tmpDir)) mkdir($tmpDir, 0755, true);
 
-        @ini_set('memory_limit', '512M');
+        @ini_set('memory_limit', '1024M');
 
         $tempId  = Str::uuid()->toString();
         $ext     = strtolower($request->file('file')->getClientOriginalExtension());
         $xlsPath = "{$tmpDir}/{$tempId}.{$ext}";
         $request->file('file')->move($tmpDir, "{$tempId}.{$ext}");
 
+        // Chỉ đọc thông tin kích thước sheet (nhẹ, không load hết dữ liệu ô)
+        // để chia nhỏ việc đọc theo từng khối dòng, tránh tràn bộ nhớ với file lớn.
         try {
-            $reader = IOFactory::createReaderForFile($xlsPath);
+            $reader    = IOFactory::createReaderForFile($xlsPath);
             $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($xlsPath);
-            $rawRows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
-            $spreadsheet->disconnectWorksheets();
-            unset($spreadsheet);
+            $sheetInfo = $reader->listWorksheetInfo($xlsPath)[0] ?? null;
+            $totalRows = (int) ($sheetInfo['totalRows'] ?? 0);
+        } catch (\Throwable $e) {
+            @unlink($xlsPath);
+            return response()->json(['error' => 'Không đọc được file: ' . $e->getMessage()], 422);
+        }
+
+        if ($totalRows < 2) {
+            @unlink($xlsPath);
+            return response()->json(['error' => 'File rỗng.'], 422);
+        }
+
+        $headers       = [];
+        $numericFields = ['unit_price', 'quantity', 'discount', 'amount', 'total_collected', 'remaining_debt', 'collected_this_period'];
+        $processedRows = [];
+        $previewRaw    = [];  // raw values cho preview table (giữ nguyên định dạng gốc)
+
+        $chunkSize = 3000;
+
+        try {
+            for ($start = 2; $start <= $totalRows; $start += $chunkSize) {
+                $end = min($start + $chunkSize - 1, $totalRows);
+
+                $reader = IOFactory::createReaderForFile($xlsPath);
+                $reader->setReadDataOnly(true);
+                $reader->setReadFilter(new RowRangeReadFilter($start, $end));
+                $spreadsheet = $reader->load($xlsPath);
+                $chunkArr    = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+                $spreadsheet->disconnectWorksheets();
+                unset($spreadsheet);
+
+                if (empty($headers)) {
+                    $headers = $chunkArr[0] ?? [];
+                }
+
+                for ($r = $start; $r <= $end; $r++) {
+                    $row = $chunkArr[$r - 1] ?? null;
+                    if ($row === null) continue;
+
+                    // Bỏ qua dòng hoàn toàn trống
+                    $hasContent = false;
+                    foreach ($row as $cell) {
+                        if ($cell !== null && $cell !== '') { $hasContent = true; break; }
+                    }
+                    if (! $hasContent) continue;
+
+                    $data = [];
+                    foreach (self::COLUMNS as $idx => $def) {
+                        $val = $row[$idx] ?? null;
+                        $data[$def['field']] = ($val !== null && $val !== '') ? $val : null;
+                    }
+
+                    // Bỏ qua dòng thiếu cả tên lẫn ngày
+                    if (! $data['patient_name'] && ! $data['record_date']) continue;
+
+                    // Parse date — Excel serial hoặc chuỗi (d/m/Y, Y-m-d, …)
+                    if ($data['record_date'] !== null) {
+                        $data['record_date'] = self::parseDate($data['record_date']);
+                    }
+
+                    // Parse time — Excel lưu giờ là phân số thập phân (0.29097... = 06:59)
+                    if ($data['record_time'] !== null) {
+                        $data['record_time'] = self::parseTime($data['record_time']);
+                    }
+
+                    foreach ($numericFields as $f) {
+                        $data[$f] = is_numeric($data[$f] ?? null) ? (int) $data[$f] : 0;
+                    }
+
+                    $data['birth_year'] = self::parseBirthYear($data['birth_year']);
+
+                    $processedRows[] = $data;
+
+                    // Giữ 20 dòng đầu để preview (dùng $data đã parse để hiện ngày đúng, không bị số serial)
+                    if (count($previewRaw) < 20) {
+                        $previewRaw[] = array_values($data);
+                    }
+                }
+
+                unset($chunkArr);
+            }
         } catch (\Throwable $e) {
             @unlink($xlsPath);
             return response()->json(['error' => 'Không đọc được file: ' . $e->getMessage()], 422);
         }
 
         @unlink($xlsPath); // Excel không cần nữa sau khi đọc xong
-
-        if (empty($rawRows)) {
-            return response()->json(['error' => 'File rỗng.'], 422);
-        }
-
-        $headers       = array_shift($rawRows);
-        $numericFields = ['unit_price', 'quantity', 'discount', 'amount', 'total_collected', 'remaining_debt', 'collected_this_period'];
-        $processedRows = [];
-        $previewRaw    = [];  // raw values cho preview table (giữ nguyên định dạng gốc)
-
-        foreach ($rawRows as $i => $row) {
-            // Bỏ qua dòng hoàn toàn trống
-            $hasContent = false;
-            foreach ($row as $cell) {
-                if ($cell !== null && $cell !== '') { $hasContent = true; break; }
-            }
-            if (! $hasContent) continue;
-
-            $data = [];
-            foreach (self::COLUMNS as $idx => $def) {
-                $val = $row[$idx] ?? null;
-                $data[$def['field']] = ($val !== null && $val !== '') ? $val : null;
-            }
-
-            // Bỏ qua dòng thiếu cả tên lẫn ngày
-            if (! $data['patient_name'] && ! $data['record_date']) continue;
-
-            // Parse date — Excel serial hoặc chuỗi (d/m/Y, Y-m-d, …)
-            if ($data['record_date'] !== null) {
-                $data['record_date'] = self::parseDate($data['record_date']);
-            }
-
-            // Parse time — Excel lưu giờ là phân số thập phân (0.29097... = 06:59)
-            if ($data['record_time'] !== null) {
-                $data['record_time'] = self::parseTime($data['record_time']);
-            }
-
-            foreach ($numericFields as $f) {
-                $data[$f] = is_numeric($data[$f] ?? null) ? (int) $data[$f] : 0;
-            }
-
-            if ($data['birth_year'] !== null) {
-                $data['birth_year'] = is_numeric($data['birth_year']) ? (int) $data['birth_year'] : null;
-            }
-
-            $processedRows[] = $data;
-
-            // Giữ 20 dòng đầu để preview (dùng $data đã parse để hiện ngày đúng, không bị số serial)
-            if (count($previewRaw) < 20) {
-                $previewRaw[] = array_values($data);
-            }
-        }
 
         if (empty($processedRows)) {
             return response()->json(['error' => 'Không tìm thấy dòng dữ liệu hợp lệ trong file.'], 422);
@@ -318,9 +353,7 @@ class ClinicRecordController extends Controller
                 $data[$f] = is_numeric($data[$f] ?? null) ? (int) $data[$f] : 0;
             }
 
-            if ($data['birth_year'] !== null) {
-                $data['birth_year'] = is_numeric($data['birth_year']) ? (int) $data['birth_year'] : null;
-            }
+            $data['birth_year'] = self::parseBirthYear($data['birth_year']);
 
             ClinicRecord::create($data);
             $inserted++;
@@ -334,13 +367,31 @@ class ClinicRecordController extends Controller
         return back()->with('success', $msg);
     }
 
+    private static function parseBirthYear(mixed $value): ?int
+    {
+        if ($value === null || $value === '' || ! is_numeric($value)) return null;
+
+        $year = (int) $value;
+
+        // smallint tối đa 32767 — chặn giá trị lỗi kiểu năm bị nối đôi (vd "19781978")
+        // hoặc ngoài khoảng năm sinh hợp lý.
+        if ($year < 1900 || $year > (int) date('Y')) return null;
+
+        return $year;
+    }
+
     private static function parseTime(mixed $value): ?string
     {
         if ($value === null || $value === '') return null;
 
-        // Excel time fraction: 0.0–1.0 (phần thập phân của ngày)
+        // Excel time fraction: 0.0–1.0 (phần thập phân của ngày).
+        // Một số file lỗi chứa cả phần ngày (số nguyên) lẫn giờ trong cùng ô —
+        // chỉ lấy phần thập phân để tránh giá trị giờ vượt quá 24h.
         if (is_numeric($value)) {
-            $totalSeconds = (int) round((float) $value * 86400);
+            $frac = fmod((float) $value, 1);
+            if ($frac < 0) $frac += 1;
+            $totalSeconds = (int) round($frac * 86400);
+            if ($totalSeconds >= 86400) $totalSeconds = 0;
             $h = intdiv($totalSeconds, 3600);
             $m = intdiv($totalSeconds % 3600, 60);
             $s = $totalSeconds % 60;
