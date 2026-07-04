@@ -84,16 +84,16 @@
                         </p>
                     </div>
 
-                    <!-- Locked notice when payments exist -->
+                    <!-- Warning notice when payments exist -->
                     <div v-if="plan.has_payments" class="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-700">
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
                         </svg>
-                        Hóa đơn đã có lịch sử thanh toán: không thể thêm/xóa dịch vụ hoặc đổi số lượng, đơn giá, giảm giá. Các thông tin khác (ghi chú, răng, bác sĩ, chẩn đoán...) vẫn có thể sửa.
+                        Hóa đơn đã có lịch sử thanh toán. Sửa số lượng/đơn giá/giảm giá sẽ làm thay đổi tổng tiền — vui lòng kiểm tra hóa đơn và thu thêm/hoàn tiền cho khách nếu cần.
                     </div>
 
                     <!-- Add item form — Bambu style -->
-                    <div v-if="plan.is_editable && can('treatment_plans.edit') && !plan.has_payments" class="bg-white rounded-xl border border-indigo-100 p-4">
+                    <div v-if="plan.items_editable && can('treatment_plans.edit')" class="bg-white rounded-xl border border-indigo-100 p-4">
                         <h3 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
@@ -248,7 +248,7 @@
                                         <span v-if="item.discount" class="text-rose-500">-{{ formatVnd(item.discount) }}</span>
                                         <span v-else class="text-gray-300">—</span>
                                     </td>
-                                    <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.quantity * item.unit_price) }}</td>
+                                    <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.quantity * item.unit_price - (item.discount ?? 0)) }}</td>
                                     <td class="px-4 py-3 text-center">
                                         <!-- Inline status radio for in_progress plans -->
                                         <div v-if="plan.status === 'in_progress' && item.status !== 'completed'" class="flex gap-1 justify-center flex-wrap">
@@ -269,7 +269,7 @@
                                         <button v-if="item.status !== 'completed' && plan.status === 'in_progress'"
                                             @click="completeItem(item.id)"
                                             class="text-emerald-600 hover:text-emerald-800 text-xs font-medium mr-2 hover:underline">✓ Xong</button>
-                                        <button v-if="plan.is_editable && !plan.has_payments"
+                                        <button v-if="plan.items_editable"
                                             @click="removeItem(item.id)"
                                             class="text-red-400 hover:text-red-600 text-xs hover:underline">Xóa</button>
                                     </td>
@@ -546,16 +546,16 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Số lượng *</label>
                                         <input v-model="detailForm.quantity" type="number" min="1"
-                                            :readonly="!canEditMoney"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-gray-50"
-                                            :class="canEditMoney ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Đơn giá (₫) *</label>
                                         <input v-model="detailForm.unit_price" type="number" min="0"
-                                            :readonly="!canEditMoney"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="canEditMoney ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                 </div>
 
@@ -564,9 +564,9 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Giảm giá (₫)</label>
                                         <input v-model="detailForm.discount" type="number" min="0"
-                                            :readonly="!canEditMoney"
+                                            :readonly="!canEditItems"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="canEditMoney ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Thành tiền</label>
@@ -660,7 +660,7 @@
                                     class="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 font-medium">
                                     ✓ Xong
                                 </button>
-                                <button v-if="plan.is_editable && !plan.has_payments"
+                                <button v-if="plan.items_editable"
                                     @click="removeItem(detailItem.id); closeDetail()"
                                     class="px-4 py-2 text-sm border border-red-200 text-red-500 rounded-lg hover:bg-red-50 font-medium">
                                     Xóa
@@ -858,10 +858,9 @@ function canGoToStep(idx) {
     return props.transitions.some(t => t.value === STAGES[idx].targetStatus);
 }
 
-const canEditItems = computed(() => props.plan.is_editable);
-const canEditMoney = computed(() => props.plan.is_editable && !props.plan.has_payments);
+const canEditItems = computed(() => props.plan.items_editable);
 
-const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0));
+const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price - (i.discount ?? 0)), 0));
 
 const allItemsCompleted = computed(() =>
     props.items.length > 0 && props.items.every(i => i.status === 'completed')

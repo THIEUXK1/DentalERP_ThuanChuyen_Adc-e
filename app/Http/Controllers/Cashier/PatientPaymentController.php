@@ -29,6 +29,10 @@ class PatientPaymentController extends Controller
         // Refund (negative) requires special permission
         if ($data['amount'] < 0) {
             $this->authorize('cashier.approve_refund');
+
+            if (abs($data['amount']) > $invoice->amount_paid) {
+                return back()->with('error', 'Số tiền hoàn vượt quá số tiền đã thu.');
+            }
         }
 
         // Block overpayment

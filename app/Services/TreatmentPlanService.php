@@ -22,11 +22,8 @@ class TreatmentPlanService
         ?PriceList $priceList = null,
         array $extra = []
     ): TreatmentPlanItem {
-        if (! $plan->status->isEditable()) {
+        if (! $plan->status->isItemsEditable()) {
             throw new \RuntimeException('Không thể sửa kế hoạch điều trị ở trạng thái hiện tại.');
-        }
-        if ($plan->hasPayments()) {
-            throw new \RuntimeException('Không thể sửa dịch vụ vì hóa đơn đã có lịch sử thanh toán.');
         }
 
         $service = DentalService::findOrFail($serviceId);
@@ -63,7 +60,7 @@ class TreatmentPlanService
 
     public function updateItem(TreatmentPlanItem $item, array $data): void
     {
-        if (! $item->plan->status->isEditable()) {
+        if (! $item->plan->status->isItemsEditable()) {
             throw new \RuntimeException('Không thể sửa kế hoạch điều trị ở trạng thái hiện tại.');
         }
 
@@ -72,11 +69,6 @@ class TreatmentPlanService
         $discount  = (int) ($data['discount'] ?? 0);
         $subtotal  = $quantity * $unitPrice;
         $amount    = $subtotal - $discount;
-
-        $changesMoney = $quantity !== $item->quantity || $unitPrice !== $item->unit_price || $discount !== $item->discount;
-        if ($changesMoney && $item->plan->hasPayments()) {
-            throw new \RuntimeException('Không thể đổi số lượng/đơn giá/giảm giá vì hóa đơn đã có lịch sử thanh toán. Các thông tin khác (ghi chú, răng, bác sĩ...) vẫn có thể sửa.');
-        }
 
         DB::transaction(function () use ($item, $quantity, $unitPrice, $discount, $subtotal, $amount, $data) {
             $item->update([
@@ -99,11 +91,8 @@ class TreatmentPlanService
 
     public function removeItem(TreatmentPlanItem $item): void
     {
-        if (! $item->plan->status->isEditable()) {
+        if (! $item->plan->status->isItemsEditable()) {
             throw new \RuntimeException('Không thể xóa item khi kế hoạch đã duyệt.');
-        }
-        if ($item->plan->hasPayments()) {
-            throw new \RuntimeException('Không thể xóa dịch vụ vì hóa đơn đã có lịch sử thanh toán.');
         }
 
         DB::transaction(function () use ($item) {

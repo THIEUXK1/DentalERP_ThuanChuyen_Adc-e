@@ -47,4 +47,9 @@ enum TreatmentPlanStatus: string
     {
         return in_array($this, [self::Draft, self::Approved]);
     }
+
+    public function isItemsEditable(): bool
+    {
+        return in_array($this, [self::Draft, self::Approved, self::InProgress]);
+    }
 }

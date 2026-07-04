@@ -106,6 +106,7 @@ class PatientInvoiceController extends Controller
                 'total'            => $invoice->total,
                 'amount_paid'      => $invoice->amount_paid,
                 'amount_due'       => $invoice->amountDue(),
+                'overpaid_amount'  => $invoice->overpaidAmount(),
                 'due_date'         => $invoice->due_date?->format('d/m/Y'),
                 'notes'            => $invoice->notes,
                 'cancel_reason'    => $invoice->cancel_reason,

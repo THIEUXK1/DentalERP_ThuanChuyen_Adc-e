@@ -72,16 +72,32 @@ class TreatmentPlan extends Model
             'discount_amount' => $this->items()->sum('discount'),
         ]);
 
-        // Keep the unpaid primary invoice (not yet split into installments) in sync
-        // with the plan's totals, since items can only be edited before any payment exists.
-        $this->invoices()
-            ->whereNull('installment_index')
-            ->where('amount_paid', 0)
-            ->update([
-                'subtotal' => $this->total_amount,
-                'discount' => $this->discount_amount,
-                'total'    => $this->net_total,
-            ]);
+        // Keep the primary invoice (not yet split into installments) in sync with the
+        // plan's totals; amount_due/overpaid will reflect any gap caused by editing paid items.
+        $invoice = $this->invoices()->whereNull('installment_index')->first();
+        if (! $invoice) {
+            return;
+        }
+
+        $total = $this->net_total;
+        $remaining = $total - $invoice->amount_paid;
+
+        $invoice->update([
+            'subtotal' => $this->total_amount,
+            'discount' => $this->discount_amount,
+            'total'    => $total,
+            'status'   => $remaining <= 0
+                ? \App\Enums\InvoiceStatus::Paid
+                : ($invoice->amount_paid > 0 ? \App\Enums\InvoiceStatus::PartialPaid : \App\Enums\InvoiceStatus::Sent),
+        ]);
+
+        $invoice->debt?->update([
+            'amount'    => $total,
+            'remaining' => max(0, $remaining),
+            'status'    => $remaining <= 0
+                ? \App\Enums\DebtStatus::Paid
+                : ($invoice->amount_paid > 0 ? \App\Enums\DebtStatus::Partial : \App\Enums\DebtStatus::Pending),
+        ]);
     }
 
     public function patient()

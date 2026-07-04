@@ -236,6 +236,7 @@ class TreatmentPlanController extends Controller
                 'status_label'     => $treatmentPlan->status->label(),
                 'status_color'     => $treatmentPlan->status->color(),
                 'is_editable'      => $treatmentPlan->status->isEditable(),
+                'items_editable'   => $treatmentPlan->status->isItemsEditable(),
                 'total_amount'     => $treatmentPlan->total_amount,
                 'discount_amount'  => $treatmentPlan->discount_amount,
                 'deposit_amount'   => $treatmentPlan->deposit_amount,

@@ -107,6 +107,17 @@
                 </button>
             </div>
 
+            <!-- ── Cảnh báo thu thừa ──────────────────────────────────────────── -->
+            <div v-if="invoice.overpaid_amount > 0"
+                class="mt-3 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3">
+                <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                <p class="text-sm text-amber-700">
+                    Hóa đơn đang thu thừa <strong>{{ formatVnd(invoice.overpaid_amount) }}</strong> (do dịch vụ trong kế hoạch điều trị đã bị bớt/xóa). Vui lòng hoàn tiền cho khách ở form bên dưới.
+                </p>
+            </div>
+
             <!-- ── Main 3-col grid ───────────────────────────────────────────── -->
             <div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 gap-4">
 
@@ -114,7 +125,7 @@
                 <div class="lg:col-span-2 xl:col-span-3 space-y-4">
 
                     <!-- ── Payment form ────────────────────────────────────────── -->
-                    <div v-if="!isPlanBeingDeleted && invoice.status !== 'paid' && invoice.status !== 'cancelled'"
+                    <div v-if="!isPlanBeingDeleted && invoice.status !== 'cancelled' && (invoice.status !== 'paid' || invoice.overpaid_amount > 0)"
                         class="bg-white rounded-xl border border-indigo-100 p-5">
                         <h3 class="text-sm font-semibold text-gray-700 mb-4 flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -146,8 +157,9 @@
                                 <input v-model="payForm.amount" type="number" :min="canRefund ? undefined : 1"
                                     :placeholder="`Còn nợ: ${formatVnd(invoice.amount_due)}`"
                                     class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none tabular-nums text-right font-semibold" />
-                                <p class="text-xs text-gray-400 mt-1">
-                                    <button @click="fillFullAmount" class="text-indigo-500 hover:text-indigo-700 underline">Thu đủ: {{ formatVnd(invoice.amount_due) }}</button>
+                                <p class="text-xs text-gray-400 mt-1 space-x-2">
+                                    <button v-if="invoice.amount_due > 0" @click="fillFullAmount" class="text-indigo-500 hover:text-indigo-700 underline">Thu đủ: {{ formatVnd(invoice.amount_due) }}</button>
+                                    <button v-if="canRefund && invoice.overpaid_amount > 0" @click="fillRefundAmount" class="text-amber-600 hover:text-amber-700 underline">Hoàn đủ: {{ formatVnd(invoice.overpaid_amount) }}</button>
                                 </p>
                             </div>
                             <div>
@@ -636,6 +648,10 @@ const payForm = useForm({
 
 function fillFullAmount() {
     payForm.amount = props.invoice.amount_due;
+}
+
+function fillRefundAmount() {
+    payForm.amount = -props.invoice.overpaid_amount;
 }
 
 function submitPayment(printAfter = false) {

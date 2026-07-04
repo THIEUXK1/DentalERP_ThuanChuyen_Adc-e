@@ -42,6 +42,11 @@ class PatientInvoice extends Model
         return max(0, $this->total - $this->amount_paid);
     }
 
+    public function overpaidAmount(): int
+    {
+        return max(0, $this->amount_paid - $this->total);
+    }
+
     public function patient()
     {
         return $this->belongsTo(Patient::class);
