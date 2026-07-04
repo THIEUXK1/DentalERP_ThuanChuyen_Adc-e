@@ -66,15 +66,17 @@ class TreatmentPlanService
         if (! $item->plan->status->isEditable()) {
             throw new \RuntimeException('Không thể sửa kế hoạch điều trị ở trạng thái hiện tại.');
         }
-        if ($item->plan->hasPayments()) {
-            throw new \RuntimeException('Không thể sửa dịch vụ vì hóa đơn đã có lịch sử thanh toán.');
-        }
 
         $quantity  = (int) $data['quantity'];
         $unitPrice = (int) $data['unit_price'];
         $discount  = (int) ($data['discount'] ?? 0);
         $subtotal  = $quantity * $unitPrice;
         $amount    = $subtotal - $discount;
+
+        $changesMoney = $quantity !== $item->quantity || $unitPrice !== $item->unit_price || $discount !== $item->discount;
+        if ($changesMoney && $item->plan->hasPayments()) {
+            throw new \RuntimeException('Không thể đổi số lượng/đơn giá/giảm giá vì hóa đơn đã có lịch sử thanh toán. Các thông tin khác (ghi chú, răng, bác sĩ...) vẫn có thể sửa.');
+        }
 
         DB::transaction(function () use ($item, $quantity, $unitPrice, $discount, $subtotal, $amount, $data) {
             $item->update([

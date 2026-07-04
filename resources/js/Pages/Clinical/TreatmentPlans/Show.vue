@@ -89,7 +89,7 @@
                         <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                         </svg>
-                        Danh sách dịch vụ đã bị khóa vì hóa đơn đã có lịch sử thanh toán.
+                        Hóa đơn đã có lịch sử thanh toán: không thể thêm/xóa dịch vụ hoặc đổi số lượng, đơn giá, giảm giá. Các thông tin khác (ghi chú, răng, bác sĩ, chẩn đoán...) vẫn có thể sửa.
                     </div>
 
                     <!-- Add item form — Bambu style -->
@@ -546,16 +546,16 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Số lượng *</label>
                                         <input v-model="detailForm.quantity" type="number" min="1"
-                                            :readonly="!canEditItems"
+                                            :readonly="!canEditMoney"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none disabled:bg-gray-50"
-                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditMoney ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Đơn giá (₫) *</label>
                                         <input v-model="detailForm.unit_price" type="number" min="0"
-                                            :readonly="!canEditItems"
+                                            :readonly="!canEditMoney"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditMoney ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                 </div>
 
@@ -564,9 +564,9 @@
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Giảm giá (₫)</label>
                                         <input v-model="detailForm.discount" type="number" min="0"
-                                            :readonly="!canEditItems"
+                                            :readonly="!canEditMoney"
                                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm tabular-nums focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-                                            :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
+                                            :class="canEditMoney ? '' : 'bg-gray-50 text-gray-500'" />
                                     </div>
                                     <div>
                                         <label class="text-xs text-gray-500 mb-1 block">Thành tiền</label>
@@ -636,6 +636,15 @@
                                         :readonly="!canEditItems"
                                         class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                                         :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'" />
+                                </div>
+
+                                <!-- Ghi chú -->
+                                <div>
+                                    <label class="text-xs text-gray-500 mb-1 block">Ghi chú</label>
+                                    <textarea v-model="detailForm.notes" rows="2" placeholder="Ghi chú..."
+                                        :readonly="!canEditItems"
+                                        class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                                        :class="canEditItems ? '' : 'bg-gray-50 text-gray-500'"></textarea>
                                 </div>
 
                             </div>
@@ -849,7 +858,8 @@ function canGoToStep(idx) {
     return props.transitions.some(t => t.value === STAGES[idx].targetStatus);
 }
 
-const canEditItems = computed(() => props.plan.is_editable && !props.plan.has_payments);
+const canEditItems = computed(() => props.plan.is_editable);
+const canEditMoney = computed(() => props.plan.is_editable && !props.plan.has_payments);
 
 const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price), 0));
 
