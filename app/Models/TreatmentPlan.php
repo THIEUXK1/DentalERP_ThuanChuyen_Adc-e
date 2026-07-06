@@ -23,7 +23,7 @@ class TreatmentPlan extends Model
     }
 
     protected $fillable = [
-        'code', 'patient_id', 'doctor_id', 'consultant_id', 'branch_id',
+        'code', 'legacy_group_key', 'patient_id', 'doctor_id', 'consultant_id', 'branch_id',
         'appointment_id', 'status', 'total_amount', 'discount_amount',
         'deposit_amount', 'notes', 'payment_schedule', 'payment_notes', 'created_by', 'approved_at',
         'diagnosis', 'chief_complaint', 'treatment_goal', 'start_date', 'expected_end_date',

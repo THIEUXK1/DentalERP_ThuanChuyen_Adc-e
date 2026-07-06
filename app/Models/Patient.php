@@ -15,7 +15,7 @@ class Patient extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'code', 'full_name', 'phone', 'email', 'dob', 'gender', 'address',
+        'code', 'legacy_code', 'full_name', 'phone', 'email', 'dob', 'gender', 'address',
         'source', 'allergies', 'medical_history', 'medical_flags', 'photo_path',
         'emergency_contact', 'branch_id', 'notes', 'is_active',
     ];

@@ -14,6 +14,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Branch;
 use App\Models\DentalChair;
+use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
 use App\Models\PatientInvoice;
@@ -33,44 +34,52 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
+        return Inertia::render('Crm/Patients/Index', [
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get()
+                ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+        ]);
+    }
+
+    public function data(): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('patients.view');
+
         $excludedStatuses = ['cancelled', 'no_show', 'completed', 'in_treatment'];
 
         $registeredPatientIds = ScheduleRegistration::whereIn('status', ['pending', 'in_treatment'])
             ->pluck('patient_id')
             ->flip();
 
-        return Inertia::render('Crm/Patients/Index', [
-            'all_patients' => Patient::with('branch')
-                ->withMin(
-                    ['appointments' => fn ($q) => $q
-                        ->whereNotIn('status', $excludedStatuses)
-                        ->where('scheduled_at', '>=', now())],
-                    'scheduled_at'
-                )
-                ->orderByDesc('id')
-                ->get()
-                ->map(fn ($p) => [
-                    'id'                      => $p->id,
-                    'code'                    => $p->code,
-                    'full_name'               => $p->full_name,
-                    'phone'                   => $p->phone ?? '',
-                    'gender'                  => $p->gender,
-                    'source'                  => $p->source,
-                    'branch'                  => $p->branch?->name,
-                    'branch_id'               => $p->branch_id,
-                    'is_active'               => $p->is_active,
-                    'created_at'              => $p->created_at->format('d/m/Y'),
-                    'created_at_raw'          => $p->created_at->toDateString(),
-                    'next_appointment_at'     => $p->appointments_min_scheduled_at,
-                    'next_appointment_display'=> $p->appointments_min_scheduled_at
-                        ? \Carbon\Carbon::parse($p->appointments_min_scheduled_at)->format('d/m H:i')
-                        : null,
-                    'has_registration'        => isset($registeredPatientIds[$p->id]),
-                ]),
-            'branches' => Branch::where('is_active', true)->orderBy('name')->get()
-                ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
-            'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-        ]);
+        $patients = Patient::with('branch')
+            ->withMin(
+                ['appointments' => fn ($q) => $q
+                    ->whereNotIn('status', $excludedStatuses)
+                    ->where('scheduled_at', '>=', now())],
+                'scheduled_at'
+            )
+            ->orderByDesc('id')
+            ->get()
+            ->map(fn ($p) => [
+                'id'                      => $p->id,
+                'code'                    => $p->code,
+                'full_name'               => $p->full_name,
+                'phone'                   => $p->phone ?? '',
+                'gender'                  => $p->gender,
+                'source'                  => $p->source,
+                'branch'                  => $p->branch?->name,
+                'branch_id'               => $p->branch_id,
+                'is_active'               => $p->is_active,
+                'created_at'              => $p->created_at->format('d/m/Y'),
+                'created_at_raw'          => $p->created_at->toDateString(),
+                'next_appointment_at'     => $p->appointments_min_scheduled_at,
+                'next_appointment_display'=> $p->appointments_min_scheduled_at
+                    ? \Carbon\Carbon::parse($p->appointments_min_scheduled_at)->format('d/m H:i')
+                    : null,
+                'has_registration'        => isset($registeredPatientIds[$p->id]),
+            ]);
+
+        return response()->json($patients);
     }
 
     public function registerAppointment(Patient $patient): Response
@@ -230,8 +239,14 @@ class PatientController extends Controller
                 'note'            => $tc->note,
             ]);
 
-        $doctors = Employee::doctors()->orderBy('full_name')->get()
-            ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]);
+        $doctors = Employee::doctors()->where('is_active', true)->orderBy('full_name')->get()
+            ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name, 'branch_id' => $e->branch_id]);
+
+        $chairs = DentalChair::where('is_active', true)->get()
+            ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]);
+
+        $services = DentalService::where('is_active', true)->orderBy('name')->get()
+            ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'duration_minutes' => $s->duration_minutes]);
 
         $conditionTypes = collect(ToothConditionType::cases())
             ->map(fn ($c) => ['value' => $c->value, 'label' => $c->label(), 'color' => $c->color()]);
@@ -274,6 +289,7 @@ class PatientController extends Controller
         // ── Appointments ────────────────────────────────────────────────────
         $appointments = Appointment::where('patient_id', $patient->id)
             ->with(['doctor', 'service'])
+            ->withExists('registration')
             ->orderByDesc('scheduled_at')
             ->get()
             ->map(fn ($a) => [
@@ -289,6 +305,7 @@ class PatientController extends Controller
                 'status_label'     => $a->status->label(),
                 'status_color'     => $a->status->color(),
                 'notes'            => $a->notes,
+                'has_registration' => (bool) $a->registration_exists,
             ]);
 
         // ── Treatment history (plans + items) ───────────────────────────────
@@ -443,6 +460,8 @@ class PatientController extends Controller
             'relationships'     => $relationships,
             'timeline'          => $timeline,
             'doctors'           => $doctors,
+            'chairs'            => $chairs,
+            'services'          => $services,
             'conditionTypes'    => $conditionTypes,
             'contactTypes'      => collect(ContactType::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
             'attachmentTypes'   => collect(AttachmentType::cases())->map(fn ($t) => ['value' => $t->value, 'label' => $t->label()]),

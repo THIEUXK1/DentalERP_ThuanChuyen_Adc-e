@@ -24,6 +24,18 @@ class PatientInvoiceController extends Controller
     {
         $this->authorize('cashier.view');
 
+        return Inertia::render('Cashier/Invoices/Index', [
+            'statuses'        => collect(InvoiceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
+            'branches'        => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'init_patient_id' => $request->patient_id ? (int) $request->patient_id : null,
+            'init_plan_id'    => $request->plan_id    ? (int) $request->plan_id    : null,
+        ]);
+    }
+
+    public function data(): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('cashier.view');
+
         $invoices = PatientInvoice::with(['patient', 'branch', 'treatmentPlan'])
             ->orderByRaw('due_date ASC NULLS LAST, id DESC')
             ->get()
@@ -57,13 +69,7 @@ class PatientInvoiceController extends Controller
                 ];
             });
 
-        return Inertia::render('Cashier/Invoices/Index', [
-            'invoices'        => $invoices,
-            'statuses'        => collect(InvoiceStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
-            'branches'        => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
-            'init_patient_id' => $request->patient_id ? (int) $request->patient_id : null,
-            'init_plan_id'    => $request->plan_id    ? (int) $request->plan_id    : null,
-        ]);
+        return response()->json($invoices);
     }
 
     public function show(PatientInvoice $invoice): \Inertia\Response

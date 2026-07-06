@@ -74,8 +74,7 @@ class AppointmentController extends Controller
             return back()->withErrors(['conflict' => $e->getMessage()]);
         }
 
-        return redirect()->route('schedule.appointments.show', $appointment)
-            ->with('success', "Đã đặt lịch hẹn {$appointment->code}.");
+        return back()->with('success', "Đã đặt lịch hẹn {$appointment->code}.");
     }
 
     public function show(Appointment $appointment): Response
@@ -199,7 +198,11 @@ class AppointmentController extends Controller
                     'created_by' => auth()->id(),
                 ]);
 
-                $this->svc->transition($appointment, AppointmentStatus::CheckedIn);
+                $arrivedStatus = now()->lt($appointment->scheduled_at)
+                    ? AppointmentStatus::ArrivedEarly
+                    : AppointmentStatus::CheckedIn;
+
+                $this->svc->transition($appointment, $arrivedStatus);
             });
         } catch (\Illuminate\Database\UniqueConstraintViolationException) {
             return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');

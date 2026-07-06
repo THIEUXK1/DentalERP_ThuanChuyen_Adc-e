@@ -147,6 +147,8 @@ Route::middleware(['auth'])->group(function () {
 Route::middleware(['auth'])->group(function () {
     Route::post('patients/check-duplicate', [PatientController::class, 'checkDuplicate'])
         ->name('patients.check-duplicate')->middleware('can:patients.create');
+    Route::get('patients/data', [PatientController::class, 'data'])
+        ->name('patients.data')->middleware('can:patients.view');
     Route::resource('patients', PatientController::class)->middleware('can:patients.view');
     Route::post('patients/{patient}/avatar', [PatientController::class, 'uploadAvatar'])
         ->name('patients.upload-avatar')->middleware('can:patients.edit');
@@ -219,6 +221,8 @@ Route::middleware(['auth'])->prefix('crm')->name('crm.')->group(function () {
 
 // Cashier
 Route::middleware(['auth'])->prefix('cashier')->name('cashier.')->group(function () {
+    Route::get('invoices/data', [PatientInvoiceController::class, 'data'])
+        ->name('invoices.data')->middleware('can:cashier.view');
     Route::resource('invoices', PatientInvoiceController::class)->only(['index', 'show'])->middleware('can:cashier.view');
     Route::post('invoices/{invoice}/payments', [PatientPaymentController::class, 'store'])->name('invoices.payments.store')->middleware('can:cashier.manage');
     Route::patch('payments/{payment}/method', [PatientPaymentController::class, 'updateMethod'])->name('payments.update-method')->middleware('can:cashier.manage');

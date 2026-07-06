@@ -11,14 +11,14 @@
             Đăng ký khám
         </Link>
 
-        <Link v-if="can('appointments.view')"
-            :href="route('schedule.appointments.create', { patient_id: patientId })"
+        <button v-if="can('appointments.view')"
+            @click="$emit('book-appointment')"
             class="action-btn action-btn-primary">
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
             Đặt lịch hẹn
-        </Link>
+        </button>
 
         <Link v-if="can('treatment_plans.view')"
             :href="route('clinical.treatment-plans.create', { patient_id: patientId })"
@@ -69,7 +69,7 @@ import { usePermission } from '@/composables/usePermission';
 const { hasPermission: can } = usePermission();
 
 defineProps({ patientId: { type: Number, required: true } });
-defineEmits(['edit']);
+defineEmits(['edit', 'book-appointment']);
 </script>
 
 <style scoped>

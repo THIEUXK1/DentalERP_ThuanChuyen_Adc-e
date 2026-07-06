@@ -161,8 +161,23 @@
                 </div>
             </div>
 
+            <!-- ── Loading ────────────────────────────────────────────────── -->
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+                <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                <p class="text-sm">Đang tải dữ liệu...</p>
+            </div>
+
+            <!-- ── Error ──────────────────────────────────────────────────── -->
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+                <p class="text-sm font-medium">Không thể tải dữ liệu</p>
+                <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
+            </div>
+
             <!-- ── Empty ──────────────────────────────────────────────── -->
-            <div v-if="filtered.length === 0"
+            <div v-else-if="filtered.length === 0"
                 class="bg-white rounded-xl border border-gray-200 py-12 text-center text-gray-400">
                 {{ hasFilters ? 'Không tìm thấy hóa đơn phù hợp' : 'Chưa có hóa đơn nào' }}
             </div>
@@ -380,7 +395,7 @@
             </div>
 
             <!-- ── Pagination ─────────────────────────────────────────── -->
-            <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 py-2">
+            <div v-if="!loading && !loadError && totalPages > 1" class="flex items-center justify-center gap-1 py-2">
                 <button @click="page = 1" :disabled="page === 1"
                     class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">«</button>
                 <button @click="page--" :disabled="page === 1"
@@ -404,7 +419,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
@@ -419,7 +434,29 @@ const SortIcon = {
 };
 
 const { formatVnd } = useCurrency();
-const props = defineProps({ invoices: Array, statuses: Array, branches: Array, init_patient_id: Number, init_plan_id: Number });
+const props = defineProps({ statuses: Array, branches: Array, init_patient_id: Number, init_plan_id: Number });
+
+// ── Data fetch ────────────────────────────────────────────────────────────────
+const invoices  = ref([]);
+const loading   = ref(true);
+const loadError = ref(false);
+
+async function loadData() {
+    loading.value   = true;
+    loadError.value = false;
+    try {
+        const res = await fetch(route('cashier.invoices.data'), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        invoices.value = await res.json();
+    } catch {
+        loadError.value = true;
+    } finally {
+        loading.value = false;
+    }
+}
+
+onMounted(loadData);
 
 // ── State ───────────────────────────────────────────────────────────────────
 const viewMode           = ref(localStorage.getItem('inv_view') || 'list');
@@ -502,12 +539,12 @@ watch([dueDateFrom, dueDateTo], () => {
 // ── Patient / plan name for banners ─────────────────────────────────────────
 const patientName = computed(() => {
     if (!filterPatientId.value) return '';
-    return props.invoices.find(i => i.patient_id === filterPatientId.value)?.patient ?? '';
+    return invoices.value.find(i => i.patient_id === filterPatientId.value)?.patient ?? '';
 });
 
 const planCode = computed(() => {
     if (!filterPlanId.value) return '';
-    return props.invoices.find(i => i.plan_id === filterPlanId.value)?.treatment_plan_code ?? `#${filterPlanId.value}`;
+    return invoices.value.find(i => i.plan_id === filterPlanId.value)?.treatment_plan_code ?? `#${filterPlanId.value}`;
 });
 
 // ── Expand installment rows ──────────────────────────────────────────────────
@@ -521,7 +558,7 @@ function toggleExpand(planId) {
 
 function getInstallments(planId) {
     if (!planId) return [];
-    return [...props.invoices]
+    return [...invoices.value]
         .filter(i => i.plan_id === planId && i.installment_index !== null && i.installment_index !== undefined)
         .sort((a, b) => a.installment_index - b.installment_index);
 }
@@ -533,7 +570,7 @@ function installmentCount(planId) {
 // ── Filtering ────────────────────────────────────────────────────────────────
 const filtered = computed(() => {
     // Installment-specific invoices are rendered as child rows under their master; exclude from main list
-    let list = props.invoices.filter(i => i.installment_index === null || i.installment_index === undefined);
+    let list = invoices.value.filter(i => i.installment_index === null || i.installment_index === undefined);
 
     if (filterPatientId.value) {
         list = list.filter(i => i.patient_id === filterPatientId.value);
@@ -634,7 +671,7 @@ const summary = computed(() => ({
     overdue: filtered.value.filter(i => isOverdue(i)).length,
 }));
 
-const overdueCount = computed(() => props.invoices.filter(i => isOverdue(i)).length);
+const overdueCount = computed(() => invoices.value.filter(i => isOverdue(i)).length);
 
 // ── Display status (simplified for cashier view) ─────────────────────────────
 function displayStatusLabel(inv) {

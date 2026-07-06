@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 class PatientPayment extends Model
 {
     protected $fillable = [
-        'invoice_id', 'amount', 'method', 'payment_date', 'reference', 'notes', 'created_by',
+        'invoice_id', 'legacy_clinic_record_id', 'amount', 'method', 'payment_date', 'reference', 'notes', 'created_by',
     ];
 
     protected function casts(): array

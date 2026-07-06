@@ -50,7 +50,7 @@
                             </span>
                         </td>
                         <td class="px-4 py-2 text-gray-400 hidden lg:table-cell max-w-xs truncate">{{ appt.notes || '—' }}</td>
-                        <td class="px-4 py-2 text-center">
+                        <td class="px-4 py-2 text-right">
                             <template v-if="pendingKey('App\\Models\\Appointment', appt.id)">
                                 <div class="flex items-center gap-1.5 justify-end">
                                     <span class="text-xs text-red-500 font-medium whitespace-nowrap">
@@ -62,15 +62,20 @@
                                     </button>
                                 </div>
                             </template>
-                            <template v-else>
+                            <div v-else class="flex items-center gap-2 justify-end">
+                                <button v-if="canQuickRegister(appt)" @click="quickRegister(appt)"
+                                    :disabled="quickRegisteringId === appt.id"
+                                    class="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium transition-colors whitespace-nowrap disabled:opacity-50">
+                                    {{ quickRegisteringId === appt.id ? 'Đang xử lý...' : '📋 Đăng ký khám' }}
+                                </button>
                                 <button @click="openDeleteAppt(appt)"
-                                    class="text-gray-300 hover:text-red-500 transition-colors"
+                                    class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
                                     title="Xóa lịch hẹn">
                                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
                                 </button>
-                            </template>
+                            </div>
                         </td>
                     </tr>
                 </tbody>
@@ -92,11 +97,32 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
+import { usePermission } from '@/composables/usePermission';
 
 const props = defineProps({
     appointments:     { type: Array,  default: () => [] },
     pendingDeletions: { type: Object, default: () => ({}) },
 });
+
+const { hasPermission: can } = usePermission();
+
+// ── Quick register (đăng ký khám) ────────────────────────────────────────────
+const QUICK_REGISTER_STATUSES = ['booked', 'confirmed'];
+const quickRegisteringId = ref(null);
+
+function canQuickRegister(appt) {
+    return can('appointments.manage') && QUICK_REGISTER_STATUSES.includes(appt.status) && !appt.has_registration;
+}
+
+function quickRegister(appt) {
+    if (quickRegisteringId.value) return;
+    quickRegisteringId.value = appt.id;
+    router.post(route('schedule.appointments.quick-register', appt.id), {}, {
+        preserveScroll: true,
+        preserveState: true,
+        onFinish: () => { quickRegisteringId.value = null; },
+    });
+}
 
 // Countdown ticker
 const now = ref(Date.now());

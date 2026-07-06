@@ -138,7 +138,7 @@
                                 class="absolute rounded-lg border-l-4 shadow-sm cursor-pointer hover:shadow-md hover:z-10 transition-all overflow-hidden group"
                                 :class="statusCard(apt.status)"
                                 :style="{ top: apt.top + 'px', height: apt.height + 'px', left: apt.left, width: apt.width, minHeight: '32px' }"
-                                @click="router.visit(route('schedule.appointments.show', apt.id))">
+                                @click="router.visit(route('patients.show', apt.patient_id) + '#appointments')">
                                 <div class="px-2 py-1 h-full flex flex-col justify-start overflow-hidden">
                                     <div class="flex items-center gap-1 flex-wrap">
                                         <span class="text-xs font-bold leading-tight truncate">{{ apt.patient }}</span>
@@ -197,7 +197,7 @@
                                     class="absolute rounded border-l-4 shadow-sm cursor-pointer hover:shadow-md hover:z-10 transition-all overflow-hidden"
                                     :class="statusCard(apt.status)"
                                     :style="{ top: apt.top + 'px', height: apt.height + 'px', left: (apt.col / apt.totalCols * 100) + '%', width: (1 / apt.totalCols * 100) + '%' }"
-                                    @click="router.visit(route('schedule.appointments.show', apt.id))">
+                                    @click="router.visit(route('patients.show', apt.patient_id) + '#appointments')">
                                     <div class="px-1 py-0.5 overflow-hidden h-full flex flex-col gap-0">
                                         <p class="text-[10px] font-bold leading-tight truncate opacity-80 flex-shrink-0">{{ timeOf(apt.scheduled_at) }}</p>
                                         <p class="text-[10px] font-semibold leading-tight truncate">{{ apt.patient }}</p>
@@ -258,7 +258,7 @@
                         <div class="flex-1 space-y-0.5 overflow-hidden">
                             <div v-for="apt in cell.appointments.slice(0, 4)" :key="apt.id"
                                 :class="['text-xs rounded px-1.5 py-0.5 truncate cursor-pointer border-l-2 leading-tight hover:opacity-80 transition-opacity', statusCard(apt.status)]"
-                                @click="router.visit(route('schedule.appointments.show', apt.id))">
+                                @click="router.visit(route('patients.show', apt.patient_id) + '#appointments')">
                                 <span class="font-mono font-semibold">{{ timeOf(apt.scheduled_at) }}</span>
                                 <span class="ml-1 hidden sm:inline">{{ apt.patient }}</span>
                             </div>
@@ -336,7 +336,7 @@
                                 class="w-4 h-4 accent-indigo-600 cursor-pointer" />
                         </label>
                         <div :class="['w-1.5 flex-shrink-0 ml-2', statusStripe(a.status)]"></div>
-                        <Link :href="route('schedule.appointments.show', a.id)" class="flex flex-1 items-center gap-4 px-4 py-3 min-w-0">
+                        <Link :href="route('patients.show', a.patient_id) + '#appointments'" class="flex flex-1 items-center gap-4 px-4 py-3 min-w-0">
                             <div class="w-16 text-center flex-shrink-0">
                                 <p class="text-xs font-semibold text-gray-500">{{ displayDate(a.scheduled_at) }}</p>
                                 <p class="text-lg font-bold text-gray-900 leading-tight">{{ timeOf(a.scheduled_at) }}</p>
@@ -432,7 +432,7 @@
                     <div v-for="a in paginatedAppointments" :key="a.id"
                         :class="['rounded-xl border hover:shadow-md transition-all flex flex-col overflow-hidden', statusBorder(a.status)]">
                         <div :class="['h-1.5 flex-shrink-0', statusStripe(a.status)]"></div>
-                        <Link :href="route('schedule.appointments.show', a.id)" class="flex-1 p-4 flex flex-col gap-3 min-w-0 bg-white">
+                        <Link :href="route('patients.show', a.patient_id) + '#appointments'" class="flex-1 p-4 flex flex-col gap-3 min-w-0 bg-white">
                             <div class="flex items-start justify-between gap-2">
                                 <div>
                                     <p class="text-xs font-semibold text-gray-500">{{ displayDate(a.scheduled_at) }}</p>

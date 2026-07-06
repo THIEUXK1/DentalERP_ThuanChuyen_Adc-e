@@ -21,7 +21,7 @@
             <div class="bg-slate-800 rounded-xl px-5 py-3 flex flex-wrap items-center gap-4">
                 <div class="flex items-center gap-2">
                     <span class="text-slate-400 text-xs">Tổng KH</span>
-                    <span class="font-bold text-white text-lg">{{ all_patients.length }}</span>
+                    <span class="font-bold text-white text-lg">{{ totalCount }}</span>
                 </div>
                 <div class="h-4 w-px bg-slate-600"></div>
                 <div class="flex items-center gap-2">
@@ -93,8 +93,23 @@
                 </button>
             </div>
 
+            <!-- ── Loading ────────────────────────────────────────────────── -->
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+                <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+                </svg>
+                <p class="text-sm">Đang tải dữ liệu...</p>
+            </div>
+
+            <!-- ── Error ──────────────────────────────────────────────────── -->
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+                <p class="text-sm font-medium">Không thể tải dữ liệu</p>
+                <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
+            </div>
+
             <!-- ── TABLE VIEW ──────────────────────────────────────────── -->
-            <div v-if="viewMode === 'table'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="viewMode === 'table'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div v-if="paginatedPatients.length === 0" class="flex flex-col items-center py-14 text-gray-400">
                     <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
@@ -218,7 +233,7 @@
             </div>
 
             <!-- ── Pagination ──────────────────────────────────────────── -->
-            <div v-if="totalPages > 1 || filteredPatients.length > 0" class="flex items-center justify-between flex-wrap gap-3">
+            <div v-if="!loading && !loadError && (totalPages > 1 || filteredPatients.length > 0)" class="flex items-center justify-between flex-wrap gap-3">
                 <p class="text-sm text-gray-500">
                     Hiển thị
                     <span class="font-medium text-gray-700">{{ fromRecord }}–{{ toRecord }}</span>
@@ -256,138 +271,23 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import { usePermission } from '@/composables/usePermission';
+import { usePatientFilters, PER_PAGE_OPTIONS, avatarColor, sourceClass } from '@/composables/usePatientFilters';
 import PatientCreateModal from './components/PatientCreateModal.vue';
 
 const { hasPermission: can } = usePermission();
-const props = defineProps({ all_patients: Array, branches: Array, sources: Array });
+defineProps({ branches: Array, sources: Array });
 
 const showCreateModal = ref(false);
+const perPageOptions  = PER_PAGE_OPTIONS;
 
-// ── Restore state from URL → sessionStorage → default ───────────
-const _q  = new URLSearchParams(window.location.search);
-const _ss = (() => { try { return JSON.parse(sessionStorage.getItem('patients_filter') ?? '{}'); } catch { return {}; } })();
-
-const search      = ref(_q.has('search')    ? _q.get('search')                                              : (_ss.search   ?? ''));
-const branchId    = ref(_q.has('branch_id') ? Number(_q.get('branch_id'))                                   : (_ss.branchId ?? ''));
-const source      = ref(_q.has('source')    ? _q.get('source')                                              : (_ss.source   ?? ''));
-const perPage     = ref(_q.has('per_page')  ? (_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page'))) : (_ss.perPage ?? 120));
-const currentPage = ref(Number(_q.get('page') ?? 1));
-const viewMode    = ref('table');
-
-const perPageOptions = [
-    { value: 10,    label: '10 / trang' },
-    { value: 20,    label: '20 / trang' },
-    { value: 50,    label: '50 / trang' },
-    { value: 100,   label: '100 / trang' },
-    { value: 120,   label: '120 / trang' },
-    { value: 'all', label: 'Tất cả' },
-];
-
-// ── Filtering + Sorting ───────────────────────────────────────────
-const filteredPatients = computed(() => {
-    const q = search.value.trim().toLowerCase();
-    const list = props.all_patients.filter(p => {
-        if (q && !p.full_name.toLowerCase().includes(q)
-              && !(p.phone ?? '').toLowerCase().includes(q)
-              && !(p.code  ?? '').toLowerCase().includes(q)) return false;
-        if (branchId.value !== '' && p.branch_id !== branchId.value) return false;
-        if (source.value && p.source !== source.value) return false;
-        return true;
-    });
-
-    return [...list].sort((a, b) => {
-        if (a.has_registration !== b.has_registration) return a.has_registration ? -1 : 1;
-        return b.id - a.id;
-    });
-});
-
-// ── Pagination ───────────────────────────────────────────────────
-const totalPages = computed(() =>
-    perPage.value === 'all' ? 1 : Math.max(1, Math.ceil(filteredPatients.value.length / Number(perPage.value)))
-);
-
-// Reset to page 1 when filter/per_page changes
-watch([search, branchId, source, perPage], () => { currentPage.value = 1; });
-
-// Clamp page if it goes out of range
-watch(totalPages, (n) => { if (currentPage.value > n) currentPage.value = n; });
-
-const fromRecord = computed(() => {
-    if (!filteredPatients.value.length) return 0;
-    if (perPage.value === 'all') return 1;
-    return (currentPage.value - 1) * Number(perPage.value) + 1;
-});
-const toRecord = computed(() => {
-    if (perPage.value === 'all') return filteredPatients.value.length;
-    return Math.min(currentPage.value * Number(perPage.value), filteredPatients.value.length);
-});
-const paginatedPatients = computed(() => {
-    if (perPage.value === 'all') return filteredPatients.value;
-    const size  = Number(perPage.value);
-    const start = (currentPage.value - 1) * size;
-    return filteredPatients.value.slice(start, start + size);
-});
-
-// Page number list with ellipsis
-const pageNumbers = computed(() => {
-    const total = totalPages.value;
-    const cur   = currentPage.value;
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const pages = [1];
-    if (cur > 3) pages.push('...');
-    for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) pages.push(i);
-    if (cur < total - 2) pages.push('...');
-    pages.push(total);
-    return pages;
-});
-
-// ── Sync URL without reload ──────────────────────────────────────
-watch([search, branchId, source, perPage, currentPage], () => {
-    const p = new URLSearchParams();
-    if (search.value)                    p.set('search',    search.value);
-    if (branchId.value !== '')           p.set('branch_id', String(branchId.value));
-    if (source.value)                    p.set('source',    source.value);
-    if (String(perPage.value) !== '120') p.set('per_page',  String(perPage.value));
-    if (currentPage.value > 1)           p.set('page',      String(currentPage.value));
-    const qs = p.toString();
-    history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
-    sessionStorage.setItem('patients_filter', JSON.stringify({
-        search: search.value, branchId: branchId.value, source: source.value,
-        perPage: perPage.value,
-    }));
-});
-
-// ── Helpers ───────────────────────────────────────────────────────
-const hasActiveFilters = computed(() =>
-    !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== '120')
-);
-
-function clearFilters() {
-    search.value = ''; branchId.value = ''; source.value = '';
-    perPage.value = 120;
-    sessionStorage.removeItem('patients_filter');
-}
-
-const AVATAR_COLORS = [
-    'bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-blue-500',
-    'bg-rose-500', 'bg-amber-500', 'bg-teal-500', 'bg-pink-500',
-];
-function avatarColor(name) {
-    return AVATAR_COLORS[(name.charCodeAt(0) ?? 0) % AVATAR_COLORS.length];
-}
-
-function sourceClass(src) {
-    return {
-        facebook: 'bg-blue-100 text-blue-700',
-        zalo:     'bg-teal-100 text-teal-700',
-        google:   'bg-red-100 text-red-700',
-        referral: 'bg-purple-100 text-purple-700',
-        walk_in:  'bg-gray-100 text-gray-700',
-        other:    'bg-orange-100 text-orange-700',
-    }[src] ?? 'bg-gray-100 text-gray-600';
-}
+const {
+    loading, loadError, loadData, totalCount,
+    search, branchId, source, perPage, currentPage, viewMode,
+    filteredPatients, totalPages, fromRecord, toRecord, paginatedPatients, pageNumbers,
+    hasActiveFilters, clearFilters,
+} = usePatientFilters();
 </script>

@@ -45,7 +45,7 @@
                 </div>
 
                 <!-- Action button bar -->
-                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" />
+                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" @book-appointment="showBookAppointment = true" />
 
                 <!-- Financial summary bar -->
                 <FinancialSummaryBar
@@ -337,6 +337,11 @@
         <PatientEditModal v-if="showEditModal"
             :patient="patient" :branches="branches" :sources="sources"
             @close="showEditModal = false" />
+
+        <AppointmentCreateModal v-if="showBookAppointment"
+            :patient-id="patient.id" :default-branch-id="patient.branch_id"
+            :branches="branches" :doctors="doctors" :chairs="chairs" :services="services"
+            @close="showBookAppointment = false" />
     </AppLayout>
 </template>
 
@@ -350,6 +355,7 @@ import LastVisitBanner from '@/Components/Shared/LastVisitBanner.vue';
 import ActionButtonBar from '@/Components/Shared/ActionButtonBar.vue';
 import TreatmentHistoryTab from '@/Components/Clinical/TreatmentHistoryTab.vue';
 import AppointmentHistoryTab from '@/Components/Clinical/AppointmentHistoryTab.vue';
+import AppointmentCreateModal from '@/Components/Clinical/AppointmentCreateModal.vue';
 import DentalChartTab from '@/Components/Clinical/DentalChartTab.vue';
 import ClinicalNotesTab from '@/Components/Clinical/ClinicalNotesTab.vue';
 import AttachmentsTab from './components/AttachmentsTab.vue';
@@ -378,6 +384,8 @@ const props = defineProps({
     relationships:      Array,
     timeline:           Array,
     doctors:            Array,
+    chairs:             { type: Array, default: () => [] },
+    services:           { type: Array, default: () => [] },
     conditionTypes:     Array,
     contactTypes:       Array,
     attachmentTypes:    Array,
@@ -387,8 +395,9 @@ const props = defineProps({
     sources:            Array,
 });
 
-const activeTab      = ref('treatment');
-const showEditModal  = ref(false);
+const activeTab           = ref('treatment');
+const showEditModal       = ref(false);
+const showBookAppointment = ref(false);
 
 const TAB_KEYS = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
 
