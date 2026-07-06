@@ -113,6 +113,11 @@
                         <option value="">Tất cả bác sĩ</option>
                         <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
                     </select>
+                    <select v-model="filterYear" title="Lọc theo năm tạo kế hoạch"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option v-for="y in yearOptions" :key="y" :value="String(y)">Năm {{ y }}</option>
+                        <option value="all">Tất cả các năm</option>
+                    </select>
                 </div>
 
                 <!-- Row 2: date range + presets + quick filters -->
@@ -377,11 +382,16 @@ const allPlans  = ref([]);
 const loading   = ref(true);
 const loadError = ref(false);
 
+const currentYear = new Date().getFullYear();
+// Defaults to the current year so the page doesn't fetch/render the entire (50k+) table.
+const filterYear  = ref(String(currentYear));
+const yearOptions = [...Array(5)].map((_, i) => currentYear - i);
+
 async function loadData() {
     loading.value   = true;
     loadError.value = false;
     try {
-        const res = await fetch(route('clinical.treatment-plans.data'), {
+        const res = await fetch(route('clinical.treatment-plans.data', { year: filterYear.value || 'all' }), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         allPlans.value = await res.json();
@@ -391,6 +401,8 @@ async function loadData() {
         loading.value = false;
     }
 }
+
+watch(filterYear, loadData);
 
 onMounted(loadData);
 
@@ -414,7 +426,7 @@ const activePreset     = ref('');
 
 watch(viewMode, v => localStorage.setItem('tp_view', v));
 watch(perPage,  v => localStorage.setItem('tp_per', String(v)));
-watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, filterDataIssue, activeStatusGroup, perPage],
+watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filterInProgress, filterHasSchedule, filterDataIssue, activeStatusGroup, filterYear, perPage],
     () => { page.value = 1; });
 
 // ── Date presets ─────────────────────────────────────────────────────────────

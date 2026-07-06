@@ -83,6 +83,11 @@
                         <option value="">Tất cả chi nhánh</option>
                         <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                     </select>
+                    <select v-model="filterYear" title="Lọc theo năm tạo hóa đơn"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option v-for="y in yearOptions" :key="y" :value="String(y)">Năm {{ y }}</option>
+                        <option value="all">Tất cả các năm</option>
+                    </select>
                 </div>
 
                 <!-- Row 2: date range + presets + quick filters -->
@@ -203,6 +208,11 @@
                                     Đến hạn <SortIcon :field="'due_date_raw'" :current="sortBy" :dir="sortDir"/>
                                 </button>
                             </th>
+                            <th class="px-4 py-3 text-left hidden lg:table-cell">
+                                <button @click="toggleSort('created_at_raw')" class="flex items-center gap-1 font-medium hover:text-gray-900">
+                                    Ngày tạo <SortIcon :field="'created_at_raw'" :current="sortBy" :dir="sortDir"/>
+                                </button>
+                            </th>
                             <th class="px-4 py-3 text-right">
                                 <button @click="toggleSort('total')" class="flex items-center gap-1 font-medium hover:text-gray-900 ml-auto">
                                     Tổng tiền <SortIcon :field="'total'" :current="sortBy" :dir="sortDir"/>
@@ -256,6 +266,7 @@
                                     <span v-if="isNearDue(inv)" class="block mt-0.5 text-xs bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium w-fit">⏰ Sắp đến hạn</span>
                                     <span v-else-if="!inv.due_date" class="text-gray-300 text-sm">—</span>
                                 </td>
+                                <td class="px-4 py-3 text-gray-500 text-sm hidden lg:table-cell">{{ inv.created_at }}</td>
                                 <td class="px-4 py-3 text-right font-medium text-gray-800 tabular-nums">{{ formatVnd(inv.total) }}</td>
                                 <td class="px-4 py-3 text-right text-green-600 tabular-nums hidden md:table-cell">{{ formatVnd(inv.amount_paid) }}</td>
                                 <td class="px-4 py-3 text-right tabular-nums hidden md:table-cell"
@@ -317,6 +328,7 @@
                                         <span v-if="isNearDue(child)" class="block mt-0.5 text-xs bg-amber-100 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full font-medium w-fit">⏰ Sắp đến hạn</span>
                                         <span v-else-if="!child.due_date" class="text-gray-300 text-xs">—</span>
                                     </td>
+                                    <td class="px-4 py-2 text-xs text-gray-400 hidden lg:table-cell">{{ child.created_at }}</td>
                                     <td class="px-4 py-2 text-right text-xs font-medium text-gray-700 tabular-nums">{{ formatVnd(child.total) }}</td>
                                     <td class="px-4 py-2 text-right text-green-600 text-xs tabular-nums hidden md:table-cell">{{ formatVnd(child.amount_paid) }}</td>
                                     <td class="px-4 py-2 text-right text-xs tabular-nums hidden md:table-cell"
@@ -441,11 +453,16 @@ const invoices  = ref([]);
 const loading   = ref(true);
 const loadError = ref(false);
 
+const currentYear = new Date().getFullYear();
+// Defaults to the current year so the page doesn't fetch/render the entire (50k+) table.
+const filterYear  = ref(String(currentYear));
+const yearOptions = [...Array(5)].map((_, i) => currentYear - i);
+
 async function loadData() {
     loading.value   = true;
     loadError.value = false;
     try {
-        const res = await fetch(route('cashier.invoices.data'), {
+        const res = await fetch(route('cashier.invoices.data', { year: filterYear.value || 'all' }), {
             headers: { 'X-Requested-With': 'XMLHttpRequest' },
         });
         invoices.value = await res.json();
@@ -455,6 +472,8 @@ async function loadData() {
         loading.value = false;
     }
 }
+
+watch(filterYear, loadData);
 
 onMounted(loadData);
 
@@ -479,7 +498,7 @@ watch(viewMode, v => localStorage.setItem('inv_view', v));
 watch(perPage,  v => localStorage.setItem('inv_per', String(v)));
 
 // Reset to page 1 when filters change
-watch([search, filterStatus, filterBranch, dueDateFrom, dueDateTo, filterOverdue, filterNeedCollection, filterPatientId, filterPlanId, perPage],
+watch([search, filterStatus, filterBranch, dueDateFrom, dueDateTo, filterOverdue, filterNeedCollection, filterPatientId, filterPlanId, filterYear, perPage],
     () => { page.value = 1; });
 
 // ── Date helpers ─────────────────────────────────────────────────────────────
@@ -610,9 +629,23 @@ const filtered = computed(() => {
 });
 
 // ── Sorting ──────────────────────────────────────────────────────────────────
+const todayMs = new Date(today).getTime();
+
+// Distance from "now", not chronological order: an invoice created a month ago and one
+// created a month from now are equally "close" — either can rank first.
+function distanceFromToday(dateRaw) {
+    return dateRaw ? Math.abs(new Date(dateRaw).getTime() - todayMs) : Infinity;
+}
+
 const sorted = computed(() => {
     const base = sortBy.value
         ? [...filtered.value].sort((a, b) => {
+            if (sortBy.value === 'created_at_raw') {
+                const da = distanceFromToday(a.created_at_raw);
+                const db = distanceFromToday(b.created_at_raw);
+                return sortDir.value === 'asc' ? da - db : db - da;
+            }
+
             let va = a[sortBy.value] ?? '';
             let vb = b[sortBy.value] ?? '';
             if (typeof va === 'string') va = va.toLowerCase();
@@ -622,7 +655,11 @@ const sorted = computed(() => {
             return 0;
           })
         : [...filtered.value];
-    // Pin invoices due within 3 days to the top of the list
+
+    // Pin invoices due within 3 days to the top only for the default due-date sort;
+    // otherwise it silently overrides whatever sort the user just picked (e.g. "Ngày tạo").
+    if (sortBy.value !== 'due_date_raw') return base;
+
     const nearDue = base.filter(i => isNearDue(i));
     const rest    = base.filter(i => !isNearDue(i));
     return [...nearDue, ...rest];

@@ -24,6 +24,7 @@ use App\Models\ScheduleRegistration;
 use App\Models\TreatmentPlan;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -45,39 +46,55 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
+        // Plain query-builder select instead of Eloquent + with()/withMin(): at 20k+ patients,
+        // per-row model hydration and Carbon parsing dominate the cost (see
+        // PatientInvoiceController::data() for the same fix applied to a bigger table).
         $excludedStatuses = ['cancelled', 'no_show', 'completed', 'in_treatment'];
 
-        $registeredPatientIds = ScheduleRegistration::whereIn('status', ['pending', 'in_treatment'])
+        $registeredPatientIds = DB::table('schedule_registrations')
+            ->whereIn('status', ['pending', 'in_treatment'])
             ->pluck('patient_id')
             ->flip();
 
-        $patients = Patient::with('branch')
-            ->withMin(
-                ['appointments' => fn ($q) => $q
-                    ->whereNotIn('status', $excludedStatuses)
-                    ->where('scheduled_at', '>=', now())],
-                'scheduled_at'
+        $nextAppointments = DB::table('appointments')
+            ->whereNotIn('status', $excludedStatuses)
+            ->where('scheduled_at', '>=', now())
+            ->groupBy('patient_id')
+            ->select('patient_id', DB::raw('MIN(scheduled_at) as next_at'))
+            ->pluck('next_at', 'patient_id');
+
+        $rows = DB::table('patients as p')
+            ->leftJoin('branches as b', 'b.id', '=', 'p.branch_id')
+            ->orderByDesc('p.id')
+            ->select(
+                'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.gender', 'p.source',
+                'p.branch_id', 'p.is_active',
+                DB::raw("to_char(p.created_at, 'DD/MM/YYYY') as created_at"),
+                DB::raw("to_char(p.created_at, 'YYYY-MM-DD') as created_at_raw"),
+                'b.name as branch_name',
             )
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn ($p) => [
+            ->get();
+
+        $patients = $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments) {
+            $next = $nextAppointments[$p->id] ?? null;
+
+            return [
                 'id'                      => $p->id,
                 'code'                    => $p->code,
                 'full_name'               => $p->full_name,
                 'phone'                   => $p->phone ?? '',
                 'gender'                  => $p->gender,
                 'source'                  => $p->source,
-                'branch'                  => $p->branch?->name,
+                'branch'                  => $p->branch_name,
                 'branch_id'               => $p->branch_id,
                 'is_active'               => $p->is_active,
-                'created_at'              => $p->created_at->format('d/m/Y'),
-                'created_at_raw'          => $p->created_at->toDateString(),
-                'next_appointment_at'     => $p->appointments_min_scheduled_at,
-                'next_appointment_display'=> $p->appointments_min_scheduled_at
-                    ? \Carbon\Carbon::parse($p->appointments_min_scheduled_at)->format('d/m H:i')
-                    : null,
+                'created_at'              => $p->created_at,
+                'created_at_raw'          => $p->created_at_raw,
+                'next_appointment_at'     => $next,
+                'next_appointment_display'=> $next ? \Carbon\Carbon::parse($next)->format('d/m H:i') : null,
                 'has_registration'        => isset($registeredPatientIds[$p->id]),
-            ]);
+            ];
+        });
 
         return response()->json($patients);
     }

@@ -38,7 +38,7 @@ class TreatmentPlanController extends Controller
         ]);
     }
 
-    public function data(): JsonResponse
+    public function data(Request $request): JsonResponse
     {
         $this->authorize('treatment_plans.view');
 
@@ -48,32 +48,62 @@ class TreatmentPlanController extends Controller
             ->unique()
             ->flip();
 
-        $plans = TreatmentPlan::with(['patient', 'doctor', 'branch'])
-            ->orderByDesc('id')
-            ->get()
-            ->map(fn ($p) => [
+        // Plain query-builder select with joins instead of Eloquent + with(): at 50k+ plans,
+        // eager-loading patient/doctor/branch via whereIn([...ids]) plus per-row model
+        // hydration and Carbon::format() calls is dramatically slower (see PatientInvoiceController::data()).
+        $rows = \DB::table('treatment_plans as tp')
+            ->leftJoin('patients as p', 'p.id', '=', 'tp.patient_id')
+            ->leftJoin('employees as d', 'd.id', '=', 'tp.doctor_id')
+            ->leftJoin('branches as b', 'b.id', '=', 'tp.branch_id')
+            // Defaults the page to this year's plans so the common case doesn't fetch/render the
+            // entire (50k+) table; pass ?year=all to see everything.
+            ->when($request->input('year', 'all') !== 'all', function ($q) use ($request) {
+                $year = (int) $request->input('year');
+                $q->where('tp.created_at', '>=', "{$year}-01-01 00:00:00")
+                  ->where('tp.created_at', '<', ($year + 1) . '-01-01 00:00:00');
+            })
+            ->orderByDesc('tp.id')
+            ->select(
+                'tp.id', 'tp.code', 'tp.patient_id', 'tp.doctor_id', 'tp.branch_id',
+                'tp.status', 'tp.total_amount', 'tp.discount_amount', 'tp.payment_schedule', 'tp.notes',
+                \DB::raw("to_char(tp.start_date, 'DD/MM/YYYY') as start_date"),
+                \DB::raw("to_char(tp.start_date, 'YYYY-MM-DD') as start_date_raw"),
+                \DB::raw("to_char(tp.created_at, 'DD/MM/YYYY') as created_at"),
+                \DB::raw("to_char(tp.created_at, 'YYYY-MM-DD') as created_at_raw"),
+                'p.full_name as patient_name',
+                'd.full_name as doctor_name',
+                'b.name as branch_name',
+            )
+            ->get();
+
+        $plans = $rows->map(function ($p) use ($issueIds) {
+            $schedule = $p->payment_schedule ? json_decode($p->payment_schedule, true) : [];
+            $status   = TreatmentPlanStatus::from($p->status);
+
+            return [
                 'id'           => $p->id,
                 'code'         => $p->code,
-                'patient'      => $p->patient->full_name,
+                'patient'      => $p->patient_name,
                 'patient_id'   => $p->patient_id,
-                'doctor'       => $p->doctor?->full_name ?? '—',
+                'doctor'       => $p->doctor_name ?? '—',
                 'doctor_id'    => $p->doctor_id,
-                'branch'       => $p->branch->name,
+                'branch'       => $p->branch_name,
                 'branch_id'    => $p->branch_id,
-                'status'       => $p->status->value,
-                'status_label' => $p->status->label(),
-                'status_color' => $p->status->color(),
+                'status'       => $status->value,
+                'status_label' => $status->label(),
+                'status_color' => $status->color(),
                 'total_amount' => $p->total_amount,
-                'net_total'    => $p->net_total,
-                'payment_schedule_total' => collect($p->payment_schedule ?? [])->sum('amount'),
-                'payment_schedule_count' => count($p->payment_schedule ?? []),
+                'net_total'    => $p->total_amount - $p->discount_amount,
+                'payment_schedule_total' => collect($schedule)->sum('amount'),
+                'payment_schedule_count' => count($schedule),
                 'has_data_issue' => isset($issueIds[$p->id]),
                 'notes'        => $p->notes ?? '',
-                'start_date'     => $p->start_date?->format('d/m/Y') ?? '—',
-                'start_date_raw' => $p->start_date?->toDateString() ?? '',
-                'created_at'   => $p->created_at->format('d/m/Y'),
-                'created_at_raw' => $p->created_at->toDateString(),
-            ]);
+                'start_date'     => $p->start_date ?? '—',
+                'start_date_raw' => $p->start_date_raw ?? '',
+                'created_at'   => $p->created_at,
+                'created_at_raw' => $p->created_at_raw,
+            ];
+        });
 
         return response()->json($plans);
     }

@@ -11,6 +11,7 @@ use App\Models\ScheduleRegistration;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,8 +35,11 @@ class RegistrationController extends Controller
                 ->get()
                 ->map(fn ($r) => $this->dto($r)),
             'statuses' => self::STATUSES,
-            'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
-                ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code]),
+            // Plain query-builder select instead of Eloquent: this dropdown embeds every active
+            // patient on every page load, and Eloquent hydration for 20k+ rows is the dominant
+            // cost (see PatientInvoiceController::data() for the same fix elsewhere).
+            'patients' => DB::table('patients')->where('is_active', true)->orderBy('full_name')
+                ->select('id', 'full_name', 'phone', 'code')->get(),
             'doctors'  => Employee::doctors()->where('is_active', true)->get()
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
             'chairs'   => DentalChair::where('is_active', true)->get()

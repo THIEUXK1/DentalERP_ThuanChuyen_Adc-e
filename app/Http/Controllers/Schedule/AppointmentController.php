@@ -37,8 +37,11 @@ class AppointmentController extends Controller
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
             'services' => DentalService::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'duration_minutes' => $s->duration_minutes]),
-            'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
-                ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code, 'branch_id' => $p->branch_id]),
+            // Plain query-builder select instead of Eloquent: this dropdown embeds every active
+            // patient on every page load, and Eloquent hydration for 20k+ rows is the dominant
+            // cost (see PatientInvoiceController::data() for the same fix elsewhere).
+            'patients' => DB::table('patients')->where('is_active', true)->orderBy('full_name')
+                ->select('id', 'full_name', 'phone', 'code', 'branch_id')->get(),
             'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
         ]);
     }
@@ -257,8 +260,8 @@ class AppointmentController extends Controller
                 'notes'            => $appointment->notes,
                 'status'           => $appointment->status->value,
             ] : array_merge(['patient_id' => null, 'branch_id' => null, 'lead_id' => null, 'doctor_id' => null], $defaults),
-            'patients' => Patient::where('is_active', true)->orderBy('full_name')->get()
-                ->map(fn ($p) => ['id' => $p->id, 'full_name' => $p->full_name, 'phone' => $p->phone, 'code' => $p->code]),
+            'patients' => DB::table('patients')->where('is_active', true)->orderBy('full_name')
+                ->select('id', 'full_name', 'phone', 'code')->get(),
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'doctors' => Employee::doctors()->where('is_active', true)
