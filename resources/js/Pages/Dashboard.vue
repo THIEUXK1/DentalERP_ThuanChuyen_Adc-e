@@ -6,15 +6,32 @@
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h1 class="text-2xl font-bold text-gray-900">Tổng quan</h1>
-                    <p class="text-sm text-gray-500 mt-0.5">{{ todayLabel }}</p>
+                    <p class="text-sm text-gray-500 mt-0.5">{{ dateLabel }}</p>
                 </div>
-                <div v-if="branches.length > 0" class="flex items-center gap-2">
-                    <span class="text-sm text-gray-500">Chi nhánh:</span>
-                    <select v-model="branchSel" @change="changeBranch"
-                        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
-                        <option :value="null">Tất cả</option>
-                        <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
-                    </select>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <!-- Date nav -->
+                    <div class="flex items-center gap-1">
+                        <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                        </button>
+                        <input v-model="dateSel" @change="changeToDate" type="date"
+                            class="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white" />
+                        <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                        </button>
+                        <button v-if="!isToday" @click="goToday"
+                            class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+                            Hôm nay
+                        </button>
+                    </div>
+                    <div v-if="branches.length > 0" class="flex items-center gap-2">
+                        <span class="text-sm text-gray-500">Chi nhánh:</span>
+                        <select v-model="branchSel" @change="changeBranch"
+                            class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                            <option :value="null">Tất cả</option>
+                            <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
+                        </select>
+                    </div>
                 </div>
             </div>
 
@@ -25,7 +42,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <p class="text-3xl font-bold">{{ kpis.todayAppts }}</p>
-                    <p class="text-blue-100 text-xs mt-1">Lịch hẹn hôm nay</p>
+                    <p class="text-blue-100 text-xs mt-1">{{ isToday ? 'Lịch hẹn hôm nay' : `Lịch hẹn ngày ${shortDateLabel}` }}</p>
                 </div>
 
                 <div v-if="canFinancial" class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white shadow-sm">
@@ -33,7 +50,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <p class="text-2xl font-bold truncate">{{ formatVndShort(kpis.todayRevenue) }}</p>
-                    <p class="text-emerald-100 text-xs mt-1">Doanh thu hôm nay</p>
+                    <p class="text-emerald-100 text-xs mt-1">{{ isToday ? 'Doanh thu hôm nay' : `Doanh thu ngày ${shortDateLabel}` }}</p>
                 </div>
 
                 <div v-if="canFinancial" class="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl p-5 text-white shadow-sm">
@@ -111,7 +128,7 @@
                 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                         <h3 class="text-sm font-semibold text-gray-800">
-                            Lịch hẹn hôm nay
+                            {{ isToday ? 'Lịch hẹn hôm nay' : `Lịch hẹn ngày ${shortDateLabel}` }}
                             <span v-if="todaySchedule.length" class="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">
                                 {{ todaySchedule.length }}
                             </span>
@@ -126,7 +143,7 @@
                         <svg class="w-10 h-10 mb-2 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
-                        <p class="text-sm">Không có lịch hẹn hôm nay</p>
+                        <p class="text-sm">{{ isToday ? 'Không có lịch hẹn hôm nay' : 'Không có lịch hẹn ngày này' }}</p>
                     </div>
                     <ul v-else class="divide-y divide-gray-50">
                         <li v-for="a in todaySchedule" :key="a.id"
@@ -155,6 +172,65 @@
                     <div v-else class="bg-white rounded-xl border border-gray-200 h-[300px] flex items-center justify-center text-gray-400 text-sm">
                         Chưa có dữ liệu lead
                     </div>
+                </div>
+            </div>
+
+            <!-- Lịch sử thanh toán — đối chiếu trực tiếp với "Doanh thu hôm nay" -->
+            <div v-if="canFinancial" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                    <h3 class="text-sm font-semibold text-gray-800">
+                        {{ isToday ? 'Lịch sử thanh toán hôm nay' : `Lịch sử thanh toán ngày ${shortDateLabel}` }}
+                        <span v-if="todayPayments.length" class="ml-2 text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
+                            {{ todayPayments.length }}
+                        </span>
+                    </h3>
+                    <span class="text-sm font-bold text-emerald-700 tabular-nums">{{ formatVnd(todayPaymentsTotal) }}</span>
+                </div>
+                <div v-if="todayPayments.length === 0" class="flex flex-col items-center py-10 text-gray-400">
+                    <svg class="w-10 h-10 mb-2 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
+                    </svg>
+                    <p class="text-sm">{{ isToday ? 'Chưa có thanh toán nào hôm nay' : 'Không có thanh toán nào ngày này' }}</p>
+                </div>
+                <div v-else class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50/60 text-gray-500 text-xs border-b border-gray-100">
+                            <tr>
+                                <th class="px-4 py-2.5 text-left font-medium">Giờ</th>
+                                <th class="px-4 py-2.5 text-left font-medium">Khách hàng</th>
+                                <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Hóa đơn</th>
+                                <th class="px-4 py-2.5 text-left font-medium">Hình thức</th>
+                                <th class="px-4 py-2.5 text-right font-medium">Số tiền</th>
+                                <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Người thu</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-50">
+                            <tr v-for="p in todayPayments" :key="p.id" class="hover:bg-gray-50">
+                                <td class="px-4 py-2.5 font-mono text-xs text-gray-500 whitespace-nowrap">{{ p.time }}</td>
+                                <td class="px-4 py-2.5">
+                                    <Link v-if="p.patient_id" :href="route('patients.show', p.patient_id)"
+                                        class="text-gray-800 hover:text-indigo-600 font-medium">{{ p.patient }}</Link>
+                                    <span v-else class="text-gray-800 font-medium">{{ p.patient }}</span>
+                                </td>
+                                <td class="px-4 py-2.5 hidden sm:table-cell">
+                                    <Link v-if="p.invoice_id" :href="route('cashier.invoices.show', p.invoice_id)"
+                                        class="font-mono text-xs text-indigo-600 hover:text-indigo-800 hover:underline">
+                                        {{ p.invoice_code }}
+                                    </Link>
+                                </td>
+                                <td class="px-4 py-2.5">
+                                    <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', apptBadgeClass(p.method_color)]">
+                                        {{ p.method_label }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-2.5 text-right tabular-nums font-semibold whitespace-nowrap"
+                                    :class="p.amount < 0 ? 'text-red-600' : 'text-emerald-700'">
+                                    {{ p.amount < 0 ? '−' : '' }}{{ formatVnd(Math.abs(p.amount)) }}
+                                </td>
+                                <td class="px-4 py-2.5 text-gray-500 text-xs hidden md:table-cell">{{ p.creator }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -293,6 +369,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
+import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import ChartCard from '@/Components/Shared/ChartCard.vue';
 import { useCurrency } from '@/composables/useCurrency';
@@ -308,16 +385,22 @@ const props = defineProps({
     revenueByDoctor:         Array,
     revenueByService:        Array,
     todaySchedule:           Array,
+    todayPayments:           { type: Array, default: () => [] },
     pendingTasksCount:       Number,
     branches:                Array,
     canFinancial:            Boolean,
     canClinical:             Boolean,
     selectedBranch:          [Number, null],
+    selectedDate:            String,
+    isToday:                 Boolean,
 });
 
-const todayLabel = computed(() =>
-    new Date().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+const dateLabel = computed(() =>
+    dayjs(props.selectedDate).toDate().toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
 );
+const shortDateLabel = computed(() => dayjs(props.selectedDate).format('DD/MM'));
+
+const todayPaymentsTotal = computed(() => props.todayPayments.reduce((sum, p) => sum + p.amount, 0));
 
 function formatVndShort(v) {
     if (v >= 1_000_000_000) return (v / 1_000_000_000).toFixed(1) + ' tỷ';
@@ -327,8 +410,24 @@ function formatVndShort(v) {
 }
 
 const branchSel = ref(props.selectedBranch);
+const dateSel   = ref(props.selectedDate);
+
+function goTo(date, branchId) {
+    router.get(route('dashboard'), { branch_id: branchId, date }, { preserveState: true });
+}
 function changeBranch() {
-    router.get(route('dashboard'), { branch_id: branchSel.value }, { preserveState: true });
+    goTo(dateSel.value, branchSel.value);
+}
+function changeToDate() {
+    goTo(dateSel.value, branchSel.value);
+}
+function changeDate(delta) {
+    dateSel.value = dayjs(dateSel.value).add(delta, 'day').format('YYYY-MM-DD');
+    goTo(dateSel.value, branchSel.value);
+}
+function goToday() {
+    dateSel.value = dayjs().format('YYYY-MM-DD');
+    goTo(dateSel.value, branchSel.value);
 }
 
 const apptColorMap = {
@@ -340,6 +439,7 @@ const apptColorMap = {
     orange: 'bg-orange-100 text-orange-700',
     red:    'bg-red-100 text-red-700',
     purple: 'bg-purple-100 text-purple-700',
+    pink:   'bg-pink-100 text-pink-700',
     gray:   'bg-gray-100 text-gray-600',
 };
 function apptBadgeClass(color) {

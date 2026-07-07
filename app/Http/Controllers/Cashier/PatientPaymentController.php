@@ -61,4 +61,17 @@ class PatientPaymentController extends Controller
 
         return back()->with('success', 'Đã cập nhật hình thức thanh toán.');
     }
+
+    public function updateDate(Request $request, PatientPayment $payment): RedirectResponse
+    {
+        $this->authorize('cashier.manage');
+
+        $data = $request->validate([
+            'payment_date' => 'required|date|before_or_equal:today',
+        ]);
+
+        $payment->update(['payment_date' => $data['payment_date']]);
+
+        return back()->with('success', 'Đã cập nhật ngày thanh toán.');
+    }
 }

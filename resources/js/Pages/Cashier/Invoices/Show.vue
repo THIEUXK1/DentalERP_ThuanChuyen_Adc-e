@@ -292,7 +292,16 @@
                             </thead>
                             <tbody class="divide-y divide-gray-50">
                                 <tr v-for="p in payments" :key="p.id" class="hover:bg-gray-50">
-                                    <td class="px-4 py-3 text-gray-600 whitespace-nowrap">{{ p.payment_date }}</td>
+                                    <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
+                                        <button @click="openDateModal(p)"
+                                            class="inline-flex items-center gap-1 hover:text-emerald-700 hover:underline cursor-pointer"
+                                            title="Bấm để sửa ngày thanh toán">
+                                            {{ p.payment_date }}
+                                            <svg class="w-2.5 h-2.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
+                                    </td>
                                     <td class="px-4 py-3">
                                         <button @click="openMethodModal(p)"
                                             :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium hover:opacity-75 transition-opacity cursor-pointer', methodBadgeClass(p.method)]"
@@ -553,6 +562,47 @@
             </div>
         </div>
     </Teleport>
+
+    <!-- ── Edit payment date modal ─────────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="dateModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+                <div class="px-5 pt-5 pb-4 border-b border-amber-200 bg-amber-50 rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        </svg>
+                        <h3 class="font-semibold text-base text-amber-800">Sửa ngày thanh toán</h3>
+                    </div>
+                </div>
+                <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                        ⚠ Thay đổi ngày thanh toán sẽ ảnh hưởng đến báo cáo tài chính theo ngày. Chỉ thực hiện khi nhập sai.
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 mb-2 font-medium">Chọn ngày mới</p>
+                        <input v-model="dateModal.selected" type="date" :max="todayStr"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input v-model="dateModal.confirmed" type="checkbox" class="w-4 h-4 accent-amber-600 cursor-pointer" />
+                        <span class="text-xs font-medium text-gray-700">Tôi xác nhận muốn thay đổi ngày thanh toán</span>
+                    </label>
+                </div>
+                <div class="px-5 pb-5 flex justify-end gap-2">
+                    <button @click="dateModal.open = false"
+                        class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        Hủy bỏ
+                    </button>
+                    <button @click="submitDateChange"
+                        :disabled="!dateModal.confirmed || !dateModal.selected || dateModal.selected === dateModal.current"
+                        class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                        Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup>
@@ -625,6 +675,23 @@ function submitMethodChange() {
         method: methodModal.value.selected,
     }, {
         onSuccess: () => { methodModal.value.open = false; },
+        preserveScroll: true,
+    });
+}
+
+// ── Edit payment date ───────────────────────────────────────────────────────
+const todayStr = dayjs().format('YYYY-MM-DD');
+const dateModal = ref({ open: false, paymentId: null, current: '', selected: '', confirmed: false });
+
+function openDateModal(p) {
+    dateModal.value = { open: true, paymentId: p.id, current: p.payment_date_raw, selected: p.payment_date_raw, confirmed: false };
+}
+function submitDateChange() {
+    if (!dateModal.value.confirmed || !dateModal.value.selected || dateModal.value.selected === dateModal.value.current) return;
+    router.patch(route('cashier.payments.update-date', dateModal.value.paymentId), {
+        payment_date: dateModal.value.selected,
+    }, {
+        onSuccess: () => { dateModal.value.open = false; },
         preserveScroll: true,
     });
 }

@@ -176,6 +176,7 @@ class PatientInvoiceController extends Controller
                 'method_label' => $p->method->label(),
                 'method_color' => $p->method->color(),
                 'payment_date' => $p->payment_date->format('d/m/Y'),
+                'payment_date_raw' => $p->payment_date->format('Y-m-d'),
                 'reference' => $p->reference,
                 'notes' => $p->notes,
                 'creator' => $p->creator->name,

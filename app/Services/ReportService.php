@@ -22,17 +22,24 @@ use Illuminate\Support\Facades\DB;
 
 class ReportService
 {
-    public function dashboardKpis(?int $branchId = null): array
+    /**
+     * $date scopes only the "today's" cards (appointments/revenue for that day) so the
+     * dashboard can look back at a past day; the other KPIs below are current-state
+     * snapshots (outstanding debt, active patients) or a rolling window from the real
+     * "now", not per-day figures, so they intentionally stay pinned to today regardless.
+     */
+    public function dashboardKpis(?int $branchId = null, ?\Carbon\Carbon $date = null): array
     {
         $today = today('Asia/Ho_Chi_Minh');
+        $date ??= $today;
 
-        $todayAppts = Appointment::whereDate('scheduled_at', $today)
+        $todayAppts = Appointment::whereDate('scheduled_at', $date)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->whereNotIn('status', ['cancelled', 'no_show'])
             ->count();
 
         $todayRevenue = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
-            ->whereDate('patient_payments.payment_date', $today)
+            ->whereDate('patient_payments.payment_date', $date)
             ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
             ->where('patient_payments.amount', '>', 0)
             ->sum('patient_payments.amount');

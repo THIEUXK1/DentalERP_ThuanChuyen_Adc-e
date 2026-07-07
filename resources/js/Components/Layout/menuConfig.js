@@ -9,7 +9,6 @@ export const menuConfig = [
         label: 'CRM & KHÁCH HÀNG',
         items: [
             { label: 'Khách hàng', route: 'patients.index', icon: 'users', permission: 'patients.view' },
-            { label: 'Khách tiềm năng', route: 'crm.leads.index', icon: 'lead', permission: 'leads.view' },
         ]
     },
     {
@@ -23,7 +22,6 @@ export const menuConfig = [
         label: 'ĐIỀU TRỊ',
         items: [
             { label: 'Kế hoạch điều trị', route: 'clinical.treatment-plans.index', icon: 'treatment-plan', permission: 'treatment_plans.view' },
-            { label: 'Mẫu lâm sàng', route: 'clinical.templates.index', icon: 'clinical-template', permission: 'clinical_notes.create' }
         ]
     },
     {
@@ -31,12 +29,12 @@ export const menuConfig = [
         items: [
             { label: 'Hóa đơn', route: 'cashier.invoices.index', icon: 'invoice', permission: 'cashier.view' },
             { label: 'Công nợ', route: 'cashier.debts.index', icon: 'debt', permission: 'cashier.view' },
-            { label: 'Phiếu chi', route: 'cashier.expenses.index', icon: 'expense', permission: 'expenses.view' }
         ]
     },
     {
         label: 'CHĂM SÓC KHÁCH HÀNG',
         items: [
+            { label: 'Khách tiềm năng', route: 'crm.leads.index', icon: 'lead', permission: 'leads.view' },
             { label: 'Công việc Follow-up', route: 'crm.tasks.index', icon: 'follow-up', permission: 'leads.view' },
             { label: 'Mẫu tin nhắn', route: 'crm.messages.templates', icon: 'message-template', permission: 'leads.manage' },
             { label: 'Lịch sử tin nhắn', route: 'crm.messages.log', icon: 'message-log', permission: 'leads.manage' },
@@ -46,6 +44,7 @@ export const menuConfig = [
     {
         label: 'NHA KHOA CHUYÊN SÂU',
         items: [
+            { label: 'Mẫu lâm sàng', route: 'clinical.templates.index', icon: 'clinical-template', permission: 'clinical_notes.create' },
             { label: 'Phiếu khám', route: 'dental.examinations.index', icon: 'examination', permission: 'dental.view' },
             { label: 'Thực hiện công đoạn', route: 'dental.examinations.index', icon: 'workflow-step', permission: 'treatment_plans.edit' },
             { label: 'KPI chuyên môn', route: 'dental.kpi.index', icon: 'kpi', permission: 'dental.kpi.view' },
@@ -55,6 +54,7 @@ export const menuConfig = [
     {
         label: 'BÁO CÁO',
         items: [
+            { label: 'Phiếu chi', route: 'cashier.expenses.index', icon: 'expense', permission: 'expenses.view' },
             { label: 'Doanh thu', route: 'reports.revenue', icon: 'report-revenue', permission: 'reports.financial' },
             { label: 'Lịch hẹn', route: 'reports.appointments', icon: 'report-appointment', permission: 'reports.view' },
             { label: 'Công nợ', route: 'reports.debt', icon: 'report-debt', permission: 'reports.financial' },

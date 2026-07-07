@@ -367,7 +367,7 @@
                             </button>
                         </div>
                         <div v-if="!dateEditOpen" class="text-sm text-gray-800 font-medium">
-                            {{ dateForm.start_date || '—' }}
+                            {{ formatDate(dateForm.start_date) || '—' }}
                         </div>
                         <div v-else>
                             <input v-model="dateForm.start_date" type="date"
@@ -456,7 +456,7 @@
                                                 Xem HĐ →
                                             </Link>
                                         </div>
-                                        <p class="text-gray-700 font-medium mt-0.5">{{ inst.due_date || 'Chưa có ngày' }}</p>
+                                        <p class="text-gray-700 font-medium mt-0.5">{{ formatDate(inst.due_date) || 'Chưa có ngày' }}</p>
                                         <p v-if="inst.note" class="text-gray-400 mt-0.5">{{ inst.note }}</p>
                                         <p v-if="instInvoice(idx)?.locked" class="text-emerald-600 mt-0.5 font-medium">
                                             Đã thu: {{ formatVnd(instInvoice(idx).amount_paid) }}
@@ -803,6 +803,12 @@ import { useCurrency } from '@/composables/useCurrency';
 
 const { hasPermission: can } = usePermission();
 const { formatVnd } = useCurrency();
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const [y, m, d] = dateStr.split('-');
+    return `${d}/${m}/${y}`;
+}
 const props = defineProps({
     plan: Object, items: Array, services: Array,
     priceLists: Array, transitions: Array,
