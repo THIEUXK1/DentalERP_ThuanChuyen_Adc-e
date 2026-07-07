@@ -1,5 +1,6 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { getRecentlyViewedMap } from './useRecentlyViewedPatients';
+import { matchesQuery } from '@/utils/text';
 
 const AVATAR_COLORS = [
     'bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-blue-500',
@@ -83,11 +84,12 @@ export function usePatientFilters() {
     const totalCount = computed(() => patients.value.length);
 
     const filteredPatients = computed(() => {
-        const q = search.value.trim().toLowerCase();
+        const q = search.value.trim();
         const list = patients.value.filter(p => {
-            if (q && !p.full_name.toLowerCase().includes(q)
-                  && !(p.phone ?? '').toLowerCase().includes(q)
-                  && !(p.code  ?? '').toLowerCase().includes(q)) return false;
+            if (q && !matchesQuery(p.full_name, q)
+                  && !matchesQuery(p.phone, q)
+                  && !(p.extra_phones ?? []).some(ph => matchesQuery(ph, q))
+                  && !matchesQuery(p.code, q)) return false;
             if (branchId.value !== '' && p.branch_id !== branchId.value) return false;
             if (source.value && p.source !== source.value) return false;
             return true;

@@ -37,6 +37,7 @@
                         <h2 class="text-xl font-bold text-gray-900">{{ patient.full_name }}</h2>
                         <p class="text-sm text-gray-500 mt-0.5">
                             {{ patient.phone }}
+                            <span v-if="patient.extra_phones?.length" class="text-xs text-gray-400">(+{{ patient.extra_phones.join(', ') }})</span>
                             <span v-if="patient.email" class="ml-2">· {{ patient.email }}</span>
                             <span v-if="patient.dob" class="ml-2">· {{ patient.dob }}</span>
                             <span v-if="genderLabel" class="ml-2">· {{ genderLabel }}</span>
@@ -45,7 +46,7 @@
                 </div>
 
                 <!-- Action button bar -->
-                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" @book-appointment="showBookAppointment = true" />
+                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" @book-appointment="showBookAppointment = true" @merge="showMergeModal = true" />
 
                 <!-- Financial summary bar -->
                 <FinancialSummaryBar
@@ -338,6 +339,10 @@
             :patient="patient" :branches="branches" :sources="sources"
             @close="showEditModal = false" />
 
+        <PatientMergeModal v-if="showMergeModal"
+            :patient="patient" :all-patients="allPatients"
+            @close="showMergeModal = false" />
+
         <AppointmentCreateModal v-if="showBookAppointment"
             :patient-id="patient.id" :default-branch-id="patient.branch_id"
             :branches="branches" :doctors="doctors" :chairs="chairs" :services="services"
@@ -363,6 +368,7 @@ import ConsentFormsTab from './components/ConsentFormsTab.vue';
 import RelationshipsSection from './components/RelationshipsSection.vue';
 import TreatmentTimeline from './components/TreatmentTimeline.vue';
 import PatientEditModal from './components/PatientEditModal.vue';
+import PatientMergeModal from './components/PatientMergeModal.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
 import { recordPatientView } from '@/composables/useRecentlyViewedPatients';
@@ -398,6 +404,7 @@ const props = defineProps({
 
 const activeTab           = ref('treatment');
 const showEditModal       = ref(false);
+const showMergeModal      = ref(false);
 const showBookAppointment = ref(false);
 
 const TAB_KEYS = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];

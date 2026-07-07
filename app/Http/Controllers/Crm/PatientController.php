@@ -68,19 +68,25 @@ class PatientController extends Controller
                 ->select('patient_id', DB::raw('MIN(scheduled_at) as next_at'))
                 ->pluck('next_at', 'patient_id');
 
+            $extraPhones = DB::table('patient_phones')
+                ->select('patient_id', DB::raw("string_agg(phone, ',') as phones"))
+                ->groupBy('patient_id')
+                ->pluck('phones', 'patient_id');
+
             $rows = DB::table('patients as p')
                 ->leftJoin('branches as b', 'b.id', '=', 'p.branch_id')
+                ->whereNull('p.deleted_at')
                 ->orderByDesc('p.id')
                 ->select(
                     'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.gender', 'p.source',
-                    'p.branch_id', 'p.is_active', 'p.address',
+                    'p.branch_id', 'p.is_active', 'p.address', 'p.dob',
                     DB::raw("to_char(p.created_at, 'DD/MM/YYYY') as created_at"),
                     DB::raw("to_char(p.created_at, 'YYYY-MM-DD') as created_at_raw"),
                     'b.name as branch_name',
                 )
                 ->get();
 
-            return $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments) {
+            return $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments, $extraPhones) {
                 $next = $nextAppointments[$p->id] ?? null;
 
                 return [
@@ -88,8 +94,10 @@ class PatientController extends Controller
                     'code'                    => $p->code,
                     'full_name'               => $p->full_name,
                     'phone'                   => $p->phone ?? '',
+                    'extra_phones'            => isset($extraPhones[$p->id]) ? explode(',', $extraPhones[$p->id]) : [],
                     'gender'                  => $p->gender,
                     'source'                  => $p->source,
+                    'dob_raw'                 => $p->dob,
                     'branch'                  => $p->branch_name,
                     'branch_id'               => $p->branch_id,
                     'is_active'               => $p->is_active,
@@ -216,6 +224,17 @@ class PatientController extends Controller
                 if ($phone !== '' && $byName->phone === $phone) {
                     $warnings['full_duplicate'] = $warnings['name_duplicate'];
                 }
+            }
+        }
+
+        if ($phone !== '' && ! $warnings['full_duplicate']) {
+            $secondaryHit = DB::table('patient_phones')
+                ->join('patients', 'patients.id', '=', 'patient_phones.patient_id')
+                ->where('patient_phones.phone', $phone)
+                ->select('patients.id', 'patients.code', 'patients.full_name as name', 'patients.phone')
+                ->first();
+            if ($secondaryHit) {
+                $warnings['full_duplicate'] = (array) $secondaryHit;
             }
         }
 
@@ -454,6 +473,7 @@ class PatientController extends Controller
                 'code'              => $patient->code,
                 'full_name'         => $patient->full_name,
                 'phone'             => $patient->phone,
+                'extra_phones'      => $patient->phones()->pluck('phone'),
                 'email'             => $patient->email,
                 'dob'               => $patient->dob?->format('d/m/Y'),
                 'dob_raw'           => $patient->dob?->format('Y-m-d'),
@@ -492,7 +512,9 @@ class PatientController extends Controller
             'contactTypes'      => collect(ContactType::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
             'attachmentTypes'   => collect(AttachmentType::cases())->map(fn ($t) => ['value' => $t->value, 'label' => $t->label()]),
             'relationshipTypes' => collect(RelationshipType::cases())->map(fn ($r) => ['value' => $r->value, 'label' => $r->label()]),
-            'allPatients'       => Patient::where('id', '!=', $patient->id)->where('is_active', true)->orderBy('full_name')->get()->map(fn ($p) => ['id' => $p->id, 'name' => $p->full_name, 'code' => $p->code, 'phone' => $p->phone]),
+            // Not filtered by is_active: this list also feeds the "merge duplicate" picker,
+            // where an inactive record is often exactly the kind of duplicate being merged away.
+            'allPatients'       => Patient::where('id', '!=', $patient->id)->orderBy('full_name')->get()->map(fn ($p) => ['id' => $p->id, 'name' => $p->full_name, 'code' => $p->code, 'phone' => $p->phone]),
             'branches'          => Branch::where('is_active', true)->orderBy('name')->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'sources'           => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
         ]);
@@ -559,6 +581,48 @@ class PatientController extends Controller
             'notes'             => $patient->notes,
             'is_active'         => $patient->is_active,
         ]);
+    }
+
+    public function mergePreview(Request $request, Patient $patient): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('patients.delete');
+
+        $data = $request->validate([
+            'loser_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('patients', 'id')->whereNull('deleted_at')],
+        ]);
+
+        if ((int) $data['loser_id'] === $patient->id) {
+            return response()->json(['error' => 'Không thể gộp một hồ sơ với chính nó.'], 422);
+        }
+
+        $loser = Patient::findOrFail($data['loser_id']);
+
+        try {
+            return response()->json(app(\App\Services\PatientMergeService::class)->preview($patient, $loser));
+        } catch (\RuntimeException $e) {
+            return response()->json(['error' => $e->getMessage()], 422);
+        }
+    }
+
+    public function merge(Request $request, Patient $patient): RedirectResponse
+    {
+        $this->authorize('patients.delete');
+
+        $data = $request->validate([
+            'loser_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('patients', 'id')->whereNull('deleted_at')],
+        ]);
+
+        if ((int) $data['loser_id'] === $patient->id) {
+            return back()->withErrors(['loser_id' => 'Không thể gộp một hồ sơ với chính nó.']);
+        }
+
+        try {
+            app(\App\Services\PatientMergeService::class)->merge($patient->id, (int) $data['loser_id']);
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['loser_id' => $e->getMessage()]);
+        }
+
+        return redirect()->route('patients.show', $patient)->with('success', 'Đã gộp hồ sơ thành công.');
     }
 
     public function update(Request $request, Patient $patient): RedirectResponse

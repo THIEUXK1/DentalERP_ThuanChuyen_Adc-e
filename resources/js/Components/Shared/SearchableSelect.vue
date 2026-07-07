@@ -74,6 +74,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
+import { matchesQuery } from '@/utils/text';
 
 const props = defineProps({
     modelValue:  { default: null },
@@ -96,11 +97,10 @@ const selectedOption = computed(() =>
 );
 
 const filtered = computed(() => {
-    const q = query.value.toLowerCase().trim();
+    const q = query.value.trim();
     if (!q) return props.options;
     return props.options.filter(o =>
-        o.label.toLowerCase().includes(q) ||
-        o.sublabel?.toLowerCase().includes(q)
+        matchesQuery(o.label, q) || matchesQuery(o.sublabel, q)
     );
 });
 

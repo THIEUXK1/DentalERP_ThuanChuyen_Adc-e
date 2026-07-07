@@ -101,6 +101,11 @@ class Patient extends Model
         return $this->hasMany(PatientRelationship::class)->with('relatedPatient');
     }
 
+    public function phones()
+    {
+        return $this->hasMany(PatientPhone::class)->orderByDesc('created_at');
+    }
+
     public function scopeByBranch(Builder $q, int $branchId): Builder
     {
         return $q->where('branch_id', $branchId);

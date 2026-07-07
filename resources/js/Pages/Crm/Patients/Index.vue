@@ -123,7 +123,7 @@
                                 <th class="px-4 py-3 text-left font-medium">Khách hàng</th>
                                 <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">SĐT</th>
                                 <th class="px-4 py-3 text-left font-medium hidden md:table-cell">Nguồn</th>
-                                <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Chi nhánh</th>
+                                <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Tuổi</th>
                                 <th class="px-4 py-3 text-left font-medium hidden xl:table-cell">Địa chỉ</th>
                                 <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Ngày tạo</th>
                                 <th class="px-4 py-3 text-left font-medium hidden xl:table-cell">
@@ -147,14 +147,23 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">{{ p.phone }}</td>
+                                <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">
+                                    {{ p.phone }}
+                                    <span v-if="p.extra_phones?.length" class="block text-xs text-gray-400">+{{ p.extra_phones.join(', ') }}</span>
+                                </td>
                                 <td class="px-4 py-3 hidden md:table-cell">
                                     <span v-if="p.source" :class="['text-xs px-2 py-0.5 rounded-full font-medium', sourceClass(p.source)]">
                                         {{ p.source }}
                                     </span>
                                     <span v-else class="text-gray-300">—</span>
                                 </td>
-                                <td class="px-4 py-3 text-gray-500 hidden lg:table-cell">{{ p.branch ?? '—' }}</td>
+                                <td class="px-4 py-3 hidden lg:table-cell">
+                                    <template v-if="calcAge(p.dob_raw) !== null">
+                                        <p class="font-semibold text-gray-800">{{ calcAge(p.dob_raw) }} tuổi</p>
+                                        <p class="text-xs text-gray-400">{{ birthYear(p.dob_raw) }}</p>
+                                    </template>
+                                    <span v-else class="text-gray-300">—</span>
+                                </td>
                                 <td class="px-4 py-3 text-gray-500 hidden xl:table-cell max-w-[220px] truncate" :title="p.address">{{ p.address || '—' }}</td>
                                 <td class="px-4 py-3 text-gray-400 text-xs hidden lg:table-cell">{{ p.created_at }}</td>
                                 <td class="px-4 py-3 hidden xl:table-cell">
@@ -210,11 +219,12 @@
                             </svg>
                             {{ p.phone }}
                         </div>
-                        <div v-if="p.branch" class="flex items-center gap-1.5">
-                            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        <div v-if="calcAge(p.dob_raw) !== null" class="flex items-center gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                             </svg>
-                            {{ p.branch }}
+                            <span class="font-semibold text-gray-700">{{ calcAge(p.dob_raw) }} tuổi</span>
+                            <span class="text-gray-400">· sinh {{ birthYear(p.dob_raw) }}</span>
                         </div>
                         <div v-if="p.address" class="flex items-start gap-1.5">
                             <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -274,7 +284,7 @@
 
         <PatientCreateModal v-if="showCreateModal"
             :branches="branches" :sources="sources"
-            @close="showCreateModal = false" />
+            @close="closeCreate" />
 
         <PatientEditModal v-if="editTarget"
             :patient="editTarget" :branches="branches" :sources="sources" :stay-on-page="true"
@@ -303,6 +313,27 @@ const {
     filteredPatients, totalPages, fromRecord, toRecord, paginatedPatients, pageNumbers,
     hasActiveFilters, clearFilters,
 } = usePatientFilters();
+
+function closeCreate() {
+    showCreateModal.value = false;
+    loadData();
+}
+
+function calcAge(dobRaw) {
+    if (!dobRaw) return null;
+    const dob = new Date(dobRaw);
+    const now = new Date();
+    let age = now.getFullYear() - dob.getFullYear();
+    const hadBirthdayThisYear = (now.getMonth() > dob.getMonth())
+        || (now.getMonth() === dob.getMonth() && now.getDate() >= dob.getDate());
+    if (!hadBirthdayThisYear) age--;
+    return age;
+}
+
+function birthYear(dobRaw) {
+    if (!dobRaw) return null;
+    return new Date(dobRaw).getFullYear();
+}
 
 // ── Inline edit (opens the edit form right on the list, no navigation) ──────
 const editTarget = ref(null);
