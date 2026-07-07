@@ -365,6 +365,7 @@ import TreatmentTimeline from './components/TreatmentTimeline.vue';
 import PatientEditModal from './components/PatientEditModal.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
+import { recordPatientView } from '@/composables/useRecentlyViewedPatients';
 
 const { hasPermission: can } = usePermission();
 const { formatVnd } = useCurrency();
@@ -406,6 +407,7 @@ onMounted(() => {
     if (hash && TAB_KEYS.includes(hash)) {
         activeTab.value = hash;
     }
+    recordPatientView(props.patient.id);
 });
 
 function setTab(key) {

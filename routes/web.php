@@ -149,6 +149,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('patients.check-duplicate')->middleware('can:patients.create');
     Route::get('patients/data', [PatientController::class, 'data'])
         ->name('patients.data')->middleware('can:patients.view');
+    Route::get('patients/{patient}/edit-json', [PatientController::class, 'editJson'])
+        ->name('patients.edit-json')->middleware('can:patients.edit');
     Route::resource('patients', PatientController::class)->middleware('can:patients.view');
     Route::post('patients/{patient}/avatar', [PatientController::class, 'uploadAvatar'])
         ->name('patients.upload-avatar')->middleware('can:patients.edit');

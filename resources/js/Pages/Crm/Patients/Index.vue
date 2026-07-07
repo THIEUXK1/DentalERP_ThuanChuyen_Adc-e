@@ -124,6 +124,7 @@
                                 <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">SĐT</th>
                                 <th class="px-4 py-3 text-left font-medium hidden md:table-cell">Nguồn</th>
                                 <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Chi nhánh</th>
+                                <th class="px-4 py-3 text-left font-medium hidden xl:table-cell">Địa chỉ</th>
                                 <th class="px-4 py-3 text-left font-medium hidden lg:table-cell">Ngày tạo</th>
                                 <th class="px-4 py-3 text-left font-medium hidden xl:table-cell">
                                     <span class="flex items-center gap-1">🗓 Lịch hẹn gần nhất</span>
@@ -154,6 +155,7 @@
                                     <span v-else class="text-gray-300">—</span>
                                 </td>
                                 <td class="px-4 py-3 text-gray-500 hidden lg:table-cell">{{ p.branch ?? '—' }}</td>
+                                <td class="px-4 py-3 text-gray-500 hidden xl:table-cell max-w-[220px] truncate" :title="p.address">{{ p.address || '—' }}</td>
                                 <td class="px-4 py-3 text-gray-400 text-xs hidden lg:table-cell">{{ p.created_at }}</td>
                                 <td class="px-4 py-3 hidden xl:table-cell">
                                     <span v-if="p.next_appointment_display"
@@ -172,10 +174,10 @@
                                             class="px-2.5 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium">
                                             Xem
                                         </Link>
-                                        <Link v-if="can('patients.edit')" :href="route('patients.edit', p.id)"
+                                        <button v-if="can('patients.edit')" @click="openEdit(p)"
                                             class="px-2.5 py-1 text-xs bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100">
                                             Sửa
-                                        </Link>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -213,6 +215,12 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                             </svg>
                             {{ p.branch }}
+                        </div>
+                        <div v-if="p.address" class="flex items-start gap-1.5">
+                            <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            <span class="line-clamp-1">{{ p.address }}</span>
                         </div>
                     </div>
                     <div v-if="p.next_appointment_display"
@@ -267,6 +275,10 @@
         <PatientCreateModal v-if="showCreateModal"
             :branches="branches" :sources="sources"
             @close="showCreateModal = false" />
+
+        <PatientEditModal v-if="editTarget"
+            :patient="editTarget" :branches="branches" :sources="sources" :stay-on-page="true"
+            @close="closeEdit" />
     </AppLayout>
 </template>
 
@@ -277,6 +289,7 @@ import AppLayout from '@/Components/Layout/AppLayout.vue';
 import { usePermission } from '@/composables/usePermission';
 import { usePatientFilters, PER_PAGE_OPTIONS, avatarColor, sourceClass } from '@/composables/usePatientFilters';
 import PatientCreateModal from './components/PatientCreateModal.vue';
+import PatientEditModal from './components/PatientEditModal.vue';
 
 const { hasPermission: can } = usePermission();
 defineProps({ branches: Array, sources: Array });
@@ -290,4 +303,17 @@ const {
     filteredPatients, totalPages, fromRecord, toRecord, paginatedPatients, pageNumbers,
     hasActiveFilters, clearFilters,
 } = usePatientFilters();
+
+// ── Inline edit (opens the edit form right on the list, no navigation) ──────
+const editTarget = ref(null);
+async function openEdit(p) {
+    const res = await fetch(route('patients.edit-json', p.id), {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    editTarget.value = await res.json();
+}
+function closeEdit() {
+    editTarget.value = null;
+    loadData();
+}
 </script>

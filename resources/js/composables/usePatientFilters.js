@@ -1,4 +1,5 @@
 import { ref, computed, watch, onMounted } from 'vue';
+import { getRecentlyViewedMap } from './useRecentlyViewedPatients';
 
 const AVATAR_COLORS = [
     'bg-indigo-500', 'bg-violet-500', 'bg-emerald-500', 'bg-blue-500',
@@ -44,6 +45,14 @@ export function usePatientFilters() {
     const loading   = ref(true);
     const loadError = ref(false);
 
+    // Read once per page load: which patients were recently opened, to bubble them to the top.
+    const recentlyViewed = getRecentlyViewedMap();
+    function recencyScore(p) {
+        const viewedAt  = recentlyViewed[p.id] ?? 0;
+        const createdAt = p.created_at_raw ? new Date(p.created_at_raw).getTime() : 0;
+        return Math.max(viewedAt, createdAt);
+    }
+
     async function loadData() {
         loading.value   = true;
         loadError.value = false;
@@ -86,6 +95,8 @@ export function usePatientFilters() {
 
         return [...list].sort((a, b) => {
             if (a.has_registration !== b.has_registration) return a.has_registration ? -1 : 1;
+            const diff = recencyScore(b) - recencyScore(a);
+            if (diff !== 0) return diff;
             return b.id - a.id;
         });
     });

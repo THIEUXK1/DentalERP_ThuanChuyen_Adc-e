@@ -46,54 +46,61 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
-        // Plain query-builder select instead of Eloquent + with()/withMin(): at 20k+ patients,
-        // per-row model hydration and Carbon parsing dominate the cost (see
-        // PatientInvoiceController::data() for the same fix applied to a bigger table).
-        $excludedStatuses = ['cancelled', 'no_show', 'completed', 'in_treatment'];
+        // Short-lived cache: this list has no per-request filters (all filtering/sorting
+        // happens client-side), so one shared cache entry serves every viewer. A few
+        // seconds of staleness is an acceptable trade for skipping the full scan + joins
+        // on repeated loads (tab switches, going back from a patient page, etc).
+        $patients = \Illuminate\Support\Facades\Cache::remember('patients.data.list', 20, function () {
+            // Plain query-builder select instead of Eloquent + with()/withMin(): at 20k+ patients,
+            // per-row model hydration and Carbon parsing dominate the cost (see
+            // PatientInvoiceController::data() for the same fix applied to a bigger table).
+            $excludedStatuses = ['cancelled', 'no_show', 'completed', 'in_treatment'];
 
-        $registeredPatientIds = DB::table('schedule_registrations')
-            ->whereIn('status', ['pending', 'in_treatment'])
-            ->pluck('patient_id')
-            ->flip();
+            $registeredPatientIds = DB::table('schedule_registrations')
+                ->whereIn('status', ['pending', 'in_treatment'])
+                ->pluck('patient_id')
+                ->flip();
 
-        $nextAppointments = DB::table('appointments')
-            ->whereNotIn('status', $excludedStatuses)
-            ->where('scheduled_at', '>=', now())
-            ->groupBy('patient_id')
-            ->select('patient_id', DB::raw('MIN(scheduled_at) as next_at'))
-            ->pluck('next_at', 'patient_id');
+            $nextAppointments = DB::table('appointments')
+                ->whereNotIn('status', $excludedStatuses)
+                ->where('scheduled_at', '>=', now())
+                ->groupBy('patient_id')
+                ->select('patient_id', DB::raw('MIN(scheduled_at) as next_at'))
+                ->pluck('next_at', 'patient_id');
 
-        $rows = DB::table('patients as p')
-            ->leftJoin('branches as b', 'b.id', '=', 'p.branch_id')
-            ->orderByDesc('p.id')
-            ->select(
-                'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.gender', 'p.source',
-                'p.branch_id', 'p.is_active',
-                DB::raw("to_char(p.created_at, 'DD/MM/YYYY') as created_at"),
-                DB::raw("to_char(p.created_at, 'YYYY-MM-DD') as created_at_raw"),
-                'b.name as branch_name',
-            )
-            ->get();
+            $rows = DB::table('patients as p')
+                ->leftJoin('branches as b', 'b.id', '=', 'p.branch_id')
+                ->orderByDesc('p.id')
+                ->select(
+                    'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.gender', 'p.source',
+                    'p.branch_id', 'p.is_active', 'p.address',
+                    DB::raw("to_char(p.created_at, 'DD/MM/YYYY') as created_at"),
+                    DB::raw("to_char(p.created_at, 'YYYY-MM-DD') as created_at_raw"),
+                    'b.name as branch_name',
+                )
+                ->get();
 
-        $patients = $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments) {
-            $next = $nextAppointments[$p->id] ?? null;
+            return $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments) {
+                $next = $nextAppointments[$p->id] ?? null;
 
-            return [
-                'id'                      => $p->id,
-                'code'                    => $p->code,
-                'full_name'               => $p->full_name,
-                'phone'                   => $p->phone ?? '',
-                'gender'                  => $p->gender,
-                'source'                  => $p->source,
-                'branch'                  => $p->branch_name,
-                'branch_id'               => $p->branch_id,
-                'is_active'               => $p->is_active,
-                'created_at'              => $p->created_at,
-                'created_at_raw'          => $p->created_at_raw,
-                'next_appointment_at'     => $next,
-                'next_appointment_display'=> $next ? \Carbon\Carbon::parse($next)->format('d/m H:i') : null,
-                'has_registration'        => isset($registeredPatientIds[$p->id]),
-            ];
+                return [
+                    'id'                      => $p->id,
+                    'code'                    => $p->code,
+                    'full_name'               => $p->full_name,
+                    'phone'                   => $p->phone ?? '',
+                    'gender'                  => $p->gender,
+                    'source'                  => $p->source,
+                    'branch'                  => $p->branch_name,
+                    'branch_id'               => $p->branch_id,
+                    'is_active'               => $p->is_active,
+                    'address'                 => $p->address,
+                    'created_at'              => $p->created_at,
+                    'created_at_raw'          => $p->created_at_raw,
+                    'next_appointment_at'     => $next,
+                    'next_appointment_display'=> $next ? \Carbon\Carbon::parse($next)->format('d/m H:i') : null,
+                    'has_registration'        => isset($registeredPatientIds[$p->id]),
+                ];
+            })->values();
         });
 
         return response()->json($patients);
@@ -222,6 +229,7 @@ class PatientController extends Controller
         $forceSave = (bool) $request->input('force_save', false);
         $data = $this->validated($request, null, $forceSave);
         Patient::create([...$data, 'code' => Patient::generateCode()]);
+        \Illuminate\Support\Facades\Cache::forget('patients.data.list');
 
         return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
     }
@@ -328,6 +336,7 @@ class PatientController extends Controller
         // ── Treatment history (plans + items) ───────────────────────────────
         $treatmentPlans = TreatmentPlan::where('patient_id', $patient->id)
             ->with(['doctor', 'items.service', 'invoices'])
+            ->orderByRaw('start_date ASC NULLS LAST')
             ->orderByDesc('created_at')
             ->get()
             ->map(function ($plan) {
@@ -528,6 +537,30 @@ class PatientController extends Controller
         return $this->form($patient);
     }
 
+    /** Same fields as edit(), but plain JSON — lets the list page open the edit form inline instead of navigating away. */
+    public function editJson(Patient $patient): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('patients.edit');
+
+        return response()->json([
+            'id'                => $patient->id,
+            'full_name'         => $patient->full_name,
+            'phone'             => $patient->phone,
+            'email'             => $patient->email,
+            'dob_raw'           => $patient->dob?->format('Y-m-d'),
+            'gender'            => $patient->gender,
+            'address'           => $patient->address,
+            'source'            => $patient->source,
+            'allergies'         => $patient->allergies,
+            'medical_history'   => $patient->medical_history,
+            'medical_flags'     => $patient->medical_flags ?? [],
+            'emergency_contact' => $patient->emergency_contact,
+            'branch_id'         => $patient->branch_id,
+            'notes'             => $patient->notes,
+            'is_active'         => $patient->is_active,
+        ]);
+    }
+
     public function update(Request $request, Patient $patient): RedirectResponse
     {
         $this->authorize('patients.edit');
@@ -535,6 +568,11 @@ class PatientController extends Controller
         $forceSave = (bool) $request->input('force_save', false);
         $data = $this->validated($request, $patient->id, $forceSave);
         $patient->update($data);
+        \Illuminate\Support\Facades\Cache::forget('patients.data.list');
+
+        if ($request->boolean('stay')) {
+            return back()->with('success', 'Đã cập nhật bệnh nhân.');
+        }
 
         return redirect()->route('patients.show', $patient)->with('success', 'Đã cập nhật bệnh nhân.');
     }
@@ -543,6 +581,7 @@ class PatientController extends Controller
     {
         $this->authorize('patients.delete');
         $patient->delete();
+        \Illuminate\Support\Facades\Cache::forget('patients.data.list');
 
         return redirect()->route('patients.index')->with('success', 'Đã xóa bệnh nhân.');
     }
@@ -592,7 +631,12 @@ class PatientController extends Controller
     {
         return $request->validate([
             'full_name'         => 'required|string|max:255',
-            'phone'             => ($forceSave ? 'nullable' : 'required').'|string|max:20',
+            // Same format rule on create and edit: a Vietnamese phone starts with 0.
+            // Without this, editing could strip the leading 0 and silently break search/lookup by phone.
+            'phone'             => [
+                $forceSave ? 'nullable' : 'required', 'string', 'max:20',
+                'regex:/^0\d{8,10}$/',
+            ],
             'email'             => 'nullable|email|max:255',
             'dob'               => 'nullable|date',
             'gender'            => 'nullable|in:male,female,other',

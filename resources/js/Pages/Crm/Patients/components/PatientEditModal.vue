@@ -27,8 +27,10 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-700 mb-1">Số điện thoại</label>
-                                <input v-model="form.phone" type="tel"
-                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
+                                <input v-model="form.phone" type="tel" placeholder="0912345678"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+                                    :class="{'border-red-400': form.errors.phone}" />
+                                <p v-if="form.errors.phone" class="mt-0.5 text-xs text-red-500">{{ form.errors.phone }}</p>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-700 mb-1">Email</label>
@@ -141,7 +143,12 @@
 <script setup>
 import { useForm } from '@inertiajs/vue3';
 
-const props = defineProps({ patient: Object, branches: Array, sources: Array });
+const props = defineProps({
+    patient: Object, branches: Array, sources: Array,
+    // When opened from a page that should stay put after saving (e.g. the patients list),
+    // ask the server to redirect back here instead of to the patient's show page.
+    stayOnPage: { type: Boolean, default: false },
+});
 const emit = defineEmits(['close']);
 
 const MEDICAL_FLAGS = [
@@ -172,6 +179,7 @@ const form = useForm({
     notes:             props.patient.notes ?? '',
     is_active:         props.patient.is_active ?? true,
     force_save:        true,
+    stay:              props.stayOnPage,
 });
 
 function toTitleCase(str) {
