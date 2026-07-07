@@ -151,6 +151,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('patients.data')->middleware('can:patients.view');
     Route::get('patients/{patient}/edit-json', [PatientController::class, 'editJson'])
         ->name('patients.edit-json')->middleware('can:patients.edit');
+    Route::get('patients/{patient}/data', [PatientController::class, 'showData'])
+        ->name('patients.show-data')->middleware('can:patients.view');
     Route::post('patients/{patient}/merge-preview', [PatientController::class, 'mergePreview'])
         ->name('patients.merge-preview')->middleware('can:patients.delete');
     Route::post('patients/{patient}/merge', [PatientController::class, 'merge'])

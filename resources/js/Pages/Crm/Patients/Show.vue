@@ -1,6 +1,21 @@
 <template>
-    <AppLayout :title="`KH: ${patient.full_name}`">
-        <div class="space-y-3">
+    <AppLayout :title="patient ? `KH: ${patient.full_name}` : 'Chi tiết bệnh nhân'">
+        <!-- ── Loading ────────────────────────────────────────────────── -->
+        <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+            <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
+            </svg>
+            <p class="text-sm">Đang tải hồ sơ...</p>
+        </div>
+
+        <!-- ── Error ──────────────────────────────────────────────────── -->
+        <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+            <p class="text-sm font-medium">Không thể tải dữ liệu</p>
+            <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
+        </div>
+
+        <div v-else class="space-y-3">
 
             <!-- ── Header ───────────────────────────────────────────────────── -->
             <div class="bg-white rounded-xl border border-gray-200 px-5 py-4 space-y-3">
@@ -351,7 +366,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineComponent, onMounted } from 'vue';
+import { ref, computed, defineComponent, onMounted, onUnmounted } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
@@ -372,35 +387,22 @@ import PatientMergeModal from './components/PatientMergeModal.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
 import { recordPatientView } from '@/composables/useRecentlyViewedPatients';
+import { usePatientDetail } from '@/composables/usePatientDetail';
 
 const { hasPermission: can } = usePermission();
 const { formatVnd } = useCurrency();
 
 const props = defineProps({
-    patient:            Object,
-    financial:          Object,
-    invoices:           { type: Array, default: () => [] },
-    treatmentPlans:     Array,
-    appointments:       Array,
-    pendingDeletions:   { type: Object, default: () => ({}) },
-    activities:         Array,
-    clinicalNotes:      Array,
-    toothConditions:    Array,
-    attachments:        Array,
-    consentForms:       Array,
-    relationships:      Array,
-    timeline:           Array,
-    doctors:            Array,
-    chairs:             { type: Array, default: () => [] },
-    services:           { type: Array, default: () => [] },
-    conditionTypes:     Array,
-    contactTypes:       Array,
-    attachmentTypes:    Array,
-    relationshipTypes:  Array,
-    allPatients:        Array,
-    branches:           Array,
-    sources:            Array,
+    patientId: { type: Number, required: true },
 });
+
+const {
+    loading, loadError, loadData,
+    patient, financial, invoices, treatmentPlans, appointments, pendingDeletions,
+    activities, clinicalNotes, toothConditions, attachments, consentForms,
+    relationships, timeline, doctors, chairs, services, conditionTypes,
+    contactTypes, attachmentTypes, relationshipTypes, allPatients, branches, sources,
+} = usePatientDetail(props.patientId);
 
 const activeTab           = ref('treatment');
 const showEditModal       = ref(false);
@@ -409,12 +411,24 @@ const showBookAppointment = ref(false);
 
 const TAB_KEYS = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
 
+let stopRouterListener = null;
 onMounted(() => {
     const hash = window.location.hash.replace('#', '');
     if (hash && TAB_KEYS.includes(hash)) {
         activeTab.value = hash;
     }
-    recordPatientView(props.patient.id);
+    recordPatientView(props.patientId);
+    loadData();
+    // Every child component (edit modal, treatment plan actions, appointment
+    // booking, clinical notes, attachments...) submits via Inertia's router
+    // and relies on the default "reload this page" behavior. Since this page's
+    // Inertia props are now just `patientId`, that reload no longer refreshes
+    // the JS-fetched data on its own — so re-fetch whenever any Inertia visit
+    // completes while this page is mounted.
+    stopRouterListener = router.on('success', () => loadData());
+});
+onUnmounted(() => {
+    stopRouterListener?.();
 });
 
 function setTab(key) {
@@ -423,21 +437,21 @@ function setTab(key) {
 }
 
 const showActivity = ref(false);
-const actForm      = useForm({ type: 'note', content: '', patient_id: props.patient.id });
+const actForm      = useForm({ type: 'note', content: '', patient_id: props.patientId });
 
 const tabs = computed(() => [
     { key: 'info',         label: 'Thông tin' },
-    { key: 'invoices',     label: 'Hóa đơn', count: props.invoices?.length ?? 0 },
-    { key: 'treatment',    label: 'Điều trị', count: props.treatmentPlans?.length ?? 0 },
-    { key: 'appointments', label: 'Lịch hẹn', count: props.appointments?.length ?? 0 },
+    { key: 'invoices',     label: 'Hóa đơn', count: invoices.value?.length ?? 0 },
+    { key: 'treatment',    label: 'Điều trị', count: treatmentPlans.value?.length ?? 0 },
+    { key: 'appointments', label: 'Lịch hẹn', count: appointments.value?.length ?? 0 },
     { key: 'chart',        label: 'Sơ đồ răng' },
-    { key: 'clinical',     label: 'Lâm sàng', count: props.clinicalNotes?.length ?? 0 },
-    { key: 'attachments',  label: 'Tài liệu', count: props.attachments?.length ?? 0 },
-    { key: 'consent',      label: 'Phiếu đồng ý', count: props.consentForms?.length ?? 0 },
+    { key: 'clinical',     label: 'Lâm sàng', count: clinicalNotes.value?.length ?? 0 },
+    { key: 'attachments',  label: 'Tài liệu', count: attachments.value?.length ?? 0 },
+    { key: 'consent',      label: 'Phiếu đồng ý', count: consentForms.value?.length ?? 0 },
     { key: 'timeline',     label: 'Timeline' },
 ]);
 
-const genderLabel = computed(() => ({ male: 'Nam', female: 'Nữ', other: 'Khác' }[props.patient.gender] ?? '—'));
+const genderLabel = computed(() => ({ male: 'Nam', female: 'Nữ', other: 'Khác' }[patient.value?.gender] ?? '—'));
 
 const MEDICAL_FLAGS = [
     { key: 'chay_mau_lau',   label: 'Chảy máu lâu' },
@@ -452,7 +466,7 @@ const MEDICAL_FLAGS = [
 ];
 
 const activeMedicalFlags = computed(() => {
-    const flags = props.patient.medical_flags ?? [];
+    const flags = patient.value?.medical_flags ?? [];
     return MEDICAL_FLAGS.filter(f => flags.includes(f.key));
 });
 
@@ -461,7 +475,7 @@ function uploadAvatar(e) {
     if (!file) return;
     const fd = new FormData();
     fd.append('photo', file);
-    router.post(route('patients.upload-avatar', props.patient.id), fd, { forceFormData: true });
+    router.post(route('patients.upload-avatar', props.patientId), fd, { forceFormData: true });
 }
 
 function submitActivity() {

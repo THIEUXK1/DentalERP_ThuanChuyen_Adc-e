@@ -257,6 +257,17 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
+        // Pure JS view: this page renders as an empty shell and fetches everything
+        // itself from showData() — see resources/js/composables/usePatientDetail.js.
+        return Inertia::render('Crm/Patients/Show', [
+            'patientId' => $patient->id,
+        ]);
+    }
+
+    public function showData(Patient $patient): \Illuminate\Http\JsonResponse
+    {
+        $this->authorize('patients.view');
+
         $activities = $patient->contactActivities()->with('creator')->take(20)->get()
             ->map(fn ($a) => [
                 'id'         => $a->id,
@@ -268,8 +279,8 @@ class PatientController extends Controller
                 'created_at' => $a->created_at->format('d/m/Y H:i'),
             ]);
 
-        $clinicalNotes = $patient->clinicalNotes()->with(['doctor', 'creator'])->take(30)->get()
-            ->map(fn ($n) => ClinicalNoteController::mapDto($n));
+        $clinicalNotesRaw = $patient->clinicalNotes()->with(['doctor', 'creator'])->take(30)->get();
+        $clinicalNotes = $clinicalNotesRaw->map(fn ($n) => ClinicalNoteController::mapDto($n));
 
         $toothConditions = $patient->toothConditions()->get()
             ->map(fn ($tc) => [
@@ -295,114 +306,114 @@ class PatientController extends Controller
         $conditionTypes = collect(ToothConditionType::cases())
             ->map(fn ($c) => ['value' => $c->value, 'label' => $c->label(), 'color' => $c->color()]);
 
-        // ── Financial summary ───────────────────────────────────────────────
-        $invoices = PatientInvoice::where('patient_id', $patient->id)
-            ->where('status', '!=', InvoiceStatus::Cancelled->value)
-            ->get();
-        $totalAmount = $invoices->sum('total');
-        $amountPaid  = $invoices->sum('amount_paid');
-        $amountDue   = max(0, $totalAmount - $amountPaid);
-
-        // ── Invoice list for tab ────────────────────────────────────────────
-        $patientInvoices = PatientInvoice::where('patient_id', $patient->id)
+        // ── Invoices (single query — used for both the financial summary and the tab list) ──
+        $allInvoices = PatientInvoice::where('patient_id', $patient->id)
             ->with(['treatmentPlan', 'payments' => fn ($q) => $q->where('amount', '>', 0)->orderByDesc('payment_date')])
             ->orderByRaw('due_date ASC NULLS LAST, id DESC')
-            ->get()
-            ->map(function ($inv) {
-                $lastPayment = $inv->payments->first();
-                return [
-                    'id'                => $inv->id,
-                    'code'              => $inv->code,
-                    'status'            => $inv->status->value,
-                    'status_label'      => $inv->status->label(),
-                    'status_color'      => $inv->status->color(),
-                    'total'             => $inv->total,
-                    'amount_paid'       => $inv->amount_paid,
-                    'amount_due'        => $inv->amountDue(),
-                    'due_date'          => $inv->due_date?->format('d/m/Y'),
-                    'due_date_raw'      => $inv->due_date?->toDateString(),
-                    'installment_index' => $inv->installment_index,
-                    'plan_id'           => $inv->treatment_plan_id,
-                    'plan_code'         => $inv->treatmentPlan?->code,
-                    'created_at'        => $inv->created_at->format('d/m/Y'),
-                    'last_payment_date' => $lastPayment?->payment_date?->format('d/m/Y'),
-                    'payment_count'     => $inv->payments->count(),
-                ];
-            });
+            ->get();
 
-        // ── Appointments ────────────────────────────────────────────────────
-        $appointments = Appointment::where('patient_id', $patient->id)
+        $billableInvoices = $allInvoices->where('status', '!=', InvoiceStatus::Cancelled->value);
+        $totalAmount = $billableInvoices->sum('total');
+        $amountPaid  = $billableInvoices->sum('amount_paid');
+        $amountDue   = max(0, $totalAmount - $amountPaid);
+
+        $patientInvoices = $allInvoices->map(function ($inv) {
+            $lastPayment = $inv->payments->first();
+            return [
+                'id'                => $inv->id,
+                'code'              => $inv->code,
+                'status'            => $inv->status->value,
+                'status_label'      => $inv->status->label(),
+                'status_color'      => $inv->status->color(),
+                'total'             => $inv->total,
+                'amount_paid'       => $inv->amount_paid,
+                'amount_due'        => $inv->amountDue(),
+                'due_date'          => $inv->due_date?->format('d/m/Y'),
+                'due_date_raw'      => $inv->due_date?->toDateString(),
+                'installment_index' => $inv->installment_index,
+                'plan_id'           => $inv->treatment_plan_id,
+                'plan_code'         => $inv->treatmentPlan?->code,
+                'created_at'        => $inv->created_at->format('d/m/Y'),
+                'last_payment_date' => $lastPayment?->payment_date?->format('d/m/Y'),
+                'payment_count'     => $inv->payments->count(),
+            ];
+        });
+
+        // ── Appointments (single query — used for the tab, the timeline, and pending-deletion ids) ──
+        $appointmentsRaw = Appointment::where('patient_id', $patient->id)
             ->with(['doctor', 'service'])
             ->withExists('registration')
             ->orderByDesc('scheduled_at')
-            ->get()
-            ->map(fn ($a) => [
-                'id'               => $a->id,
-                'code'             => $a->code,
-                'scheduled_at'     => $a->scheduled_at->format('d/m/Y H:i'),
-                'scheduled_date'   => $a->scheduled_at->format('d/m/Y'),
-                'scheduled_time'   => $a->scheduled_at->format('H:i'),
-                'duration_minutes' => $a->duration_minutes,
-                'doctor'           => $a->doctor?->full_name ?? '—',
-                'service'          => $a->service?->name ?? '—',
-                'status'           => $a->status->value,
-                'status_label'     => $a->status->label(),
-                'status_color'     => $a->status->color(),
-                'notes'            => $a->notes,
-                'has_registration' => (bool) $a->registration_exists,
-            ]);
+            ->get();
+
+        $appointments = $appointmentsRaw->map(fn ($a) => [
+            'id'               => $a->id,
+            'code'             => $a->code,
+            'scheduled_at'     => $a->scheduled_at->format('d/m/Y H:i'),
+            'scheduled_date'   => $a->scheduled_at->format('d/m/Y'),
+            'scheduled_time'   => $a->scheduled_at->format('H:i'),
+            'duration_minutes' => $a->duration_minutes,
+            'doctor'           => $a->doctor?->full_name ?? '—',
+            'service'          => $a->service?->name ?? '—',
+            'status'           => $a->status->value,
+            'status_label'     => $a->status->label(),
+            'status_color'     => $a->status->color(),
+            'notes'            => $a->notes,
+            'has_registration' => (bool) $a->registration_exists,
+        ]);
 
         // ── Treatment history (plans + items) ───────────────────────────────
-        $treatmentPlans = TreatmentPlan::where('patient_id', $patient->id)
+        $treatmentPlansRaw = TreatmentPlan::where('patient_id', $patient->id)
             ->with(['doctor', 'items.service', 'invoices'])
             ->orderByRaw('start_date ASC NULLS LAST')
             ->orderByDesc('created_at')
-            ->get()
-            ->map(function ($plan) {
-                $paid = $plan->invoices->sum('amount_paid');
-                $due  = max(0, ($plan->total_amount - $plan->discount_amount) - $paid);
-                return [
-                    'id'                 => $plan->id,
-                    'code'               => $plan->code,
-                    'status'             => $plan->status->value,
-                    'status_label'       => $plan->status->label(),
-                    'doctor'             => $plan->doctor?->full_name,
-                    'total_amount'       => $plan->total_amount - $plan->discount_amount,
-                    'amount_paid'        => $paid,
-                    'amount_due'         => $due,
-                    'created_at'         => $plan->created_at->format('d/m/Y H:i'),
-                    'diagnosis'          => $plan->diagnosis,
-                    'chief_complaint'    => $plan->chief_complaint,
-                    'treatment_goal'     => $plan->treatment_goal,
-                    'priority'           => $plan->priority,
-                    'start_date'         => $plan->start_date?->format('d/m/Y'),
-                    'start_date_raw'     => $plan->start_date?->format('Y-m-d'),
-                    'expected_end_date'  => $plan->expected_end_date?->format('d/m/Y'),
-                    'estimated_sessions' => $plan->estimated_sessions,
-                    'frequency'          => $plan->frequency,
-                    'notes'              => $plan->notes,
-                    'transitions'        => collect($plan->status->allowedTransitions())->map(fn ($s) => [
-                        'value' => $s->value,
-                    ])->values()->all(),
-                    'items'              => $plan->items->map(fn ($item) => [
-                        'id'           => $item->id,
-                        'name'         => $item->name,
-                        'tooth_number' => $item->tooth_number,
-                        'unit_price'   => $item->unit_price,
-                        'quantity'     => $item->quantity,
-                        'subtotal'     => $item->subtotal,
-                        'status'       => $item->status,
-                        'status_label' => match($item->status) {
-                            'pending'     => 'Chờ',
-                            'in_progress' => 'Đang làm',
-                            'completed'   => 'Hoàn thành',
-                            'cancelled'   => 'Hủy',
-                            default       => $item->status,
-                        },
-                        'notes'  => $item->notes,
-                    ])->values()->all(),
-                ];
-            });
+            ->get();
+
+        $treatmentPlans = $treatmentPlansRaw->map(function ($plan) {
+            $paid = $plan->invoices->sum('amount_paid');
+            $due  = max(0, ($plan->total_amount - $plan->discount_amount) - $paid);
+            return [
+                'id'                 => $plan->id,
+                'code'               => $plan->code,
+                'status'             => $plan->status->value,
+                'status_label'       => $plan->status->label(),
+                'doctor'             => $plan->doctor?->full_name,
+                'total_amount'       => $plan->total_amount - $plan->discount_amount,
+                'amount_paid'        => $paid,
+                'amount_due'         => $due,
+                'created_at'         => $plan->created_at->format('d/m/Y H:i'),
+                'diagnosis'          => $plan->diagnosis,
+                'chief_complaint'    => $plan->chief_complaint,
+                'treatment_goal'     => $plan->treatment_goal,
+                'priority'           => $plan->priority,
+                'start_date'         => $plan->start_date?->format('d/m/Y'),
+                'start_date_raw'     => $plan->start_date?->format('Y-m-d'),
+                'expected_end_date'  => $plan->expected_end_date?->format('d/m/Y'),
+                'estimated_sessions' => $plan->estimated_sessions,
+                'frequency'          => $plan->frequency,
+                'notes'              => $plan->notes,
+                'transitions'        => collect($plan->status->allowedTransitions())->map(fn ($s) => [
+                    'value' => $s->value,
+                ])->values()->all(),
+                'items'              => $plan->items->map(fn ($item) => [
+                    'id'           => $item->id,
+                    'name'         => $item->name,
+                    'tooth_number' => $item->tooth_number,
+                    'unit_price'   => $item->unit_price,
+                    'quantity'     => $item->quantity,
+                    'subtotal'     => $item->subtotal,
+                    'status'       => $item->status,
+                    'status_label' => match($item->status) {
+                        'pending'     => 'Chờ',
+                        'in_progress' => 'Đang làm',
+                        'completed'   => 'Hoàn thành',
+                        'cancelled'   => 'Hủy',
+                        default       => $item->status,
+                    },
+                    'notes'  => $item->notes,
+                ])->values()->all(),
+            ];
+        });
 
         // ── Phase M: Attachments ─────────────────────────────────────────────
         $attachments = $patient->attachments()->get()->map(fn ($a) => [
@@ -445,14 +456,14 @@ class PatientController extends Controller
             'notes'               => $r->notes,
         ]);
 
-        // ── Phase M: Treatment Timeline ──────────────────────────────────────
+        // ── Phase M: Treatment Timeline (reuses $appointmentsRaw / $clinicalNotesRaw above) ──
         $timeline = collect();
 
-        Appointment::where('patient_id', $patient->id)->get()->each(function ($a) use (&$timeline) {
+        $appointmentsRaw->each(function ($a) use (&$timeline) {
             $timeline->push(['date' => $a->scheduled_at->format('Y-m-d H:i'), 'type' => 'appointment', 'label' => 'Lịch hẹn', 'detail' => $a->code, 'status' => $a->status->value]);
         });
 
-        $patient->clinicalNotes()->get()->each(function ($n) use (&$timeline) {
+        $clinicalNotesRaw->each(function ($n) use (&$timeline) {
             $timeline->push(['date' => $n->created_at->format('Y-m-d H:i'), 'type' => 'clinical_note', 'label' => 'Ghi chú lâm sàng', 'detail' => $n->chief_complaint ?? '']);
         });
 
@@ -467,7 +478,7 @@ class PatientController extends Controller
 
         $timeline = $timeline->sortByDesc('date')->values()->toArray();
 
-        return Inertia::render('Crm/Patients/Show', [
+        return response()->json([
             'patient' => [
                 'id'                => $patient->id,
                 'code'              => $patient->code,
@@ -494,10 +505,10 @@ class PatientController extends Controller
                 'amount_paid'  => $amountPaid,
                 'amount_due'   => $amountDue,
             ],
-            'invoices'          => $patientInvoices,
-            'treatmentPlans'    => $treatmentPlans,
-            'appointments'      => $appointments,
-            'pendingDeletions'  => $this->pendingDeletionsMap($patient),
+            'invoices'          => $patientInvoices->values(),
+            'treatmentPlans'    => $treatmentPlans->values(),
+            'appointments'      => $appointments->values(),
+            'pendingDeletions'  => $this->pendingDeletionsMap($appointmentsRaw->pluck('id'), $treatmentPlansRaw->pluck('id')),
             'activities'        => $activities,
             'clinicalNotes'     => $clinicalNotes,
             'toothConditions'   => $toothConditions,
@@ -520,11 +531,8 @@ class PatientController extends Controller
         ]);
     }
 
-    private function pendingDeletionsMap(Patient $patient): array
+    private function pendingDeletionsMap($apptIds, $planIds): array
     {
-        $apptIds = Appointment::where('patient_id', $patient->id)->pluck('id');
-        $planIds = TreatmentPlan::where('patient_id', $patient->id)->pluck('id');
-
         $rows = PendingDeletion::query()
             ->whereNull('cancelled_at')
             ->whereNull('executed_at')
