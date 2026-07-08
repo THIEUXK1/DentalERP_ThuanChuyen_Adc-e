@@ -22,7 +22,11 @@ class DebtController extends Controller
 
         $query = PatientDebt::with(['patient', 'invoice'])
             ->whereIn('status', ['pending', 'partial'])
-            ->when($request->patient_search, fn ($q, $v) => $q->whereHas('patient', fn ($pq) => $pq->where('full_name', 'ilike', "%{$v}%")->orWhere('phone', 'ilike', "%{$v}%")))
+            ->when($request->patient_search, function ($q, $v) {
+                // ILIKE is Postgres-only; SQLite/MySQL use case-insensitive LIKE instead.
+                $op = \Illuminate\Support\Facades\DB::getDriverName() === 'sqlite' ? 'like' : 'ilike';
+                $q->whereHas('patient', fn ($pq) => $pq->where('full_name', $op, "%{$v}%")->orWhere('phone', $op, "%{$v}%"));
+            })
             ->when($request->branch_id, fn ($q, $v) => $q->whereHas('invoice', fn ($iq) => $iq->where('branch_id', $v)))
             ->orderByDesc('remaining');
 

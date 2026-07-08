@@ -63,17 +63,14 @@ class TreatmentPlanController extends Controller
                   ->where('tp.created_at', '<', ($year + 1) . '-01-01 00:00:00');
             })
             ->orderByDesc('tp.id')
-            ->select(
+            ->select(array_merge([
                 'tp.id', 'tp.code', 'tp.patient_id', 'tp.doctor_id', 'tp.branch_id',
                 'tp.status', 'tp.total_amount', 'tp.discount_amount', 'tp.payment_schedule', 'tp.notes',
-                \DB::raw("to_char(tp.start_date, 'DD/MM/YYYY') as start_date"),
-                \DB::raw("to_char(tp.start_date, 'YYYY-MM-DD') as start_date_raw"),
-                \DB::raw("to_char(tp.created_at, 'DD/MM/YYYY') as created_at"),
-                \DB::raw("to_char(tp.created_at, 'YYYY-MM-DD') as created_at_raw"),
+            ], $this->dateColumns(), [
                 'p.full_name as patient_name',
                 'd.full_name as doctor_name',
                 'b.name as branch_name',
-            )
+            ]))
             ->get();
 
         $plans = $rows->map(function ($p) use ($issueIds) {
@@ -106,6 +103,26 @@ class TreatmentPlanController extends Controller
         });
 
         return response()->json($plans);
+    }
+
+    /** Driver-portable date formatting for the raw select() above (Postgres to_char vs SQLite strftime). */
+    private function dateColumns(): array
+    {
+        if (\DB::getDriverName() === 'sqlite') {
+            return [
+                \DB::raw("strftime('%d/%m/%Y', tp.start_date) as start_date"),
+                \DB::raw("strftime('%Y-%m-%d', tp.start_date) as start_date_raw"),
+                \DB::raw("strftime('%d/%m/%Y', tp.created_at) as created_at"),
+                \DB::raw("strftime('%Y-%m-%d', tp.created_at) as created_at_raw"),
+            ];
+        }
+
+        return [
+            \DB::raw("to_char(tp.start_date, 'DD/MM/YYYY') as start_date"),
+            \DB::raw("to_char(tp.start_date, 'YYYY-MM-DD') as start_date_raw"),
+            \DB::raw("to_char(tp.created_at, 'DD/MM/YYYY') as created_at"),
+            \DB::raw("to_char(tp.created_at, 'YYYY-MM-DD') as created_at_raw"),
+        ];
     }
 
     public function create(Request $request): \Inertia\Response

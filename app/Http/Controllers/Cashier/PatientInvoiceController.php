@@ -55,18 +55,16 @@ class PatientInvoiceController extends Controller
                 $q->where('pi.created_at', '>=', "{$year}-01-01 00:00:00")
                   ->where('pi.created_at', '<', ($year + 1) . '-01-01 00:00:00');
             })
-            ->orderByRaw('pi.due_date ASC NULLS LAST, pi.id DESC')
-            ->select(
+            // Portable "NULLS LAST": works unchanged on Postgres, MySQL and SQLite.
+            ->orderByRaw('(pi.due_date IS NULL) ASC, pi.due_date ASC, pi.id DESC')
+            ->select(array_merge([
                 'pi.id', 'pi.code', 'pi.patient_id', 'pi.branch_id', 'pi.treatment_plan_id',
                 'pi.status', 'pi.total', 'pi.amount_paid', 'pi.installment_index',
-                DB::raw("to_char(pi.due_date, 'DD/MM/YYYY') as due_date"),
-                DB::raw("to_char(pi.due_date, 'YYYY-MM-DD') as due_date_raw"),
-                DB::raw("to_char(pi.created_at, 'DD/MM/YYYY') as created_at"),
-                DB::raw("to_char(pi.created_at, 'YYYY-MM-DD') as created_at_raw"),
+            ], $this->dateColumns(), [
                 'p.full_name as patient_name', 'p.phone as patient_phone',
                 'b.name as branch_name',
                 'tp.code as plan_code', 'tp.payment_schedule as plan_payment_schedule',
-            )
+            ]))
             ->get();
 
         $invoices = $rows->map(function ($inv) {
@@ -103,6 +101,26 @@ class PatientInvoiceController extends Controller
         });
 
         return response()->json($invoices);
+    }
+
+    /** Driver-portable date formatting for the raw select() above (Postgres to_char vs SQLite strftime). */
+    private function dateColumns(): array
+    {
+        if (DB::getDriverName() === 'sqlite') {
+            return [
+                DB::raw("strftime('%d/%m/%Y', pi.due_date) as due_date"),
+                DB::raw("strftime('%Y-%m-%d', pi.due_date) as due_date_raw"),
+                DB::raw("strftime('%d/%m/%Y', pi.created_at) as created_at"),
+                DB::raw("strftime('%Y-%m-%d', pi.created_at) as created_at_raw"),
+            ];
+        }
+
+        return [
+            DB::raw("to_char(pi.due_date, 'DD/MM/YYYY') as due_date"),
+            DB::raw("to_char(pi.due_date, 'YYYY-MM-DD') as due_date_raw"),
+            DB::raw("to_char(pi.created_at, 'DD/MM/YYYY') as created_at"),
+            DB::raw("to_char(pi.created_at, 'YYYY-MM-DD') as created_at_raw"),
+        ];
     }
 
     public function show(PatientInvoice $invoice): \Inertia\Response

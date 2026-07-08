@@ -68,8 +68,12 @@ class PatientController extends Controller
                 ->select('patient_id', DB::raw('MIN(scheduled_at) as next_at'))
                 ->pluck('next_at', 'patient_id');
 
+            $isSqlite = DB::getDriverName() === 'sqlite';
+
             $extraPhones = DB::table('patient_phones')
-                ->select('patient_id', DB::raw("string_agg(phone, ',') as phones"))
+                ->select('patient_id', DB::raw($isSqlite
+                    ? "group_concat(phone, ',') as phones"
+                    : "string_agg(phone, ',') as phones"))
                 ->groupBy('patient_id')
                 ->pluck('phones', 'patient_id');
 
@@ -80,8 +84,12 @@ class PatientController extends Controller
                 ->select(
                     'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.gender', 'p.source',
                     'p.branch_id', 'p.is_active', 'p.address', 'p.dob',
-                    DB::raw("to_char(p.created_at, 'DD/MM/YYYY') as created_at"),
-                    DB::raw("to_char(p.created_at, 'YYYY-MM-DD') as created_at_raw"),
+                    DB::raw($isSqlite
+                        ? "strftime('%d/%m/%Y', p.created_at) as created_at"
+                        : "to_char(p.created_at, 'DD/MM/YYYY') as created_at"),
+                    DB::raw($isSqlite
+                        ? "strftime('%Y-%m-%d', p.created_at) as created_at_raw"
+                        : "to_char(p.created_at, 'YYYY-MM-DD') as created_at_raw"),
                     'b.name as branch_name',
                 )
                 ->get();
@@ -309,7 +317,8 @@ class PatientController extends Controller
         // ── Invoices (single query — used for both the financial summary and the tab list) ──
         $allInvoices = PatientInvoice::where('patient_id', $patient->id)
             ->with(['treatmentPlan', 'payments' => fn ($q) => $q->where('amount', '>', 0)->orderByDesc('payment_date')])
-            ->orderByRaw('due_date ASC NULLS LAST, id DESC')
+            // Portable "NULLS LAST": works unchanged on Postgres, MySQL and SQLite.
+            ->orderByRaw('(due_date IS NULL) ASC, due_date ASC, id DESC')
             ->get();
 
         $billableInvoices = $allInvoices->where('status', '!=', InvoiceStatus::Cancelled->value);
@@ -365,7 +374,8 @@ class PatientController extends Controller
         // ── Treatment history (plans + items) ───────────────────────────────
         $treatmentPlansRaw = TreatmentPlan::where('patient_id', $patient->id)
             ->with(['doctor', 'items.service', 'invoices'])
-            ->orderByRaw('start_date ASC NULLS LAST')
+            // Portable "NULLS LAST": works unchanged on Postgres, MySQL and SQLite.
+            ->orderByRaw('(start_date IS NULL) ASC, start_date ASC')
             ->orderByDesc('created_at')
             ->get();
 

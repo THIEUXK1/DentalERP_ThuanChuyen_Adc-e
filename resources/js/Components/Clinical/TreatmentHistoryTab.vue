@@ -112,7 +112,7 @@
                         <div @click.stop>
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ngày điều trị</p>
                             <div v-if="!dateEditOpen[plan.id]" class="flex items-center gap-1.5 mt-0.5">
-                                <span class="text-gray-800 font-medium">{{ dateEdits[plan.id] || '—' }}</span>
+                                <span class="text-gray-800 font-medium">{{ formatDisplayDate(dateEdits[plan.id]) || '—' }}</span>
                                 <button @click="dateEditOpen[plan.id] = true" class="text-gray-400 hover:text-indigo-600 transition-colors" title="Sửa ngày điều trị">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
@@ -291,6 +291,13 @@ const dateEdits = reactive(
 const dateEditOpen = reactive(
     Object.fromEntries(props.treatmentPlans.map(p => [p.id, false]))
 );
+
+function formatDisplayDate(raw) {
+    if (!raw) return '';
+    const [y, m, d] = raw.split('-');
+    if (!y || !m || !d) return raw;
+    return `${d}/${m}/${y}`;
+}
 
 function saveDate(planId) {
     router.put(route('clinical.treatment-plans.update', planId), {

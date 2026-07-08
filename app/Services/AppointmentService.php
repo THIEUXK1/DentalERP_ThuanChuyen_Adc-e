@@ -25,7 +25,7 @@ class AppointmentService
                 ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
                 ->where(fn ($q) => $q
                     ->where(fn ($q2) => $q2->where('scheduled_at', '<', $end)
-                        ->whereRaw("scheduled_at + interval '1 minute' * duration_minutes > ?", [$start])))
+                        ->whereRaw($this->rowEndAfterExpr(), [$start])))
                 ->exists();
 
             if ($conflict) {
@@ -40,13 +40,21 @@ class AppointmentService
                 ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
                 ->where(fn ($q) => $q
                     ->where(fn ($q2) => $q2->where('scheduled_at', '<', $end)
-                        ->whereRaw("scheduled_at + interval '1 minute' * duration_minutes > ?", [$start])))
+                        ->whereRaw($this->rowEndAfterExpr(), [$start])))
                 ->exists();
 
             if ($conflict) {
                 throw new \RuntimeException('Ghế nha đã được đặt trong khung giờ này.');
             }
         }
+    }
+
+    /** Portable "row's end time (scheduled_at + duration_minutes) is after ?" — Postgres interval vs SQLite datetime(). */
+    private function rowEndAfterExpr(): string
+    {
+        return DB::getDriverName() === 'sqlite'
+            ? "datetime(scheduled_at, '+' || duration_minutes || ' minutes') > ?"
+            : "scheduled_at + interval '1 minute' * duration_minutes > ?";
     }
 
     public function book(array $data): Appointment
