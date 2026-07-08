@@ -122,7 +122,7 @@
             </div>
 
             <!-- Today's schedule + Lead funnel -->
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="grid grid-cols-1 gap-4" :class="leadFunnel.length > 0 ? 'lg:grid-cols-2' : ''">
 
                 <!-- Today's schedule -->
                 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -160,19 +160,14 @@
                     </ul>
                 </div>
 
-                <!-- Lead funnel -->
-                <div>
-                    <ChartCard v-if="leadFunnel.length > 0"
-                        title="Pipeline Lead (30 ngày)"
-                        type="bar"
-                        :data="leadChartData"
-                        :height="240"
-                        :options="leadChartOptions"
-                    />
-                    <div v-else class="bg-white rounded-xl border border-gray-200 h-[300px] flex items-center justify-center text-gray-400 text-sm">
-                        Chưa có dữ liệu lead
-                    </div>
-                </div>
+                <!-- Lead funnel (only takes a column here when it has data; otherwise shown lower down) -->
+                <ChartCard v-if="leadFunnel.length > 0"
+                    title="Pipeline Lead (30 ngày)"
+                    type="bar"
+                    :data="leadChartData"
+                    :height="240"
+                    :options="leadChartOptions"
+                />
             </div>
 
             <!-- Lịch sử thanh toán — đối chiếu trực tiếp với "Doanh thu hôm nay" -->
@@ -299,6 +294,11 @@
                         Chưa có dữ liệu
                     </div>
                 </div>
+            </div>
+
+            <!-- Lead funnel empty state — pushed down here so it doesn't crowd the top of the page when there's no data -->
+            <div v-if="leadFunnel.length === 0" class="bg-white rounded-xl border border-gray-200 h-[160px] flex items-center justify-center text-gray-400 text-sm">
+                Chưa có dữ liệu lead
             </div>
 
             <!-- Quick actions -->
