@@ -65,7 +65,13 @@ class ClinicRecordController extends Controller
                 });
             })
             ->when($request->record_type, fn ($q, $v) => $q->where('record_type', $v))
-            ->when($request->year, fn ($q, $v) => $q->whereYear('record_date', $v))
+            ->when($request->year, function ($q, $v) {
+                if ($v === 'unknown') {
+                    $q->whereDate('record_date', '>', now()->toDateString());
+                } else {
+                    $q->whereYear('record_date', $v);
+                }
+            })
             ->when($request->date_from, fn ($q, $v) => $q->whereDate('record_date', '>=', $v))
             ->when($request->date_to, fn ($q, $v) => $q->whereDate('record_date', '<=', $v))
             ->orderByDesc('record_date')
@@ -85,6 +91,7 @@ class ClinicRecordController extends Controller
                 ->pluck('y')
                 ->map(fn ($y) => (int) $y)
                 ->values(),
+            'unknown_year_count' => ClinicRecord::whereDate('record_date', '>', now()->toDateString())->count(),
             'total_all'    => ClinicRecord::count(),
         ]);
     }
@@ -104,7 +111,13 @@ class ClinicRecordController extends Controller
                     });
                 })
                 ->when($request->record_type, fn ($q, $v) => $q->where('record_type', $v))
-                ->when($request->year, fn ($q, $v) => $q->whereYear('record_date', $v))
+                ->when($request->year, function ($q, $v) {
+                    if ($v === 'unknown') {
+                        $q->whereDate('record_date', '>', now()->toDateString());
+                    } else {
+                        $q->whereYear('record_date', $v);
+                    }
+                })
                 ->when($request->date_from, fn ($q, $v) => $q->whereDate('record_date', '>=', $v))
                 ->when($request->date_to, fn ($q, $v) => $q->whereDate('record_date', '<=', $v));
 

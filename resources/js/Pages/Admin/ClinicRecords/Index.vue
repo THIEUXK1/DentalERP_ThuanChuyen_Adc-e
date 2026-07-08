@@ -83,6 +83,7 @@
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         @change="applyFilters">
                         <option value="">Tất cả năm</option>
+                        <option value="unknown">⚠ Ngày không xác định ({{ unknown_year_count }})</option>
                         <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                     </select>
                     <input v-model="form.date_from" type="date"
@@ -451,6 +452,7 @@ const props = defineProps({
     filters: Object,
     record_types: Array,
     years: Array,
+    unknown_year_count: Number,
     total_all: Number,
 });
 
