@@ -123,11 +123,17 @@
                 <!-- Row 2: date range + presets + quick filters -->
                 <div class="flex flex-wrap items-center gap-3">
                     <span class="text-xs text-gray-500 font-medium">Ngày điều trị:</span>
-                    <input v-model="dateFrom" type="date"
-                        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
+                    <div class="flex items-center gap-1">
+                        <input v-model="dateFrom" type="date"
+                            class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
+                        <span v-if="dateFrom" class="text-[11px] text-gray-400 whitespace-nowrap">({{ formatDmy(dateFrom) }})</span>
+                    </div>
                     <span class="text-gray-400 text-xs">→</span>
-                    <input v-model="dateTo" type="date"
-                        class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
+                    <div class="flex items-center gap-1">
+                        <input v-model="dateTo" type="date"
+                            class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
+                        <span v-if="dateTo" class="text-[11px] text-gray-400 whitespace-nowrap">({{ formatDmy(dateTo) }})</span>
+                    </div>
 
                     <div class="flex gap-1 flex-wrap">
                         <button v-for="p in datePresets" :key="p.label"
@@ -430,24 +436,39 @@ watch([search, filterStatus, filterBranch, filterDoctor, dateFrom, dateTo, filte
     () => { page.value = 1; });
 
 // ── Date presets ─────────────────────────────────────────────────────────────
-const today = new Date().toISOString().split('T')[0];
+// Use local calendar date (not toISOString, which converts to UTC and can land
+// on the wrong day for users in UTC+7 between 00:00-07:00 local time).
+function formatDmy(isoDate) {
+    const [y, m, d] = isoDate.split('-');
+    if (!y || !m || !d) return isoDate;
+    return `${d}/${m}/${y}`;
+}
+
+function toLocalIso(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+const today = toLocalIso(new Date());
 
 const datePresets = [
     { label: 'Hôm nay', from: today, to: today },
     {
         label: 'Tuần này',
-        from: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return d.toISOString().split('T')[0]; })(),
-        to:   (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return d.toISOString().split('T')[0]; })(),
+        from: (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 1); return toLocalIso(d); })(),
+        to:   (() => { const d = new Date(); d.setDate(d.getDate() - d.getDay() + 7); return toLocalIso(d); })(),
     },
     {
         label: 'Tháng này',
-        from: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-        to:   new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().split('T')[0],
+        from: toLocalIso(new Date(new Date().getFullYear(), new Date().getMonth(), 1)),
+        to:   toLocalIso(new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0)),
     },
     {
         label: 'Tháng trước',
-        from: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1).toISOString().split('T')[0],
-        to:   new Date(new Date().getFullYear(), new Date().getMonth(), 0).toISOString().split('T')[0],
+        from: toLocalIso(new Date(new Date().getFullYear(), new Date().getMonth() - 1, 1)),
+        to:   toLocalIso(new Date(new Date().getFullYear(), new Date().getMonth(), 0)),
     },
 ];
 

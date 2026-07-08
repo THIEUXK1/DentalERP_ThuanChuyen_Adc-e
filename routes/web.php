@@ -41,6 +41,7 @@ use App\Http\Controllers\Core\DepartmentController;
 use App\Http\Controllers\Core\FundAccountController;
 use App\Http\Controllers\Crm\ConsentFormController;
 use App\Http\Controllers\Crm\PatientAttachmentController;
+use App\Http\Controllers\Crm\PatientPhoneController;
 use App\Http\Controllers\Crm\PatientRelationshipController;
 use App\Http\Controllers\Hr\EmployeeContractController;
 use App\Http\Controllers\Hr\KpiController;
@@ -200,6 +201,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('patient-relationships.store')->middleware('can:patients.edit');
     Route::delete('patient-relationships/{relationship}', [PatientRelationshipController::class, 'destroy'])
         ->name('patient-relationships.destroy')->middleware('can:patients.edit');
+
+    // Secondary phone numbers
+    Route::post('patients/{patient}/phones', [PatientPhoneController::class, 'store'])
+        ->name('patient-phones.store')->middleware('can:patients.edit');
+    Route::delete('patient-phones/{phone}', [PatientPhoneController::class, 'destroy'])
+        ->name('patient-phones.destroy')->middleware('can:patients.edit');
 });
 
 // CRM

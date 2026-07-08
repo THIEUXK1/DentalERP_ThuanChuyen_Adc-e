@@ -255,7 +255,11 @@ class PatientController extends Controller
 
         $forceSave = (bool) $request->input('force_save', false);
         $data = $this->validated($request, null, $forceSave);
-        Patient::create([...$data, 'code' => Patient::generateCode()]);
+        $extraPhones = $data['extra_phones'] ?? [];
+        unset($data['extra_phones']);
+
+        $patient = Patient::create([...$data, 'code' => Patient::generateCode()]);
+        $this->syncExtraPhones($patient, $extraPhones);
         \Illuminate\Support\Facades\Cache::forget('patients.data.list');
 
         return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
@@ -494,7 +498,7 @@ class PatientController extends Controller
                 'code'              => $patient->code,
                 'full_name'         => $patient->full_name,
                 'phone'             => $patient->phone,
-                'extra_phones'      => $patient->phones()->pluck('phone'),
+                'extra_phones'      => $patient->phones()->get(['id', 'phone']),
                 'email'             => $patient->email,
                 'dob'               => $patient->dob?->format('d/m/Y'),
                 'dob_raw'           => $patient->dob?->format('Y-m-d'),
@@ -586,6 +590,7 @@ class PatientController extends Controller
             'id'                => $patient->id,
             'full_name'         => $patient->full_name,
             'phone'             => $patient->phone,
+            'extra_phones'      => $patient->phones()->pluck('phone'),
             'email'             => $patient->email,
             'dob_raw'           => $patient->dob?->format('Y-m-d'),
             'gender'            => $patient->gender,
@@ -649,7 +654,16 @@ class PatientController extends Controller
 
         $forceSave = (bool) $request->input('force_save', false);
         $data = $this->validated($request, $patient->id, $forceSave);
+        $hasExtraPhones = $request->has('extra_phones');
+        $extraPhones = $data['extra_phones'] ?? [];
+        unset($data['extra_phones']);
+
         $patient->update($data);
+        // Only touch secondary phones when the caller actually sent this field —
+        // older forms that don't know about it (e.g. Form.vue) must not wipe them out.
+        if ($hasExtraPhones) {
+            $this->syncExtraPhones($patient, $extraPhones);
+        }
         \Illuminate\Support\Facades\Cache::forget('patients.data.list');
 
         if ($request->boolean('stay')) {
@@ -732,6 +746,22 @@ class PatientController extends Controller
             'branch_id'         => 'nullable|exists:branches,id',
             'notes'             => 'nullable|string',
             'is_active'         => 'boolean',
+            'extra_phones'      => 'nullable|array',
+            'extra_phones.*'    => ['string', 'max:20', 'regex:/^0\d{8,10}$/'],
         ]);
+    }
+
+    /** Replace a patient's secondary phone numbers with the given list (dedup, skip the primary phone). */
+    private function syncExtraPhones(Patient $patient, array $extraPhones): void
+    {
+        $unique = collect($extraPhones)
+            ->filter(fn ($p) => $p !== '' && $p !== $patient->phone)
+            ->unique()
+            ->values();
+
+        $patient->phones()->whereNotIn('phone', $unique)->delete();
+
+        $existing = $patient->phones()->pluck('phone');
+        $unique->diff($existing)->each(fn ($phone) => $patient->phones()->create(['phone' => $phone]));
     }
 }

@@ -32,6 +32,22 @@
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
                                     :class="{'border-red-400': form.errors.phone}" />
                                 <p v-if="form.errors.phone" class="mt-0.5 text-xs text-red-500">{{ form.errors.phone }}</p>
+                                <div class="mt-1.5 space-y-1.5">
+                                    <div v-for="(p, i) in form.extra_phones" :key="i" class="flex items-center gap-1">
+                                        <input v-model="form.extra_phones[i]" type="tel" placeholder="SĐT phụ"
+                                            class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+                                            :class="{'border-red-400': form.errors[`extra_phones.${i}`]}" />
+                                        <button type="button" @click="form.extra_phones.splice(i, 1)" class="text-gray-400 hover:text-red-500">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <button type="button" @click="form.extra_phones.push('')"
+                                        class="text-xs text-indigo-600 hover:text-indigo-700">
+                                        + Thêm số điện thoại khác
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-700 mb-1">Giới tính</label>
@@ -204,7 +220,7 @@ const MEDICAL_FLAGS = [
 ];
 
 const form = useForm({
-    full_name: '', phone: '', email: '', dob: '', gender: '',
+    full_name: '', phone: '', extra_phones: [], email: '', dob: '', gender: '',
     address: '', source: '', allergies: '', medical_history: '',
     medical_flags: [], emergency_contact: '', branch_id: null,
     notes: '', is_active: true, force_save: false,
@@ -263,6 +279,7 @@ function confirmAndSave() {
 function doSave() {
     form.full_name = toTitleCase(form.full_name);
     form.address   = toTitleCase(form.address);
+    form.extra_phones = form.extra_phones.map(p => p.trim()).filter(Boolean);
     form.post(route('patients.store'), {
         onSuccess: () => emit('close'),
     });

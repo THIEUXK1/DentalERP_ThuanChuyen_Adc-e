@@ -50,13 +50,40 @@
                     </div>
                     <div class="flex-1 min-w-0">
                         <h2 class="text-xl font-bold text-gray-900">{{ patient.full_name }}</h2>
-                        <p class="text-sm text-gray-500 mt-0.5">
-                            {{ patient.phone }}
-                            <span v-if="patient.extra_phones?.length" class="text-xs text-gray-400">(+{{ patient.extra_phones.join(', ') }})</span>
-                            <span v-if="patient.email" class="ml-2">· {{ patient.email }}</span>
-                            <span v-if="patient.dob" class="ml-2">· {{ patient.dob }}</span>
-                            <span v-if="genderLabel" class="ml-2">· {{ genderLabel }}</span>
-                        </p>
+                        <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                            <span class="text-sm text-gray-500">{{ patient.phone }}</span>
+                            <span v-for="ph in patient.extra_phones" :key="ph.id"
+                                class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 rounded-full pl-2 pr-1 py-0.5">
+                                {{ ph.phone }}
+                                <button v-if="can('patients.edit')" @click="removePhone(ph)"
+                                    class="text-gray-400 hover:text-red-500 transition-colors" title="Xóa số này">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </span>
+                            <template v-if="can('patients.edit')">
+                                <form v-if="showAddPhone" @submit.prevent="submitAddPhone" class="inline-flex items-center gap-1">
+                                    <input v-model="newPhone" type="tel" placeholder="0912345678" autofocus
+                                        class="w-28 text-xs border border-gray-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                    <button type="submit" class="text-xs px-1.5 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700">Lưu</button>
+                                    <button type="button" @click="showAddPhone = false; newPhone = ''" class="text-gray-400 hover:text-gray-600">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </form>
+                                <button v-else @click="showAddPhone = true"
+                                    class="text-xs text-indigo-600 hover:text-indigo-700 border border-dashed border-indigo-300 rounded-full px-2 py-0.5"
+                                    title="Thêm số điện thoại phụ">
+                                    + SĐT
+                                </button>
+                            </template>
+                            <span v-if="phoneError" class="text-xs text-red-500">{{ phoneError }}</span>
+                            <span v-if="patient.email" class="text-sm text-gray-500">· {{ patient.email }}</span>
+                            <span v-if="patient.dob" class="text-sm text-gray-500">· {{ patient.dob }}</span>
+                            <span v-if="genderLabel" class="text-sm text-gray-500">· {{ genderLabel }}</span>
+                        </div>
                     </div>
                 </div>
 
@@ -469,6 +496,23 @@ const activeMedicalFlags = computed(() => {
     const flags = patient.value?.medical_flags ?? [];
     return MEDICAL_FLAGS.filter(f => flags.includes(f.key));
 });
+
+const showAddPhone = ref(false);
+const newPhone      = ref('');
+const phoneError    = ref('');
+
+function submitAddPhone() {
+    phoneError.value = '';
+    router.post(route('patient-phones.store', props.patientId), { phone: newPhone.value }, {
+        preserveScroll: true,
+        onSuccess: () => { showAddPhone.value = false; newPhone.value = ''; },
+        onError: (errors) => { phoneError.value = errors.phone ?? 'Có lỗi xảy ra.'; },
+    });
+}
+
+function removePhone(ph) {
+    router.delete(route('patient-phones.destroy', ph.id), { preserveScroll: true });
+}
 
 function uploadAvatar(e) {
     const file = e.target.files[0];
