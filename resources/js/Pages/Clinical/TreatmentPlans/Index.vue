@@ -122,7 +122,7 @@
 
                 <!-- Row 2: date range + presets + quick filters -->
                 <div class="flex flex-wrap items-center gap-3">
-                    <span class="text-xs text-gray-500 font-medium">Ngày tạo:</span>
+                    <span class="text-xs text-gray-500 font-medium">Ngày điều trị:</span>
                     <input v-model="dateFrom" type="date"
                         class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none"/>
                     <span class="text-gray-400 text-xs">→</span>
@@ -474,8 +474,8 @@ const filtered = computed(() => {
     if (filterStatus.value)  list = list.filter(p => p.status === filterStatus.value);
     if (filterBranch.value)  list = list.filter(p => p.branch_id == filterBranch.value);
     if (filterDoctor.value)  list = list.filter(p => p.doctor_id == filterDoctor.value);
-    if (dateFrom.value)      list = list.filter(p => p.created_at_raw >= dateFrom.value);
-    if (dateTo.value)        list = list.filter(p => p.created_at_raw <= dateTo.value);
+    if (dateFrom.value)      list = list.filter(p => p.start_date_raw && p.start_date_raw >= dateFrom.value);
+    if (dateTo.value)        list = list.filter(p => p.start_date_raw && p.start_date_raw <= dateTo.value);
     if (activeStatusGroup.value === 'draft')       list = list.filter(p => p.status === 'draft');
     else if (activeStatusGroup.value === 'not_started') list = list.filter(p => p.status === 'approved');
     else if (activeStatusGroup.value === 'in_progress') list = list.filter(p => p.status === 'in_progress');
