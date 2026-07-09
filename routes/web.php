@@ -305,6 +305,8 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('dental-chairs', DentalChairController::class)->only(['index', 'store', 'update', 'destroy'])->middleware('can:branches.manage');
     Route::resource('branches', BranchController::class)->middleware('can:branches.view');
     Route::resource('employees', EmployeeController::class)->middleware('can:employees.view');
+    Route::patch('employees/{employee}/toggle-active', [EmployeeController::class, 'toggleActive'])
+        ->name('employees.toggle-active')->middleware('can:employees.manage');
 
     // Core management
     Route::prefix('core')->name('core.')->group(function () {

@@ -42,7 +42,7 @@ class PatientController extends Controller
         ]);
     }
 
-    public function data(): \Illuminate\Http\JsonResponse
+    public function data(): \Illuminate\Http\Response
     {
         $this->authorize('patients.view');
 
@@ -50,7 +50,13 @@ class PatientController extends Controller
         // happens client-side), so one shared cache entry serves every viewer. A few
         // seconds of staleness is an acceptable trade for skipping the full scan + joins
         // on repeated loads (tab switches, going back from a patient page, etc).
-        $patients = \Illuminate\Support\Facades\Cache::remember('patients.data.list', 20, function () {
+        //
+        // Cache the already-encoded JSON string, not the raw PHP array, and use the
+        // `file` store instead of the app's default `database` store: at ~8MB per entry,
+        // the `database` store's Postgres round-trip (TOAST compression) takes 800ms-1.5s
+        // per read/write, while `file` takes ~20ms — the cache was making this endpoint
+        // slower than just recomputing on every request.
+        $json = \Illuminate\Support\Facades\Cache::store('file')->remember('patients.data.list', 20, function () {
             // Plain query-builder select instead of Eloquent + with()/withMin(): at 20k+ patients,
             // per-row model hydration and Carbon parsing dominate the cost (see
             // PatientInvoiceController::data() for the same fix applied to a bigger table).
@@ -116,10 +122,10 @@ class PatientController extends Controller
                     'next_appointment_display'=> $next ? \Carbon\Carbon::parse($next)->format('d/m H:i') : null,
                     'has_registration'        => isset($registeredPatientIds[$p->id]),
                 ];
-            })->values();
+            })->values()->toJson();
         });
 
-        return response()->json($patients);
+        return response($json, 200, ['Content-Type' => 'application/json']);
     }
 
     public function registerAppointment(Patient $patient): Response
@@ -260,7 +266,7 @@ class PatientController extends Controller
 
         $patient = Patient::create([...$data, 'code' => Patient::generateCode()]);
         $this->syncExtraPhones($patient, $extraPhones);
-        \Illuminate\Support\Facades\Cache::forget('patients.data.list');
+        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
 
         return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
     }
@@ -664,7 +670,7 @@ class PatientController extends Controller
         if ($hasExtraPhones) {
             $this->syncExtraPhones($patient, $extraPhones);
         }
-        \Illuminate\Support\Facades\Cache::forget('patients.data.list');
+        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
 
         if ($request->boolean('stay')) {
             return back()->with('success', 'Đã cập nhật bệnh nhân.');
@@ -677,7 +683,7 @@ class PatientController extends Controller
     {
         $this->authorize('patients.delete');
         $patient->delete();
-        \Illuminate\Support\Facades\Cache::forget('patients.data.list');
+        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
 
         return redirect()->route('patients.index')->with('success', 'Đã xóa bệnh nhân.');
     }

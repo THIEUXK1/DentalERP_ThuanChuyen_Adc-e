@@ -108,7 +108,7 @@ class PatientMergeService
             $this->stampAndDeleteLoser($survivor, $loser);
         });
 
-        Cache::forget('patients.data.list');
+        Cache::store('file')->forget('patients.data.list');
     }
 
     private function assertDistinctAndActive(Patient $a, Patient $b): void

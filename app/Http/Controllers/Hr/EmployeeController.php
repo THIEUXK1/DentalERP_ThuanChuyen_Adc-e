@@ -32,10 +32,14 @@ class EmployeeController extends Controller
             ->when($request->employment_status, fn ($q, $v) => $q->where('employment_status', $v))
             ->when($request->department_id, fn ($q, $v) => $q->where('department_id', $v))
             ->when($request->branch_id, fn ($q, $v) => $q->where('branch_id', $v))
+            ->orderByDesc('is_active')
             ->orderByDesc('id');
 
+        $perPage = (int) $request->input('per_page', 50);
+        $perPage = in_array($perPage, [20, 50, 100, 200], true) ? $perPage : 50;
+
         return Inertia::render('Hr/Employees/Index', [
-            'employees' => $query->paginate(20)->through(fn ($e) => [
+            'employees' => $query->paginate($perPage)->withQueryString()->through(fn ($e) => [
                 'id'                => $e->id,
                 'code'              => $e->code,
                 'full_name'         => $e->full_name,
@@ -60,7 +64,7 @@ class EmployeeController extends Controller
                 'label' => $s->label(),
                 'color' => $s->color(),
             ]),
-            'filters' => $request->only(['search', 'employment_status', 'department_id', 'branch_id']),
+            'filters' => $request->only(['search', 'employment_status', 'department_id', 'branch_id', 'per_page']),
         ]);
     }
 
@@ -117,6 +121,17 @@ class EmployeeController extends Controller
         $employee->delete();
 
         return redirect()->route('employees.index')->with('success', 'Đã xóa nhân viên.');
+    }
+
+    public function toggleActive(Employee $employee): RedirectResponse
+    {
+        $this->authorize('employees.manage');
+
+        $employee->update(['is_active' => ! $employee->is_active]);
+
+        $message = $employee->is_active ? 'Đã kích hoạt nhân viên.' : 'Đã ngừng hoạt động nhân viên.';
+
+        return back()->with('success', $message);
     }
 
     private function form(?Employee $employee = null): Response

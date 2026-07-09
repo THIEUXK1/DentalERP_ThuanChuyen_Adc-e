@@ -33,6 +33,10 @@
                     <option value="">Tất cả chi nhánh</option>
                     <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                 </select>
+                <select v-model="perPage" @change="applyFilters"
+                    class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                    <option v-for="n in [20, 50, 100, 200]" :key="n" :value="n">{{ n }} / trang</option>
+                </select>
             </div>
 
             <!-- Table -->
@@ -48,12 +52,13 @@
                             <th class="px-4 py-3 text-left font-medium">Ngày vào làm</th>
                             <th class="px-4 py-3 text-left font-medium">Loại HĐ</th>
                             <th class="px-4 py-3 text-center font-medium">Trạng thái</th>
+                            <th class="px-4 py-3 text-center font-medium">Hoạt động</th>
                             <th class="px-4 py-3 text-right font-medium">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
                         <tr v-if="employees.data.length === 0">
-                            <td colspan="9" class="text-center py-10 text-gray-400">Chưa có cán bộ nào</td>
+                            <td colspan="10" class="text-center py-10 text-gray-400">Chưa có cán bộ nào</td>
                         </tr>
                         <tr v-for="e in employees.data" :key="e.id" class="hover:bg-gray-50">
                             <td class="px-4 py-3 font-mono text-xs text-gray-500">{{ e.code }}</td>
@@ -71,6 +76,23 @@
                                     {{ e.status_label }}
                                 </span>
                             </td>
+                            <td class="px-4 py-3 text-center">
+                                <button v-if="can('employees.manage')" type="button" @click="toggleActive(e)"
+                                    :class="[
+                                        'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
+                                        e.is_active ? 'bg-green-500' : 'bg-gray-300',
+                                    ]"
+                                    :title="e.is_active ? 'Đang hoạt động - bấm để ngừng' : 'Ngừng hoạt động - bấm để kích hoạt'">
+                                    <span :class="[
+                                        'inline-block h-4 w-4 transform rounded-full bg-white transition-transform',
+                                        e.is_active ? 'translate-x-6' : 'translate-x-1',
+                                    ]" />
+                                </button>
+                                <span v-else
+                                    :class="`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${e.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`">
+                                    {{ e.is_active ? 'Bật' : 'Tắt' }}
+                                </span>
+                            </td>
                             <td class="px-4 py-3 text-right space-x-3">
                                 <Link :href="route('employees.show', e.id)"
                                     class="text-xs text-primary-600 hover:text-primary-800 font-medium">Xem</Link>
@@ -82,7 +104,7 @@
                 </table>
             </div>
 
-            <Pagination :links="employees.links" />
+            <Pagination :links="employees.links" :meta="employees.meta" @navigate="url => router.get(url, {}, { preserveState: true, preserveScroll: true })" />
         </div>
     </AppLayout>
 </template>
@@ -107,13 +129,19 @@ const search          = ref(props.filters?.search ?? '');
 const statusFilter    = ref(props.filters?.employment_status ?? '');
 const departmentFilter = ref(props.filters?.department_id ?? '');
 const branchFilter    = ref(props.filters?.branch_id ?? '');
+const perPage         = ref(Number(props.filters?.per_page ?? 50));
 
 function applyFilters() {
     router.get(route('employees.index'), {
         search: search.value,
         employment_status: statusFilter.value,
         department_id: departmentFilter.value,
+        per_page: perPage.value,
         branch_id: branchFilter.value,
     }, { preserveState: true });
+}
+
+function toggleActive(employee) {
+    router.patch(route('employees.toggle-active', employee.id), {}, { preserveScroll: true, preserveState: true });
 }
 </script>
