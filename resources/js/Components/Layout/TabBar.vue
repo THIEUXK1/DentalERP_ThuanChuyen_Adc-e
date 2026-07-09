@@ -13,20 +13,28 @@
         <!-- Tab list -->
         <div ref="scrollEl" role="tablist" class="flex flex-1 overflow-x-auto hide-scrollbar" @scroll="checkScroll">
             <a
-                v-for="tab in tabs"
+                v-for="(tab, index) in tabs"
                 :key="tab.url"
                 :href="tab.url"
                 role="tab"
                 :aria-selected="isActive(tab)"
+                draggable="true"
                 :class="[
                     'group relative flex items-center gap-1.5 px-3 py-2 text-xs whitespace-nowrap cursor-pointer',
                     'border-t-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-inset',
                     isActive(tab)
                         ? 'border-t-primary-600 bg-white text-primary-700 font-semibold -mb-px border-b border-b-white'
                         : 'border-t-transparent text-gray-500 hover:text-gray-800 hover:bg-white/70',
+                    dragOverIndex === index ? 'bg-primary-50' : '',
+                    dragIndex === index ? 'opacity-40' : '',
                 ]"
                 @click.prevent="clickTab(tab)"
                 @contextmenu.prevent="openContext($event, tab)"
+                @dragstart="onDragStart($event, index)"
+                @dragover.prevent="onDragOver(index)"
+                @dragleave="onDragLeave(index)"
+                @drop.prevent="onDrop(index)"
+                @dragend="onDragEnd"
             >
                 <!-- Pin icon -->
                 <svg v-if="tab.pinned" class="w-3 h-3 flex-shrink-0 text-amber-500" fill="currentColor" viewBox="0 0 24 24">
@@ -133,7 +141,7 @@ import { useTabs } from '@/composables/useTabs';
 import { restorePage } from '@/composables/usePageCache';
 import { saveScroll, restoreScroll } from '@/composables/useScrollRestore';
 
-const { tabs, closeTab, pinTab, closeAllTabs } = useTabs();
+const { tabs, closeTab, pinTab, closeAllTabs, reorderTabs } = useTabs();
 
 // Dùng usePage().url (luôn reactive) thay vì tab.active để xác định tab đang xem
 const page = usePage();
@@ -173,6 +181,32 @@ function clickTab(tab) {
     } else {
         nextTick(() => restoreScroll(tab.url));
     }
+}
+
+// ── Drag & drop reorder ─────────────────────────────────────
+const dragIndex     = ref(null);
+const dragOverIndex = ref(null);
+
+function onDragStart(event, index) {
+    dragIndex.value = index;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', String(index));
+}
+function onDragOver(index) {
+    if (dragIndex.value === null) return;
+    dragOverIndex.value = index;
+}
+function onDragLeave(index) {
+    if (dragOverIndex.value === index) dragOverIndex.value = null;
+}
+function onDrop(index) {
+    if (dragIndex.value !== null) reorderTabs(dragIndex.value, index);
+    dragIndex.value = null;
+    dragOverIndex.value = null;
+}
+function onDragEnd() {
+    dragIndex.value = null;
+    dragOverIndex.value = null;
 }
 
 // ── 3 dots menu ───────────────────────────────────────────────

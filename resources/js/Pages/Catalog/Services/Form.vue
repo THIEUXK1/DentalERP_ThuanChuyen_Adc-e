@@ -8,8 +8,11 @@
                 <FormInput label="Tên dịch vụ" :error="form.errors.name" required>
                     <input v-model="form.name" type="text" class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
                 </FormInput>
-                <FormInput label="Phân loại" :error="form.errors.category">
-                    <input v-model="form.category" type="text" placeholder="Vd: Niềng răng, Implant, Nhổ răng..." class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
+                <FormInput label="Nhóm dịch vụ" :error="form.errors.category_id">
+                    <select v-model="form.category_id" class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none">
+                        <option :value="null">— Không chọn —</option>
+                        <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                    </select>
                 </FormInput>
                 <div class="grid grid-cols-2 gap-4">
                     <FormInput label="Giá vốn (₫)" :error="form.errors.cost_price" required>
@@ -44,11 +47,11 @@ import { Link, useForm } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import FormInput from '@/Components/Shared/FormInput.vue';
 
-const props = defineProps({ service: Object });
+const props = defineProps({ service: Object, categories: Array });
 
 const form = useForm({
     name:             props.service?.name ?? '',
-    category:         props.service?.category ?? '',
+    category_id:      props.service?.category_id ?? null,
     cost_price:       props.service?.cost_price ?? 0,
     selling_price:    props.service?.selling_price ?? 0,
     duration_minutes: props.service?.duration_minutes ?? 30,

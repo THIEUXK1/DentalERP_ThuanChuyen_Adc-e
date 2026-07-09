@@ -197,6 +197,8 @@ export const menuConfig = [
             { label: 'Bộ phận', route: 'core.departments.index', icon: 'department', permission: 'branches.manage' },
             { label: 'Nguồn quỹ', route: 'core.fund-accounts.index', icon: 'fund', permission: 'branches.manage' },
             { label: 'Dịch vụ', route: 'catalog.services.index', icon: 'service', permission: 'services.view' },
+            { label: 'Loại dịch vụ', route: 'catalog.service-categories.index', icon: 'service', permission: 'services.manage' },
+            { label: 'Nhóm dịch vụ', route: 'catalog.service-groups.index', icon: 'service', permission: 'services.manage' },
             { label: 'Bảng giá', route: 'catalog.price-lists.index', icon: 'price-list', permission: 'services.view' },
             { label: 'Ghế nha', route: 'dental-chairs.index', icon: 'dental-chair', roles: ['owner', 'admin'] }
         ]

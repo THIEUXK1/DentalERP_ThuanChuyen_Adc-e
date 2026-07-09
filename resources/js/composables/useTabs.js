@@ -63,6 +63,8 @@ const ROUTE_TITLES = [
     ['/reports/crm',                          'BC CRM'],
     ['/reports/profit-loss',                  'Lãi / Lỗ'],
     ['/catalog/price-lists',                  'Bảng giá'],
+    ['/catalog/service-categories',           'Loại dịch vụ'],
+    ['/catalog/service-groups',               'Nhóm dịch vụ'],
     ['/catalog/services',                     'Dịch vụ'],
     ['/admin/activity-log',                   'Audit Log'],
     ['/admin/users',                          'Người dùng'],
@@ -99,7 +101,9 @@ function save(tabs) {
 }
 
 // ── Singleton state — created once at module level, never duplicated ──────────
-const tabs = ref(load());
+// Titles are always recomputed from ROUTE_TITLES on load, so tabs saved before a
+// title mapping existed (or was renamed) pick up the current Vietnamese label.
+const tabs = ref(load().map(t => ({ ...t, title: titleFor(t.url) })));
 
 function openTab(url) {
     // Deduplicate by pathname; update stored URL when only query-string changed
@@ -110,6 +114,7 @@ function openTab(url) {
         tabs.value = tabs.value.map((t, i) => ({
             ...t,
             url: i === idx ? url : t.url,
+            title: i === idx ? titleFor(url) : t.title,
             active: i === idx,
         }));
     } else {
@@ -152,9 +157,18 @@ function closeAllTabs() {
     save(tabs.value);
 }
 
+function reorderTabs(fromIndex, toIndex) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= tabs.value.length || toIndex >= tabs.value.length) return;
+    const next = [...tabs.value];
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    tabs.value = next;
+    save(tabs.value);
+}
+
 // Single listener — registered once at module scope, never re-registered
 router.on('navigate', e => openTab(e.detail.page.url));
 
 export function useTabs() {
-    return { tabs, closeTab, pinTab, closeAllTabs };
+    return { tabs, closeTab, pinTab, closeAllTabs, reorderTabs };
 }

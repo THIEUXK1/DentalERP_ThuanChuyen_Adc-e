@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Catalog;
 
 use App\Http\Controllers\Controller;
 use App\Models\DentalService;
+use App\Models\ServiceCategory;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -15,25 +16,27 @@ class DentalServiceController extends Controller
     {
         $this->authorize('services.view');
 
-        $query = DentalService::query()
+        $query = DentalService::with('category')
             ->when($request->search, fn ($q, $v) => $q->where('name', 'ilike', "%{$v}%")->orWhere('code', 'ilike', "%{$v}%"))
-            ->when($request->category, fn ($q, $v) => $q->where('category', $v))
+            ->when($request->category_id, fn ($q, $v) => $q->where('category_id', $v))
             ->orderByDesc('id');
 
-        $categories = DentalService::withTrashed()->distinct()->pluck('category')->filter()->sort()->values();
+        $categories = ServiceCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('Catalog/Services/Index', [
             'services' => $query->paginate(20)->through(fn ($s) => [
                 'id' => $s->id,
                 'code' => $s->code,
                 'name' => $s->name,
-                'category' => $s->category,
+                'category' => $s->category?->name,
+                'category_id' => $s->category_id,
+                'cost_price' => $s->cost_price,
                 'selling_price' => $s->selling_price,
                 'duration_minutes' => $s->duration_minutes,
                 'is_active' => $s->is_active,
             ]),
             'categories' => $categories,
-            'filters' => $request->only(['search', 'category']),
+            'filters' => $request->only(['search', 'category_id']),
         ]);
     }
 
@@ -41,7 +44,9 @@ class DentalServiceController extends Controller
     {
         $this->authorize('services.manage');
 
-        return Inertia::render('Catalog/Services/Form');
+        return Inertia::render('Catalog/Services/Form', [
+            'categories' => ServiceCategory::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -50,7 +55,7 @@ class DentalServiceController extends Controller
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
-            'category' => 'nullable|string|max:100',
+            'category_id' => 'nullable|exists:service_categories,id',
             'cost_price' => 'required|integer|min:0',
             'selling_price' => 'required|integer|min:0',
             'duration_minutes' => 'required|integer|min:5|max:480',
@@ -71,12 +76,14 @@ class DentalServiceController extends Controller
                 'id' => $service->id,
                 'code' => $service->code,
                 'name' => $service->name,
-                'category' => $service->category,
+                'category_id' => $service->category_id,
                 'cost_price' => $service->cost_price,
                 'selling_price' => $service->selling_price,
                 'duration_minutes' => $service->duration_minutes,
                 'is_active' => $service->is_active,
             ],
+            'categories' => ServiceCategory::where('is_active', true)->orWhere('id', $service->category_id)
+                ->orderBy('name')->get(['id', 'name']),
         ]);
     }
 
@@ -86,7 +93,7 @@ class DentalServiceController extends Controller
 
         $data = $request->validate([
             'name' => 'required|string|max:255',
-            'category' => 'nullable|string|max:100',
+            'category_id' => 'nullable|exists:service_categories,id',
             'cost_price' => 'required|integer|min:0',
             'selling_price' => 'required|integer|min:0',
             'duration_minutes' => 'required|integer|min:5|max:480',

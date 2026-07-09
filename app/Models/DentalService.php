@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\KpiBaseType;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
@@ -13,7 +14,7 @@ class DentalService extends Model
     use LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'code', 'name', 'category', 'service_group', 'cost_price', 'selling_price',
+        'code', 'name', 'category_id', 'service_group', 'cost_price', 'selling_price',
         'duration_minutes', 'estimated_sessions', 'kpi_base_type', 'kpi_rate',
         'fixed_kpi_amount', 'notes', 'is_active',
     ];
@@ -39,6 +40,11 @@ class DentalService extends Model
         $last = static::withTrashed()->max('id') ?? 0;
 
         return 'DV-'.str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(ServiceCategory::class, 'category_id');
     }
 
     public function priceListItems()

@@ -11,6 +11,8 @@ use App\Http\Controllers\Cashier\PatientInvoiceController;
 use App\Http\Controllers\Cashier\PatientPaymentController;
 use App\Http\Controllers\Catalog\DentalServiceController;
 use App\Http\Controllers\Catalog\PriceListController;
+use App\Http\Controllers\Catalog\ServiceCategoryController;
+use App\Http\Controllers\Catalog\ServiceGroupController;
 use App\Http\Controllers\Clinical\ClinicalNoteController;
 use App\Http\Controllers\Clinical\ClinicalTemplateController;
 use App\Http\Controllers\Clinical\ToothConditionController;
@@ -556,6 +558,14 @@ Route::middleware(['auth'])->group(function () {
             ->name('price-lists.items.add')->middleware('can:services.manage');
         Route::delete('price-list-items/{item}', [PriceListController::class, 'removeItem'])
             ->name('price-lists.items.remove')->middleware('can:services.manage');
+        Route::get('service-categories', [ServiceCategoryController::class, 'index'])->name('service-categories.index')->middleware('can:services.manage');
+        Route::post('service-categories', [ServiceCategoryController::class, 'store'])->name('service-categories.store')->middleware('can:services.manage');
+        Route::put('service-categories/{serviceCategory}', [ServiceCategoryController::class, 'update'])->name('service-categories.update')->middleware('can:services.manage');
+        Route::delete('service-categories/{serviceCategory}', [ServiceCategoryController::class, 'destroy'])->name('service-categories.destroy')->middleware('can:services.manage');
+        Route::get('service-groups', [ServiceGroupController::class, 'index'])->name('service-groups.index')->middleware('can:services.manage');
+        Route::post('service-groups', [ServiceGroupController::class, 'store'])->name('service-groups.store')->middleware('can:services.manage');
+        Route::put('service-groups/{serviceGroup}', [ServiceGroupController::class, 'update'])->name('service-groups.update')->middleware('can:services.manage');
+        Route::delete('service-groups/{serviceGroup}', [ServiceGroupController::class, 'destroy'])->name('service-groups.destroy')->middleware('can:services.manage');
     });
 });
 
