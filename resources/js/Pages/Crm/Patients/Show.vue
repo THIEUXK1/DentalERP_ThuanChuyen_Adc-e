@@ -88,7 +88,7 @@
                 </div>
 
                 <!-- Action button bar -->
-                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" @book-appointment="showBookAppointment = true" @merge="showMergeModal = true" />
+                <ActionButtonBar :patient-id="patient.id" @edit="showEditModal = true" @book-appointment="showBookAppointment = true" @merge="openMergeModal" />
 
                 <!-- Financial summary bar -->
                 <FinancialSummaryBar
@@ -373,6 +373,7 @@
                     :relationships="relationships"
                     :relationshipTypes="relationshipTypes"
                     :allPatients="allPatients"
+                    @need-patients="loadAllPatients"
                 />
             </div>
         </div>
@@ -428,13 +429,18 @@ const {
     patient, financial, invoices, treatmentPlans, appointments, pendingDeletions,
     activities, clinicalNotes, toothConditions, attachments, consentForms,
     relationships, timeline, doctors, chairs, services, conditionTypes,
-    contactTypes, attachmentTypes, relationshipTypes, allPatients, branches, sources,
+    contactTypes, attachmentTypes, relationshipTypes, allPatients, loadAllPatients, branches, sources,
 } = usePatientDetail(props.patientId);
 
 const activeTab           = ref('treatment');
 const showEditModal       = ref(false);
 const showMergeModal      = ref(false);
 const showBookAppointment = ref(false);
+
+function openMergeModal() {
+    loadAllPatients();
+    showMergeModal.value = true;
+}
 
 const TAB_KEYS = ['info', 'invoices', 'treatment', 'appointments', 'chart', 'clinical', 'attachments', 'consent', 'timeline'];
 

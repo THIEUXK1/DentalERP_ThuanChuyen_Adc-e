@@ -37,11 +37,9 @@ class AppointmentController extends Controller
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
             'services' => DentalService::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'duration_minutes' => $s->duration_minutes]),
-            // Plain query-builder select instead of Eloquent: this dropdown embeds every active
-            // patient on every page load, and Eloquent hydration for 20k+ rows is the dominant
-            // cost (see PatientInvoiceController::data() for the same fix elsewhere).
-            'patients' => DB::table('patients')->where('is_active', true)->orderBy('full_name')
-                ->select('id', 'full_name', 'phone', 'code', 'branch_id')->get(),
+            // The patient picker for "book appointment" is loaded on demand from
+            // patients.lite-list (see Index.vue) instead of embedded here — shipping all
+            // 20k+ patients on every board load was the dominant cost of this page.
             'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
         ]);
     }
@@ -50,7 +48,7 @@ class AppointmentController extends Controller
     {
         $this->authorize('appointments.view');
 
-        $appointments = Appointment::with(['patient', 'doctor', 'chair', 'service'])
+        $appointments = Appointment::with(['patient', 'doctor', 'chair', 'service', 'branch'])
             ->orderByDesc('scheduled_at')
             ->get()
             ->map(fn ($a) => $this->dto($a));

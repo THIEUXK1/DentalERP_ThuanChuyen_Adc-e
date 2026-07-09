@@ -658,9 +658,25 @@ const props = defineProps({
     doctors: Array,
     chairs: Array,
     services: Array,
-    patients: Array,
     statuses: Array,
 });
+
+// Patient picker for "book appointment": loaded on demand (not with the page)
+// since it embeds every patient — see patients.lite-list.
+const patients        = ref([]);
+let patientsLoaded    = false;
+async function loadPatients() {
+    if (patientsLoaded) return;
+    patientsLoaded = true;
+    try {
+        const res = await fetch(route('patients.lite-list'), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        patients.value = (await res.json()).filter(p => p.is_active);
+    } catch {
+        patientsLoaded = false;
+    }
+}
 
 // ── Data fetch ─────────────────────────────────────────────────
 const allAppointments = ref([]);
@@ -1001,17 +1017,18 @@ const createForm = useForm({
     service_id: null, scheduled_at: dayjs().format('YYYY-MM-DD') + 'T08:00',
     duration_minutes: 30, notes: '',
 });
-const patientOptions  = computed(() => props.patients.map(p => ({ value: p.id, label: `${p.code} — ${p.full_name}`, sublabel: p.phone })));
+const patientOptions  = computed(() => patients.value.map(p => ({ value: p.id, label: `${p.code} — ${p.name}`, sublabel: p.phone })));
 const filteredDoctors = computed(() => props.doctors.filter(d => !createForm.branch_id || d.branch_id == createForm.branch_id));
 const filteredChairs  = computed(() => props.chairs.filter(c => !createForm.branch_id || c.branch_id == createForm.branch_id));
 
 function openCreate() {
+    loadPatients();
     createForm.reset();
     createForm.scheduled_at = date.value + 'T08:00';
     showCreate.value = true;
 }
 function onPatientChange(pid) {
-    const p = props.patients.find(x => x.id === pid);
+    const p = patients.value.find(x => x.id === pid);
     if (p?.branch_id && !createForm.branch_id) createForm.branch_id = p.branch_id;
 }
 function onBranchChange() { createForm.doctor_id = null; createForm.dental_chair_id = null; }

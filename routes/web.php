@@ -150,6 +150,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('patients.check-duplicate')->middleware('can:patients.create');
     Route::get('patients/data', [PatientController::class, 'data'])
         ->name('patients.data')->middleware('can:patients.view');
+    Route::get('patients/lite-list', [PatientController::class, 'liteList'])
+        ->name('patients.lite-list')->middleware('can:patients.view');
     Route::get('patients/{patient}/edit-json', [PatientController::class, 'editJson'])
         ->name('patients.edit-json')->middleware('can:patients.edit');
     Route::get('patients/{patient}/data', [PatientController::class, 'showData'])

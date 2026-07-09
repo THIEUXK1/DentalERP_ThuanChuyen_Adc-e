@@ -267,6 +267,7 @@ class PatientController extends Controller
         $patient = Patient::create([...$data, 'code' => Patient::generateCode()]);
         $this->syncExtraPhones($patient, $extraPhones);
         \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
+        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');
 
         return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
     }
@@ -543,12 +544,37 @@ class PatientController extends Controller
             'contactTypes'      => collect(ContactType::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
             'attachmentTypes'   => collect(AttachmentType::cases())->map(fn ($t) => ['value' => $t->value, 'label' => $t->label()]),
             'relationshipTypes' => collect(RelationshipType::cases())->map(fn ($r) => ['value' => $r->value, 'label' => $r->label()]),
-            // Not filtered by is_active: this list also feeds the "merge duplicate" picker,
-            // where an inactive record is often exactly the kind of duplicate being merged away.
-            'allPatients'       => Patient::where('id', '!=', $patient->id)->orderBy('full_name')->get()->map(fn ($p) => ['id' => $p->id, 'name' => $p->full_name, 'code' => $p->code, 'phone' => $p->phone]),
             'branches'          => Branch::where('is_active', true)->orderBy('name')->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'sources'           => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
         ]);
+    }
+
+    /**
+     * Lightweight id/name/code/phone(/branch_id/is_active) list of every patient, shared by
+     * every "pick a patient" UI that only needs identity fields: the merge-duplicate and
+     * "add relationship" pickers on the patient page, and the "book appointment" picker on
+     * the appointments board. Those are all opened on demand (rarely) — loading all 20k+
+     * patients eagerly on every page view was the dominant cost on both pages (~2MB,
+     * 1-5s query+hydration depending on Eloquent vs query-builder).
+     * Plain query-builder select (no Eloquent hydration) + a short shared cache, same
+     * pattern as data() above. Not filtered by is_active server-side (the merge picker
+     * needs inactive records too) — consumers that only want bookable patients filter
+     * client-side on the `is_active` flag.
+     */
+    public function liteList(): \Illuminate\Http\Response
+    {
+        $this->authorize('patients.view');
+
+        $json = \Illuminate\Support\Facades\Cache::store('file')->remember('patients.lite-list', 60, function () {
+            return DB::table('patients')
+                ->whereNull('deleted_at')
+                ->orderBy('full_name')
+                ->select('id', 'full_name as name', 'code', 'phone', 'branch_id', 'is_active')
+                ->get()
+                ->toJson();
+        });
+
+        return response($json, 200, ['Content-Type' => 'application/json']);
     }
 
     private function pendingDeletionsMap($apptIds, $planIds): array
@@ -671,6 +697,7 @@ class PatientController extends Controller
             $this->syncExtraPhones($patient, $extraPhones);
         }
         \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
+        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');
 
         if ($request->boolean('stay')) {
             return back()->with('success', 'Đã cập nhật bệnh nhân.');
@@ -684,6 +711,7 @@ class PatientController extends Controller
         $this->authorize('patients.delete');
         $patient->delete();
         \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
+        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');
 
         return redirect()->route('patients.index')->with('success', 'Đã xóa bệnh nhân.');
     }

@@ -31,6 +31,7 @@ export function usePatientDetail(patientId) {
     const attachmentTypes    = ref([]);
     const relationshipTypes  = ref([]);
     const allPatients        = ref([]);
+    let allPatientsLoaded    = false;
     const branches           = ref([]);
     const sources            = ref([]);
 
@@ -64,7 +65,6 @@ export function usePatientDetail(patientId) {
             contactTypes.value     = data.contactTypes;
             attachmentTypes.value  = data.attachmentTypes;
             relationshipTypes.value= data.relationshipTypes;
-            allPatients.value      = data.allPatients;
             branches.value         = data.branches;
             sources.value          = data.sources;
         } catch {
@@ -74,11 +74,29 @@ export function usePatientDetail(patientId) {
         }
     }
 
+    // Full id/name/code/phone list, used only by the merge-duplicate and "add
+    // relationship" pickers. Loaded on demand (when one of those UIs is opened)
+    // rather than with the rest of the page — at 20k+ patients this list alone
+    // is ~1.8MB and dominated the page's load time.
+    async function loadAllPatients() {
+        if (allPatientsLoaded) return;
+        allPatientsLoaded = true;
+        try {
+            const res = await fetch(route('patients.lite-list'), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (!res.ok) throw new Error('Request failed');
+            allPatients.value = await res.json();
+        } catch {
+            allPatientsLoaded = false;
+        }
+    }
+
     return {
         loading, loadError, loadData,
         patient, financial, invoices, treatmentPlans, appointments, pendingDeletions,
         activities, clinicalNotes, toothConditions, attachments, consentForms,
         relationships, timeline, doctors, chairs, services, conditionTypes,
-        contactTypes, attachmentTypes, relationshipTypes, allPatients, branches, sources,
+        contactTypes, attachmentTypes, relationshipTypes, allPatients, loadAllPatients, branches, sources,
     };
 }

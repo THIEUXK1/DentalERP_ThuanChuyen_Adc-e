@@ -12,9 +12,15 @@ const props = defineProps({
     relationshipTypes: Array,
     allPatients: Array,
 });
+const emit = defineEmits(['need-patients']);
 
 const showForm = ref(false);
 const form = useForm({ related_patient_id: null, relationship_type: 'referrer', referral_rate: null, notes: '' });
+
+function openForm() {
+    emit('need-patients');
+    showForm.value = !showForm.value;
+}
 
 function submit() {
     form.post(route('patient-relationships.store', props.patientId), {
@@ -32,7 +38,7 @@ function remove(id) {
     <div>
         <div class="flex items-center justify-between mb-3">
             <h3 class="font-semibold text-gray-700">Gia đình / Người giới thiệu</h3>
-            <button v-if="can('patients.edit')" @click="showForm = !showForm"
+            <button v-if="can('patients.edit')" @click="openForm"
                 class="px-3 py-1 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700">
                 + Thêm
             </button>
