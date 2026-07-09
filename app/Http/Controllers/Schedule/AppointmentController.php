@@ -201,7 +201,7 @@ class AppointmentController extends Controller
                     'created_by' => auth()->id(),
                 ]);
 
-                $arrivedStatus = now()->lt($appointment->scheduled_at)
+                $arrivedStatus = now()->toDateString() < $appointment->scheduled_at->toDateString()
                     ? AppointmentStatus::ArrivedEarly
                     : AppointmentStatus::CheckedIn;
 

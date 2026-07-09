@@ -100,7 +100,7 @@ class AppointmentService
 
     public function transition(Appointment $appointment, AppointmentStatus $to, array $extra = []): void
     {
-        if ($to === AppointmentStatus::CheckedIn && now()->lt($appointment->scheduled_at)) {
+        if ($to === AppointmentStatus::CheckedIn && now()->toDateString() < $appointment->scheduled_at->toDateString()) {
             $to = AppointmentStatus::ArrivedEarly;
         }
 
