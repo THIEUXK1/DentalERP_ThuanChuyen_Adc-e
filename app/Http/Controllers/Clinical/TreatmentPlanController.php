@@ -485,14 +485,8 @@ class TreatmentPlanController extends Controller
             $fresh = $treatmentPlan->fresh();
             if (! $fresh->invoices()->exists()) {
                 try {
-                    if (! empty($fresh->payment_schedule)) {
-                        $this->invoiceSvc->syncInstallments($fresh);
-                        $count = count($fresh->payment_schedule);
-                        $msg   = "Đã cập nhật trạng thái. Tự động tạo {$count} hóa đơn theo lịch thanh toán.";
-                    } else {
-                        $this->invoiceSvc->fromTreatmentPlan($fresh);
-                        $msg = 'Đã cập nhật trạng thái. Tự động tạo hóa đơn.';
-                    }
+                    $this->invoiceSvc->fromTreatmentPlan($fresh);
+                    $msg = 'Đã cập nhật trạng thái. Tự động tạo hóa đơn.';
                 } catch (\RuntimeException $e) {
                     return back()->with('success', $msg)->with('warning', 'Không thể tạo hóa đơn: ' . $e->getMessage());
                 }
@@ -508,17 +502,8 @@ class TreatmentPlanController extends Controller
 
         try {
             $this->svc->approve($treatmentPlan);
-
-            if (! empty($treatmentPlan->payment_schedule)) {
-                // Has installment schedule → create one invoice per entry
-                $this->invoiceSvc->syncInstallments($treatmentPlan);
-                $count = count($treatmentPlan->payment_schedule);
-                $msg   = "Đã duyệt kế hoạch. Đã tạo {$count} hóa đơn theo lịch thanh toán.";
-            } else {
-                // No schedule → single full invoice
-                $this->invoiceSvc->fromTreatmentPlan($treatmentPlan);
-                $msg = 'Đã duyệt kế hoạch điều trị. Hóa đơn đã được tạo tự động.';
-            }
+            $this->invoiceSvc->fromTreatmentPlan($treatmentPlan);
+            $msg = 'Đã duyệt kế hoạch điều trị. Hóa đơn đã được tạo tự động.';
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -543,30 +528,8 @@ class TreatmentPlanController extends Controller
 
         $schedule = $request->input('schedule') ?? [];
 
-        // Guard: cannot remove an installment that already has payments
-        $paidIndices = $treatmentPlan->invoices()
-            ->whereNotNull('installment_index')
-            ->where('amount_paid', '>', 0)
-            ->pluck('installment_index')
-            ->toArray();
-
-        foreach ($paidIndices as $paidIdx) {
-            if (! array_key_exists($paidIdx, $schedule)) {
-                return back()->with('error', 'Không thể xóa đợt ' . ($paidIdx + 1) . ' vì đã có thanh toán.');
-            }
-        }
-
+        // Lịch thanh toán chỉ là nhắc hẹn — không tạo/đồng bộ hóa đơn theo đợt.
         $treatmentPlan->update(['payment_schedule' => $schedule]);
-
-        // If plan is already approved, sync installment invoices immediately
-        if (! $treatmentPlan->status->isEditable() && ! empty($schedule)) {
-            try {
-                $this->invoiceSvc->syncInstallments($treatmentPlan->fresh());
-            } catch (\RuntimeException $e) {
-                return back()->with('error', $e->getMessage());
-            }
-            return back()->with('success', 'Đã lưu lịch thanh toán và đồng bộ hóa đơn theo đợt.');
-        }
 
         return back()->with('success', 'Đã lưu lịch thanh toán.');
     }
