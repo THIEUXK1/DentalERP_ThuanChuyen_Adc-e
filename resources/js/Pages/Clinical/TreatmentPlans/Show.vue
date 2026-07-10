@@ -340,6 +340,11 @@
                                             :class="['text-xs px-2.5 py-1 rounded-lg font-medium border transition-colors flex-shrink-0', stage.btnClass]">
                                             Chuyển →
                                         </button>
+                                        <button v-else-if="currentStepIdx > idx && canGoToStep(idx)"
+                                            @click="confirmTransition(stage.targetStatus, stage.label)"
+                                            class="text-xs px-2.5 py-1 rounded-lg font-medium border border-gray-200 text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors flex-shrink-0">
+                                            ← Quay lại
+                                        </button>
                                     </div>
                                 </div>
                             </div>
@@ -715,10 +720,24 @@
                         <div v-else-if="transitionModal.status === 'completed' && pendingItemCount > 0"
                             class="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
                             <p class="font-medium text-amber-700">⚠ Còn {{ pendingItemCount }} dịch vụ chưa hoàn thành.</p>
-                            <p class="text-amber-600 text-xs">Kế hoạch sẽ được đánh dấu hoàn thành dù còn dịch vụ đang dở.</p>
+                            <p class="text-amber-600 text-xs">Các dịch vụ còn lại sẽ được tự động đánh dấu hoàn thành khi đóng kế hoạch.</p>
                             <label class="flex items-center gap-2 cursor-pointer mt-1">
                                 <input v-model="transitionConfirmed" type="checkbox" class="w-4 h-4 accent-amber-600 cursor-pointer" />
                                 <span class="text-xs font-medium text-amber-800">Tôi xác nhận muốn hoàn thành kế hoạch này</span>
+                            </label>
+                        </div>
+
+                        <!-- Reverting to an earlier stage -->
+                        <div v-else-if="transitionModal.isReverting"
+                            class="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                            <p class="font-medium text-amber-700">⚠ Quay lại trạng thái trước đó</p>
+                            <p class="text-amber-600 text-xs">
+                                Kế hoạch đang ở <strong>{{ plan.status_label }}</strong> sẽ được chuyển ngược về <strong>{{ transitionModal.label }}</strong>.
+                                Thao tác này có thể ảnh hưởng đến hóa đơn, công nợ và báo cáo liên quan đã phát sinh dựa trên trạng thái hiện tại.
+                            </p>
+                            <label class="flex items-center gap-2 cursor-pointer mt-1">
+                                <input v-model="transitionConfirmed" type="checkbox" class="w-4 h-4 accent-amber-600 cursor-pointer" />
+                                <span class="text-xs font-medium text-amber-800">Tôi xác nhận muốn quay lại trạng thái này</span>
                             </label>
                         </div>
 
@@ -739,7 +758,7 @@
                             Hủy bỏ
                         </button>
                         <button @click="executeTransition"
-                            :disabled="transitionModal.status === 'completed' && pendingItemCount > 0 && !transitionConfirmed"
+                            :disabled="((transitionModal.status === 'completed' && pendingItemCount > 0) || transitionModal.isReverting) && !transitionConfirmed"
                             :class="['px-4 py-2 text-sm font-medium text-white rounded-lg disabled:opacity-40 disabled:cursor-not-allowed',
                                 transitionModal.isCancelling ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700']">
                             {{ transitionModal.isCancelling ? 'Xác nhận hủy' : 'Xác nhận chuyển' }}
@@ -1037,7 +1056,7 @@ function changeItemStatus(id, status) {
 
 // ── Transition confirmation ───────────────────────────────────────────────
 const STATUS_ORDER = ['draft', 'approved', 'in_progress', 'completed'];
-const transitionModal    = ref({ open: false, status: '', label: '', isCancelling: false, isSkipping: false });
+const transitionModal    = ref({ open: false, status: '', label: '', isCancelling: false, isSkipping: false, isReverting: false });
 const transitionConfirmed = ref(false);
 
 function confirmTransition(status, label) {
@@ -1049,18 +1068,24 @@ function confirmTransition(status, label) {
         status,
         label,
         isCancelling,
-        isSkipping: !isCancelling && toIdx - fromIdx > 1,
+        isSkipping:  !isCancelling && toIdx - fromIdx > 1,
+        isReverting: !isCancelling && toIdx >= 0 && toIdx < fromIdx,
     };
     transitionConfirmed.value = false;
 }
 
 function executeTransition() {
+    const status = transitionModal.value.status;
+    const forceCompleteItems = status === 'completed' && pendingItemCount.value > 0;
     transitionModal.value.open = false;
-    doTransition(transitionModal.value.status);
+    doTransition(status, forceCompleteItems);
 }
 
-function doTransition(status) {
-    router.post(route('clinical.treatment-plans.transition', props.plan.id), { status });
+function doTransition(status, forceCompleteItems = false) {
+    router.post(route('clinical.treatment-plans.transition', props.plan.id), {
+        status,
+        force_complete_items: forceCompleteItems,
+    });
 }
 
 

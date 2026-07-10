@@ -468,11 +468,14 @@ class TreatmentPlanController extends Controller
     {
         $this->authorize('treatment_plans.edit');
 
-        $data      = $request->validate(['status' => 'required|string']);
+        $data      = $request->validate([
+            'status'                => 'required|string',
+            'force_complete_items'  => 'sometimes|boolean',
+        ]);
         $newStatus = TreatmentPlanStatus::from($data['status']);
 
         try {
-            $this->svc->transition($treatmentPlan, $newStatus);
+            $this->svc->transition($treatmentPlan, $newStatus, (bool) ($data['force_complete_items'] ?? false));
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }

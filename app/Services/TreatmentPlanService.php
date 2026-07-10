@@ -102,7 +102,7 @@ class TreatmentPlanService
         });
     }
 
-    public function transition(TreatmentPlan $plan, TreatmentPlanStatus $to): void
+    public function transition(TreatmentPlan $plan, TreatmentPlanStatus $to, bool $forceCompleteItems = false): void
     {
         $allowed = $plan->status->allowedTransitions();
 
@@ -111,10 +111,25 @@ class TreatmentPlanService
         }
 
         if ($to === TreatmentPlanStatus::Completed) {
-            $remaining = $plan->items()->where('status', '!=', TreatmentItemStatus::Completed->value)->count();
-            if ($remaining > 0) {
-                throw new \RuntimeException("Còn {$remaining} dịch vụ chưa hoàn thành. Vui lòng hoàn thành tất cả dịch vụ trước khi đóng kế hoạch.");
-            }
+            DB::transaction(function () use ($plan, $forceCompleteItems, $to) {
+                if ($forceCompleteItems) {
+                    $plan->items()
+                        ->whereNotIn('status', [TreatmentItemStatus::Completed->value, TreatmentItemStatus::Cancelled->value])
+                        ->update(['status' => TreatmentItemStatus::Completed->value]);
+                }
+
+                $remaining = $forceCompleteItems
+                    ? $plan->items()->whereNotIn('status', [TreatmentItemStatus::Completed->value, TreatmentItemStatus::Cancelled->value])->count()
+                    : $plan->items()->where('status', '!=', TreatmentItemStatus::Completed->value)->count();
+
+                if ($remaining > 0) {
+                    throw new \RuntimeException("Còn {$remaining} dịch vụ chưa hoàn thành. Vui lòng hoàn thành tất cả dịch vụ trước khi đóng kế hoạch.");
+                }
+
+                $plan->update(['status' => $to]);
+            });
+
+            return;
         }
 
         DB::transaction(fn () => $plan->update(['status' => $to]));

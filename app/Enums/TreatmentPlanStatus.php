@@ -38,7 +38,7 @@ enum TreatmentPlanStatus: string
             self::Draft      => [self::Approved, self::InProgress, self::Completed, self::Cancelled],
             self::Approved   => [self::InProgress, self::Completed, self::Cancelled],
             self::InProgress => [self::Completed, self::Cancelled],
-            self::Completed  => [],
+            self::Completed  => [self::Approved, self::InProgress],
             self::Cancelled  => [],
         };
     }
