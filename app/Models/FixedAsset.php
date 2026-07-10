@@ -4,12 +4,15 @@ namespace App\Models;
 
 use App\Enums\FixedAssetCategory;
 use App\Enums\FixedAssetStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FixedAsset extends Model
 {
+    use GeneratesUniqueCode;
+
     protected $fillable = [
         'code', 'name', 'category', 'branch_id',
         'acquisition_date', 'acquisition_cost', 'useful_life_months',

@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class PriceList extends Model
 {
-    use LogsActivity;
+    use LogsActivity, GeneratesUniqueCode;
 
     protected $fillable = ['code', 'name', 'is_active'];
 

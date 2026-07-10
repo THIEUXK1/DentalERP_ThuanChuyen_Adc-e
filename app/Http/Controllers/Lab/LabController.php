@@ -46,7 +46,7 @@ class LabController extends Controller
         $this->authorize('labo.manage');
 
         $data = $this->validated($request);
-        $lab  = Lab::create([...$data, 'code' => Lab::generateCode()]);
+        $lab  = Lab::createWithCode($data);
 
         return redirect()->route('lab.labs.show', $lab)->with('success', 'Đã tạo labo.');
     }

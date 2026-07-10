@@ -6,6 +6,7 @@ use App\Enums\ContractType;
 use App\Enums\DentalRole;
 use App\Enums\EmploymentStatus;
 use App\Enums\RoleType;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,7 +17,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Employee extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
 
     protected $fillable = [
         'code', 'user_id', 'branch_id', 'department_id',

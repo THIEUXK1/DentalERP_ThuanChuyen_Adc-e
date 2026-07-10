@@ -264,7 +264,7 @@ class PatientController extends Controller
         $extraPhones = $data['extra_phones'] ?? [];
         unset($data['extra_phones']);
 
-        $patient = Patient::create([...$data, 'code' => Patient::generateCode()]);
+        $patient = Patient::createWithCode($data);
         $this->syncExtraPhones($patient, $extraPhones);
         \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
         \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');

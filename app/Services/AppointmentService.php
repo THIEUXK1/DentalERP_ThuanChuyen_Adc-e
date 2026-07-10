@@ -62,9 +62,8 @@ class AppointmentService
         return DB::transaction(function () use ($data) {
             $this->checkConflict($data);
 
-            $appointment = Appointment::create([
+            $appointment = Appointment::createWithCode([
                 ...$data,
-                'code' => Appointment::generateCode(),
                 'status' => AppointmentStatus::Booked->value,
                 'created_by' => auth()->id(),
             ]);

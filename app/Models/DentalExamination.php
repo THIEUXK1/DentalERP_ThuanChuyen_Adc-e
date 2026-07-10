@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Enums\ExaminationStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class DentalExamination extends Model
 {
-    use LogsActivity;
+    use LogsActivity, GeneratesUniqueCode;
 
     protected $fillable = [
         'code', 'patient_id', 'appointment_id', 'branch_id', 'doctor_id', 'consultant_id',

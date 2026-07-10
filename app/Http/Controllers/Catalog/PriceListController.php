@@ -38,7 +38,7 @@ class PriceListController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        PriceList::create([...$data, 'code' => PriceList::generateCode()]);
+        PriceList::createWithCode($data);
 
         return redirect()->route('catalog.price-lists.index')->with('success', 'Đã tạo bảng giá.');
     }

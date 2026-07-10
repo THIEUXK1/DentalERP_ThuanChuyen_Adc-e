@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Enums\DentalConditionGroup;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 
 class DentalCondition extends Model
 {
+    use GeneratesUniqueCode;
+
     protected $fillable = [
         'code', 'name', 'group', 'description', 'sort_order', 'is_active',
     ];

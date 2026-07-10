@@ -172,8 +172,7 @@ class TreatmentPlanController extends Controller
         $plan = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
             $planStatus = $data['status'] ?? TreatmentPlanStatus::Draft->value;
             
-            $plan = TreatmentPlan::create([
-                'code' => TreatmentPlan::generateCode(),
+            $plan = TreatmentPlan::createWithCode([
                 'patient_id' => $data['patient_id'],
                 'branch_id' => $data['branch_id'],
                 'doctor_id' => $data['doctor_id'] ?? null,

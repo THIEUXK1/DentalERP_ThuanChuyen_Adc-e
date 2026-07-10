@@ -55,9 +55,8 @@ class ConditionController extends Controller
             'sort_order'  => 'nullable|integer|min:0',
         ]);
 
-        DentalCondition::create([
+        DentalCondition::createWithCode([
             ...$data,
-            'code'       => DentalCondition::generateCode(),
             'sort_order' => $data['sort_order'] ?? 0,
             'is_active'  => true,
         ]);

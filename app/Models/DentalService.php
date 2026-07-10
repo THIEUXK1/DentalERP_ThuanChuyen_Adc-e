@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\KpiBaseType;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -11,7 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class DentalService extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
 
     protected $fillable = [
         'code', 'name', 'category_id', 'service_group', 'cost_price', 'selling_price',

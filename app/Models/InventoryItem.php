@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Enums\InventoryTransactionType;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 
 class InventoryItem extends Model
 {
+    use GeneratesUniqueCode;
+
     protected $fillable = [
         'code', 'name', 'category', 'unit', 'branch_id',
         'min_stock_qty', 'current_stock_qty', 'unit_cost',

@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Lab extends Model
 {
+    use GeneratesUniqueCode;
+
     protected $fillable = [
         'code', 'name', 'phone', 'email', 'address',
         'contact_person', 'bank_account', 'notes', 'is_active',

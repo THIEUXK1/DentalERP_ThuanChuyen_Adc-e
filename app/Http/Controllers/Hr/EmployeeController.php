@@ -81,7 +81,7 @@ class EmployeeController extends Controller
 
         $data = $this->validated($request);
 
-        Employee::create([...$data, 'code' => Employee::generateCode()]);
+        Employee::createWithCode($data);
 
         return redirect()->route('employees.index')->with('success', 'Đã tạo hồ sơ nhân viên.');
     }

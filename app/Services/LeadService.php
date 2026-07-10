@@ -40,8 +40,7 @@ class LeadService
             if ($existing) {
                 $patient = $existing;
             } else {
-                $patient = Patient::create([
-                    'code' => Patient::generateCode(),
+                $patient = Patient::createWithCode([
                     'full_name' => $extra['full_name'] ?? $lead->name,
                     'phone' => $lead->phone,
                     'email' => $lead->email,

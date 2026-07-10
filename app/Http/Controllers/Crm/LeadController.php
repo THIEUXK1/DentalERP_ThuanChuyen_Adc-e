@@ -66,7 +66,7 @@ class LeadController extends Controller
         $this->authorize('leads.create');
 
         $data = $this->validated($request);
-        Lead::create([...$data, 'code' => Lead::generateCode(), 'status' => LeadStatus::New->value]);
+        Lead::createWithCode([...$data, 'status' => LeadStatus::New->value]);
 
         return redirect()->route('crm.leads.index')->with('success', 'Đã tạo lead.');
     }

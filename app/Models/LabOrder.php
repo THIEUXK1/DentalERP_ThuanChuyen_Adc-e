@@ -3,12 +3,15 @@
 namespace App\Models;
 
 use App\Enums\LabOrderStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LabOrder extends Model
 {
+    use GeneratesUniqueCode;
+
     protected $fillable = [
         'code', 'lab_id', 'treatment_plan_id', 'patient_id', 'branch_id',
         'status', 'items', 'total_amount', 'notes',

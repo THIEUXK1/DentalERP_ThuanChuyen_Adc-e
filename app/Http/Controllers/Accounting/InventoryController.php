@@ -80,9 +80,8 @@ class InventoryController extends Controller
             'notes'         => 'nullable|string|max:1000',
         ]);
 
-        $item = InventoryItem::create([
+        $item = InventoryItem::createWithCode([
             ...$data,
-            'code'       => InventoryItem::generateCode(),
             'created_by' => auth()->id(),
         ]);
 

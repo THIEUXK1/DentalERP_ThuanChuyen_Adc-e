@@ -56,7 +56,7 @@ class BranchController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        Branch::create([...$data, 'code' => Branch::generateCode()]);
+        Branch::createWithCode($data);
 
         return redirect()->route('branches.index')->with('success', 'Đã tạo chi nhánh.');
     }

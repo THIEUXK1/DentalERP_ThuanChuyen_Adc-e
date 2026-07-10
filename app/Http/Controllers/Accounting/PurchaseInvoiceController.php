@@ -85,8 +85,7 @@ class PurchaseInvoiceController extends Controller
         ]);
 
         DB::transaction(function () use ($data) {
-            $invoice = PurchaseInvoice::create([
-                'code'            => PurchaseInvoice::generateCode(),
+            $invoice = PurchaseInvoice::createWithCode([
                 'supplier_id'     => $data['supplier_id'],
                 'branch_id'       => $data['branch_id'] ?? null,
                 'fund_account_id' => $data['fund_account_id'] ?? null,

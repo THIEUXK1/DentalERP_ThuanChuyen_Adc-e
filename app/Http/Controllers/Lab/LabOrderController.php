@@ -44,9 +44,8 @@ class LabOrderController extends Controller
         $this->authorize('labo.manage');
 
         $data = $this->validated($request);
-        $order = LabOrder::create([
+        $order = LabOrder::createWithCode([
             ...$data,
-            'code'       => LabOrder::generateCode(),
             'status'     => LabOrderStatus::Draft,
             'created_by' => auth()->id(),
         ]);

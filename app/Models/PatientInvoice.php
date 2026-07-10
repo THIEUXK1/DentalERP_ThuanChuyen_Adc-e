@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Enums\InvoiceStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class PatientInvoice extends Model
 {
-    use LogsActivity;
+    use LogsActivity, GeneratesUniqueCode;
 
     protected $fillable = [
         'code', 'patient_id', 'treatment_plan_id', 'installment_index', 'branch_id',

@@ -14,9 +14,8 @@ class FixedAssetService
     {
         $monthly = (int) ceil($data['acquisition_cost'] / $data['useful_life_months']);
 
-        return FixedAsset::create([
+        return FixedAsset::createWithCode([
             ...$data,
-            'code'                    => FixedAsset::generateCode(),
             'monthly_depreciation'    => $monthly,
             'accumulated_depreciation' => 0,
             'net_book_value'          => $data['acquisition_cost'],

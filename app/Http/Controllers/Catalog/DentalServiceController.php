@@ -62,7 +62,7 @@ class DentalServiceController extends Controller
             'is_active' => 'boolean',
         ]);
 
-        DentalService::create([...$data, 'code' => DentalService::generateCode()]);
+        DentalService::createWithCode($data);
 
         return redirect()->route('catalog.services.index')->with('success', 'Đã tạo dịch vụ.');
     }

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AppointmentStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Appointment extends Model
 {
-    use LogsActivity;
+    use LogsActivity, GeneratesUniqueCode;
 
     protected $fillable = [
         'code', 'patient_id', 'branch_id', 'doctor_id', 'dental_chair_id',

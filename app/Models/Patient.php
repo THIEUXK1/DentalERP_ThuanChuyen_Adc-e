@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Appointment;
+use App\Models\Concerns\GeneratesUniqueCode;
 use App\Models\ScheduleRegistration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Patient extends Model
 {
-    use LogsActivity, SoftDeletes;
+    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
 
     protected $fillable = [
         'code', 'legacy_code', 'full_name', 'phone', 'email', 'dob', 'gender', 'address',

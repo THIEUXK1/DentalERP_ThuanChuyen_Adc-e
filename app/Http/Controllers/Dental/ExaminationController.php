@@ -100,9 +100,8 @@ class ExaminationController extends Controller
         ]);
 
         $examination = DB::transaction(function () use ($data) {
-            $exam = DentalExamination::create([
+            $exam = DentalExamination::createWithCode([
                 ...$data,
-                'code'        => DentalExamination::generateCode(),
                 'status'      => ExaminationStatus::Draft->value,
                 'examined_at' => $data['examined_at'] ?? now(),
                 'created_by'  => auth()->id(),

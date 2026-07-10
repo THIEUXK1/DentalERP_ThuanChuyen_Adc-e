@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Enums\PurchaseInvoiceStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 
 class PurchaseInvoice extends Model
 {
+    use GeneratesUniqueCode;
+
     protected $fillable = [
         'code', 'supplier_id', 'branch_id', 'fund_account_id', 'invoice_date', 'due_date',
         'status', 'subtotal', 'vat_amount', 'total', 'paid_amount', 'payment_method', 'notes', 'created_by',

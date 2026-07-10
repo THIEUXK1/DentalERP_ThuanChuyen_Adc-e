@@ -22,8 +22,7 @@ class InvoiceService
         return DB::transaction(function () use ($plan) {
             $total = $plan->net_total;
 
-            $invoice = PatientInvoice::create([
-                'code' => PatientInvoice::generateCode(),
+            $invoice = PatientInvoice::createWithCode([
                 'patient_id' => $plan->patient_id,
                 'treatment_plan_id' => $plan->id,
                 'branch_id' => $plan->branch_id,

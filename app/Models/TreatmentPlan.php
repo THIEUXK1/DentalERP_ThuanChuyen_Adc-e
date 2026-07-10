@@ -3,13 +3,14 @@
 namespace App\Models;
 
 use App\Enums\TreatmentPlanStatus;
+use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
 
 class TreatmentPlan extends Model
 {
-    use LogsActivity;
+    use LogsActivity, GeneratesUniqueCode;
 
     protected static function booted(): void
     {
