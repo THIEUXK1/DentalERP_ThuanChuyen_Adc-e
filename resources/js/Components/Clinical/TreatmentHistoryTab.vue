@@ -57,7 +57,8 @@
                         </div>
                     </div>
                     <div class="hidden md:flex items-center gap-3 text-xs ml-2">
-                        <span class="text-gray-500">Tổng: <span class="font-semibold text-gray-800">{{ fmt(plan.total_amount) }}</span></span>
+                        <span class="text-gray-500">Tổng: <span class="font-semibold text-gray-800">{{ fmt(planGrossTotal(plan)) }}</span></span>
+                        <span v-if="planDiscountTotal(plan) > 0" class="text-gray-500">Giảm giá: <span class="font-semibold text-rose-600">-{{ fmt(planDiscountTotal(plan)) }}</span></span>
                         <span class="text-gray-500">Đã thu: <span class="font-semibold text-emerald-600">{{ fmt(plan.amount_paid) }}</span></span>
                         <span v-if="plan.amount_due > 0" class="text-gray-500">Nợ: <span class="font-semibold text-rose-600">{{ fmt(plan.amount_due) }}</span></span>
                     </div>
@@ -156,13 +157,14 @@
                                 <th class="px-4 py-2 text-left text-gray-500 font-medium hidden sm:table-cell">Vị trí răng</th>
                                 <th class="px-4 py-2 text-right text-gray-500 font-medium">Đơn giá</th>
                                 <th class="px-4 py-2 text-right text-gray-500 font-medium">SL</th>
+                                <th class="px-4 py-2 text-right text-gray-500 font-medium">Giảm giá</th>
                                 <th class="px-4 py-2 text-right text-gray-500 font-medium">Thành tiền</th>
                                 <th class="px-4 py-2 text-center text-gray-500 font-medium">Trạng thái</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-50">
                             <tr v-if="plan.items.length === 0">
-                                <td colspan="7" class="px-4 py-4 text-center text-gray-400">Chưa có dịch vụ</td>
+                                <td colspan="8" class="px-4 py-4 text-center text-gray-400">Chưa có dịch vụ</td>
                             </tr>
                             <tr v-for="(item, ii) in plan.items" :key="item.id"
                                 class="hover:bg-blue-50/30 transition-colors">
@@ -180,7 +182,11 @@
                                 </td>
                                 <td class="px-4 py-2 text-right tabular-nums text-gray-600">{{ fmt(item.unit_price) }}</td>
                                 <td class="px-4 py-2 text-right text-gray-600">{{ item.quantity }}</td>
-                                <td class="px-4 py-2 text-right tabular-nums font-semibold text-gray-800">{{ fmt(item.subtotal) }}</td>
+                                <td class="px-4 py-2 text-right tabular-nums">
+                                    <span v-if="item.discount" class="text-rose-500">-{{ fmt(item.discount) }}</span>
+                                    <span v-else class="text-gray-300">—</span>
+                                </td>
+                                <td class="px-4 py-2 text-right tabular-nums font-semibold text-gray-800">{{ fmt(item.unit_price * item.quantity - (item.discount ?? 0)) }}</td>
                                 <td class="px-4 py-2 text-center">
                                     <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', itemStatusClass(item.status)]">
                                         {{ item.status_label }}
@@ -188,8 +194,8 @@
                                 </td>
                             </tr>
                             <tr v-if="plan.items.length > 0" class="bg-gray-50 border-t border-gray-200">
-                                <td colspan="5" class="px-4 py-2 text-right text-gray-500 text-xs font-medium">Tổng kế hoạch:</td>
-                                <td class="px-4 py-2 text-right tabular-nums font-bold text-gray-900">{{ fmt(plan.total_amount) }}</td>
+                                <td colspan="6" class="px-4 py-2 text-right text-gray-500 text-xs font-medium">Tổng kế hoạch:</td>
+                                <td class="px-4 py-2 text-right tabular-nums font-bold text-gray-900">{{ fmt(planNetTotal(plan)) }}</td>
                                 <td></td>
                             </tr>
                         </tbody>
@@ -319,6 +325,18 @@ function togglePlan(id) {
 // ── Formatters ──────────────────────────────────────────────────────────────
 function fmt(val) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(val ?? 0);
+}
+
+// Recomputed straight from each item's unit_price/quantity/discount rather than
+// trusting the plan/item aggregate columns, which can go stale on old records.
+function planGrossTotal(plan) {
+    return (plan.items ?? []).reduce((s, i) => s + i.unit_price * i.quantity, 0);
+}
+function planDiscountTotal(plan) {
+    return (plan.items ?? []).reduce((s, i) => s + (i.discount ?? 0), 0);
+}
+function planNetTotal(plan) {
+    return planGrossTotal(plan) - planDiscountTotal(plan);
 }
 function stageLabel(status) {
     if (status === 'cancelled') return 'Đã hủy';

@@ -399,7 +399,9 @@ class PatientController extends Controller
                 'status'             => $plan->status->value,
                 'status_label'       => $plan->status->label(),
                 'doctor'             => $plan->doctor?->full_name,
-                'total_amount'       => $plan->total_amount - $plan->discount_amount,
+                'total_amount'       => $plan->total_amount,
+                'discount_amount'    => $plan->discount_amount,
+                'net_total'          => $plan->total_amount - $plan->discount_amount,
                 'amount_paid'        => $paid,
                 'amount_due'         => $due,
                 'created_at'         => $plan->created_at->format('d/m/Y H:i'),
@@ -422,6 +424,7 @@ class PatientController extends Controller
                     'tooth_number' => $item->tooth_number,
                     'unit_price'   => $item->unit_price,
                     'quantity'     => $item->quantity,
+                    'discount'     => $item->discount,
                     'subtotal'     => $item->subtotal,
                     'status'       => $item->status,
                     'status_label' => match($item->status) {
