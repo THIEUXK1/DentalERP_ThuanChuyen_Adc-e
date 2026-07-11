@@ -50,6 +50,6 @@ enum TreatmentPlanStatus: string
 
     public function isItemsEditable(): bool
     {
-        return in_array($this, [self::Draft, self::Approved, self::InProgress]);
+        return in_array($this, [self::Draft, self::Approved, self::InProgress, self::Completed]);
     }
 }
