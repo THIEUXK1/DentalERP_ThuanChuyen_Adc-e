@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\PatientInvoice;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -40,6 +39,20 @@ class AuditInvoicePayments extends Command
             'count' => $mismatched->count(),
             'total_diff' => $totalDiff,
         ]);
+
+        activity('invoice_payment_audit')
+            ->withProperties([
+                'count' => $mismatched->count(),
+                'total_diff' => $totalDiff,
+                'sample' => $mismatched->take(10)->map(fn ($r) => [
+                    'invoice_id' => $r->id,
+                    'code' => $r->code,
+                    'amount_paid' => $r->amount_paid,
+                    'paysum' => $r->paysum,
+                    'diff' => $r->amount_paid - $r->paysum,
+                ])->values()->all(),
+            ])
+            ->log("Phát hiện {$mismatched->count()} hóa đơn lệch amount_paid, tổng chênh lệch ".number_format($totalDiff)." đ");
 
         $limit = (int) $this->option('limit');
         $this->table(

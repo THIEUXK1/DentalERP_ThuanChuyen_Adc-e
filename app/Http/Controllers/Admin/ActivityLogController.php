@@ -15,6 +15,7 @@ class ActivityLogController extends Controller
         $this->authorize('admin.audit_log');
 
         $query = Activity::with(['causer', 'subject'])
+            ->where('log_name', '!=', 'invoice_payment_audit')
             ->when($request->search, fn ($q, $v) => $q->whereHas('causer', fn ($cq) => $cq->where('name', 'ilike', "%{$v}%")))
             ->when($request->subject_type, fn ($q, $v) => $q->where('subject_type', 'like', "%{$v}%"))
             ->when($request->date, fn ($q, $v) => $q->whereDate('created_at', $v))
@@ -22,6 +23,19 @@ class ActivityLogController extends Controller
 
         $subjectTypes = Activity::distinct()->pluck('subject_type')->filter()
             ->map(fn ($t) => class_basename($t))->unique()->values();
+
+        $paymentAudits = Activity::where('log_name', 'invoice_payment_audit')
+            ->orderByDesc('id')
+            ->limit(10)
+            ->get()
+            ->map(fn ($a) => [
+                'id' => $a->id,
+                'description' => $a->description,
+                'count' => $a->properties['count'] ?? null,
+                'total_diff' => $a->properties['total_diff'] ?? null,
+                'sample' => $a->properties['sample'] ?? [],
+                'created_at' => $a->created_at->format('d/m/Y H:i:s'),
+            ]);
 
         return Inertia::render('Admin/ActivityLog/Index', [
             'logs' => $query->paginate(30)->through(fn ($a) => [
@@ -36,6 +50,7 @@ class ActivityLogController extends Controller
             ]),
             'subjectTypes' => $subjectTypes,
             'filters' => $request->only(['search', 'subject_type', 'date']),
+            'paymentAudits' => $paymentAudits,
         ]);
     }
 }
