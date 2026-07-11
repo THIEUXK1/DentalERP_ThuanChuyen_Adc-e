@@ -212,8 +212,26 @@ class ClinicRecordSyncService
     {
         $groupKey = "{$patientCode}|{$recordDate}";
 
-        if (TreatmentPlan::where('legacy_group_key', $groupKey)->exists()) {
+        $existingPlan = TreatmentPlan::where('legacy_group_key', $groupKey)->first();
+        if ($existingPlan) {
             $stats['plans_skipped_existing']++;
+
+            // The plan/invoice already exist, but attachPayments() may never have run
+            // against them with a complete payment index (e.g. they were created while
+            // buildPaymentIndex() was still silently dropping ~49% of "Thanh toán" rows).
+            // Retry attaching now, against the *existing* invoice, so a still-missing
+            // payment lands where it truly belongs instead of spawning a duplicate
+            // placeholder plan in the leftover-payment pass below.
+            $existingInvoice = PatientInvoice::where('treatment_plan_id', $existingPlan->id)->first();
+            if ($existingInvoice) {
+                ClinicRecord::query()
+                    ->where('record_type', 'Thủ thuật')
+                    ->where('patient_code', $patientCode)
+                    ->whereDate('record_date', $recordDate)
+                    ->get()
+                    ->each(fn ($row) => $this->attachPayments($patientCode, $row, $existingInvoice, $userId, $stats));
+            }
+
             return;
         }
 
