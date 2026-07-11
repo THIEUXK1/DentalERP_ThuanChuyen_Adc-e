@@ -61,8 +61,12 @@ class InvoiceService
                 'created_by' => auth()->id(),
             ]);
 
-            // Recompute from sum (idempotent)
-            $amountPaid = $invoice->payments()->sum('amount');
+            // Add to the existing amount_paid rather than recomputing from the sum of
+            // patient_payments rows: legacy-synced invoices can have amount_paid that
+            // is correct but not fully backed by individual payment rows (see
+            // ClinicRecordSyncService), so recomputing from the sum would silently
+            // erase that difference every time a new payment is recorded.
+            $amountPaid = $invoice->amount_paid + $data['amount'];
             $remaining = $invoice->total - $amountPaid;
 
             $invoiceStatus = $remaining <= 0
