@@ -12,7 +12,8 @@ class SyncClinicRecordsCommand extends Command
         {--dry-run : Preview changes without writing to the database}
         {--branch=2 : Branch ID to assign to migrated records}
         {--user=1 : User ID to attribute created_by to}
-        {--limit= : Only process this many (patient, date) groups, for testing}';
+        {--limit= : Only process this many (patient, date) groups, for testing}
+        {--until= : Only process legacy records dated on or before this date (YYYY-MM-DD); leaves anything after it untouched}';
 
     protected $description = 'Sync clinic_records (legacy system data) into patients/treatment_plans/invoices/payments/debts';
 
@@ -29,13 +30,14 @@ class SyncClinicRecordsCommand extends Command
         $branch  = (int) $this->option('branch');
         $user    = (int) $this->option('user');
         $limit   = $this->option('limit') ? (int) $this->option('limit') : null;
+        $until   = $this->option('until') ?: null;
 
         $this->info($dryRun ? 'Running in DRY-RUN mode (no data will be written).' : 'Running LIVE — data will be written.');
-        $this->info("Branch ID: {$branch}, User ID (created_by): {$user}".($limit ? ", limit: {$limit} groups" : ''));
+        $this->info("Branch ID: {$branch}, User ID (created_by): {$user}".($limit ? ", limit: {$limit} groups" : '').($until ? ", until: {$until}" : ''));
 
         $stats = $service->sync($branch, $user, $limit, $dryRun, function (int $processed, int $total, array $stats) {
             $this->line("  … {$processed}/{$total} groups — patients:{$stats['patients_created']} plans:{$stats['plans_created']} items:{$stats['items_created']} payments:{$stats['payments_created']} errors:".count($stats['errors']));
-        });
+        }, $until);
 
         $this->newLine();
         $this->info('=== Summary ===');

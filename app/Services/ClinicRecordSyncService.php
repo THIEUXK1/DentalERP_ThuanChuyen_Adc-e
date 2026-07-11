@@ -14,6 +14,7 @@ use App\Models\Patient;
 use App\Models\PatientDebt;
 use App\Models\PatientInvoice;
 use App\Models\PatientPayment;
+use App\Models\ServiceCategory;
 use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
 use Illuminate\Support\Carbon;
@@ -40,10 +41,13 @@ class ClinicRecordSyncService
     /** @var array<string, array<int, object>> patient_code|service_name(lower) => list of Thanh toán rows */
     private array $paymentIndex = [];
 
+    /** @var array<int, object> clinic_records.id => Thanh toán row, every row seen by buildPaymentIndex() */
+    private array $allPaymentRows = [];
+
     /** @var array<int, true> clinic_records.id of Thanh toán rows already turned into a PatientPayment */
     private array $consumedPaymentIds = [];
 
-    public function sync(int $branchId, int $userId, ?int $limit, bool $dryRun, ?\Closure $onProgress = null): array
+    public function sync(int $branchId, int $userId, ?int $limit, bool $dryRun, ?\Closure $onProgress = null, ?string $until = null): array
     {
         $stats = [
             'patients_created'          => 0,
@@ -57,7 +61,7 @@ class ClinicRecordSyncService
             'errors'                    => [],
         ];
 
-        $this->buildPaymentIndex();
+        $this->buildPaymentIndex($until);
         $this->consumedPaymentIds = PatientPayment::query()
             ->whereNotNull('legacy_clinic_record_id')
             ->pluck('legacy_clinic_record_id')
@@ -67,21 +71,7 @@ class ClinicRecordSyncService
 
         $groups = ClinicRecord::query()
             ->where('record_type', 'Thủ thuật')
-            ->select('patient_code', 'record_date')
-            ->groupBy('patient_code', 'record_date')
-            ->orderBy('record_date')
-            ->get();
-
-        // Patients who only ever have "Thanh toán" rows (no "Thủ thuật" at all) would
-        // otherwise never get a patient/plan record — give them a placeholder plan built
-        // straight from their payment rows' own service_name, so their payment history
-        // isn't silently dropped.
-        $paymentOnlyGroups = ClinicRecord::query()
-            ->where('record_type', 'Thanh toán')
-            ->whereNotIn('patient_code', function ($q) {
-                $q->select('patient_code')->from('clinic_records')
-                    ->where('record_type', 'Thủ thuật')->whereNull('deleted_at');
-            })
+            ->when($until, fn ($q) => $q->whereDate('record_date', '<=', $until))
             ->select('patient_code', 'record_date')
             ->groupBy('patient_code', 'record_date')
             ->orderBy('record_date')
@@ -89,10 +79,9 @@ class ClinicRecordSyncService
 
         if ($limit) {
             $groups = $groups->take($limit);
-            $paymentOnlyGroups = $paymentOnlyGroups->take($limit);
         }
 
-        $total = $groups->count() + $paymentOnlyGroups->count();
+        $total = $groups->count();
         $processed = 0;
 
         foreach ($groups as $group) {
@@ -133,6 +122,30 @@ class ClinicRecordSyncService
                 }
             }
         }
+
+        // Any "Thanh toán" row that attachPayments() never claimed — either because its
+        // service_name never matches a "Thủ thuật" row at all, or because the matching
+        // procedure's $need was already fully covered by other payments — has no home to
+        // land in. Build a placeholder plan/invoice straight from these leftover rows so
+        // the payment history isn't silently dropped, regardless of whether this patient
+        // has other, unrelated procedure-based plans elsewhere.
+        // Match the "Y-m-d H:i:s" shape already stored in existing legacy_group_key values
+        // (see processGroup()) so the exists() dedup check below keeps working across runs.
+        $paymentOnlyGroups = collect($this->allPaymentRows)
+            ->reject(fn ($row) => isset($this->consumedPaymentIds[$row->id]))
+            ->groupBy(fn ($row) => $row->patient_code.'|'.Carbon::parse($row->record_date)->toDateTimeString())
+            ->map(fn ($rows, $key) => (object) [
+                'patient_code' => $rows->first()->patient_code,
+                'record_date'  => Carbon::parse($rows->first()->record_date)->toDateTimeString(),
+            ])
+            ->sortBy('record_date')
+            ->values();
+
+        if ($limit) {
+            $paymentOnlyGroups = $paymentOnlyGroups->take($limit);
+        }
+
+        $total += $paymentOnlyGroups->count();
 
         foreach ($paymentOnlyGroups as $group) {
             $processed++;
@@ -331,9 +344,11 @@ class ClinicRecordSyncService
     }
 
     /**
-     * Placeholder plan/invoice for a patient who only ever has "Thanh toán" rows
-     * (no "Thủ thuật" at all) — built from the payment rows' own service_name so
-     * their payment history isn't silently dropped from the sync.
+     * Placeholder plan/invoice for a "Thanh toán" row that attachPayments() couldn't
+     * match to any procedure — either the patient never has a "Thủ thuật" row at all,
+     * or this specific payment's service just doesn't correspond to one. Built from the
+     * payment rows' own service_name so payment history is never silently dropped: any
+     * payment implies there must have been a treatment plan for it.
      */
     private function processPaymentOnlyGroup(string $patientCode, string $recordDate, int $branchId, int $userId, bool $dryRun, array &$stats): void
     {
@@ -344,11 +359,15 @@ class ClinicRecordSyncService
             return;
         }
 
+        // Only the rows attachPayments() left unclaimed belong here — a row already
+        // attached to a procedure-based invoice (possibly dated elsewhere) must not
+        // also get counted into this placeholder plan, or its amount would be doubled.
         $rows = ClinicRecord::query()
             ->where('record_type', 'Thanh toán')
             ->where('patient_code', $patientCode)
             ->whereDate('record_date', $recordDate)
-            ->get();
+            ->get()
+            ->reject(fn ($r) => isset($this->consumedPaymentIds[$r->id]));
 
         if ($rows->isEmpty()) {
             return;
@@ -503,20 +522,32 @@ class ClinicRecordSyncService
         }
     }
 
-    private function buildPaymentIndex(): void
+    private function buildPaymentIndex(?string $until = null): void
     {
         $this->paymentIndex = [];
+        $this->allPaymentRows = [];
 
+        // chunkById paginates by "id > lastId", which only visits every row once if the
+        // query's primary order is the id column itself. Combining it with orderBy('record_date')
+        // (as this used to do) breaks that invariant and silently skips a large share of
+        // rows — verified to drop ~49% of "Thanh toán" rows. Let chunkById order by id, and
+        // sort each per-key payment list by date afterwards instead.
         ClinicRecord::query()
             ->where('record_type', 'Thanh toán')
-            ->orderBy('record_date')
+            ->when($until, fn ($q) => $q->whereDate('record_date', '<=', $until))
             ->select('id', 'patient_code', 'service_name', 'record_date', 'record_time', 'collected_this_period', 'fund_name')
             ->chunkById(2000, function ($rows) {
                 foreach ($rows as $row) {
                     $key = $row->patient_code.'|'.mb_strtolower(trim((string) $row->service_name));
                     $this->paymentIndex[$key][] = $row;
+                    $this->allPaymentRows[$row->id] = $row;
                 }
             });
+
+        foreach ($this->paymentIndex as $key => $rows) {
+            usort($rows, fn ($a, $b) => strcmp((string) $a->record_date, (string) $b->record_date));
+            $this->paymentIndex[$key] = $rows;
+        }
     }
 
     private function resolvePatient(string $patientCode, object $row, int $branchId, Carbon $createdAt, bool $dryRun, array &$stats): Patient
@@ -599,14 +630,19 @@ class ClinicRecordSyncService
             return $this->serviceIdCache[$lookup];
         }
 
-        $service = DentalService::whereRaw('LOWER(category) = ?', [$lookup])->orderBy('id')->first()
+        $service = DentalService::whereHas('category', fn ($q) => $q->whereRaw('LOWER(name) = ?', [$lookup]))->orderBy('id')->first()
             ?? DentalService::whereRaw('LOWER(name) = ?', [$lookup])->first();
 
         if (! $service) {
+            // dental_services no longer has a free-text "category" column — it's now a
+            // category_id FK to service_categories — so find-or-create the category row first.
+            $category = ServiceCategory::whereRaw('LOWER(name) = ?', [$lookup])->first()
+                ?? ServiceCategory::create(['name' => $lookup, 'is_active' => true]);
+
             $service = DentalService::create([
                 'code'          => DentalService::generateCode(),
                 'name'          => $lookup,
-                'category'      => $lookup,
+                'category_id'   => $category->id,
                 'service_group' => $lookup,
                 'is_active'     => true,
             ]);
