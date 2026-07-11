@@ -16,3 +16,6 @@ Schedule::command('attendance:sync')->dailyAt('23:30')->timezone('Asia/Ho_Chi_Mi
 
 // Execute pending deletions every minute
 Schedule::command('pending-deletions:execute')->everyMinute();
+
+// Daily check that invoice.amount_paid matches the sum of its patient_payments rows
+Schedule::command('invoices:audit-payments')->dailyAt('06:00')->timezone('Asia/Ho_Chi_Minh');
