@@ -167,6 +167,8 @@ class TreatmentPlanController extends Controller
             'items.*.estimated_sessions' => 'nullable|integer|min:1',
             'items.*.stage_name' => 'nullable|string|max:255',
             'items.*.notes' => 'nullable|string|max:1000',
+            'items.*.responsible_doctor_id' => 'nullable|exists:employees,id',
+            'items.*.assistant_doctor_id' => 'nullable|exists:employees,id',
         ]);
 
         $plan = \Illuminate\Support\Facades\DB::transaction(function () use ($data) {
@@ -207,6 +209,8 @@ class TreatmentPlanController extends Controller
                     'estimated_sessions' => $itemData['estimated_sessions'] ?? null,
                     'stage_name' => $itemData['stage_name'] ?? null,
                     'notes' => $itemData['notes'] ?? null,
+                    'responsible_doctor_id' => $itemData['responsible_doctor_id'] ?? null,
+                    'assistant_doctor_id' => $itemData['assistant_doctor_id'] ?? null,
                     'status' => 'pending',
                 ]);
             }
