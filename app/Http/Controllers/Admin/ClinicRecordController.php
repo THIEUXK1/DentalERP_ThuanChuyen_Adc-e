@@ -348,18 +348,9 @@ class ClinicRecordController extends Controller
                 continue;
             }
 
-            // Parse date — Excel may give a serial number or a string
+            // Dùng chung parseDate() với previewImport() — Carbon::parse() cũ hiểu nhầm d/m/Y thành m/d/Y, gây lệch legacy_group_key và tạo bản ghi trùng.
             if ($data['record_date'] !== null) {
-                try {
-                    if (is_numeric($data['record_date'])) {
-                        $data['record_date'] = ExcelDate::excelToDateTimeObject((float) $data['record_date'])->format('Y-m-d');
-                    } else {
-                        $data['record_date'] = \Carbon\Carbon::parse($data['record_date'])->format('Y-m-d');
-                    }
-                } catch (\Throwable) {
-                    $skipped++;
-                    continue;
-                }
+                $data['record_date'] = self::parseDate($data['record_date']);
             }
 
             foreach ($numericFields as $f) {
