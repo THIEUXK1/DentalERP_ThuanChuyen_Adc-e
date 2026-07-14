@@ -20,11 +20,12 @@
             <p class="text-sm">Chưa có kế hoạch điều trị</p>
         </div>
 
-        <div v-else class="divide-y divide-gray-100">
-            <div v-for="(plan, pi) in treatmentPlans" :key="plan.id" class="group">
+        <div v-else class="p-3 space-y-3">
+            <div v-for="(plan, pi) in treatmentPlans" :key="plan.id"
+                class="group rounded-lg border border-gray-200 border-l-4 border-l-indigo-300 overflow-hidden">
                 <!-- Plan header row -->
                 <div
-                    :class="['flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors',
+                    :class="['flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors',
                         pendingKey('App\\Models\\TreatmentPlan', plan.id) ? 'bg-red-50/60 hover:bg-red-100/40' : 'bg-gray-50/60 hover:bg-indigo-50/40']"
                     @click="togglePlan(plan.id)">
                     <svg :class="['w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0', expanded.has(plan.id) ? 'rotate-90' : '']"
@@ -32,7 +33,12 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
                     </svg>
                     <span class="text-xs text-gray-500 font-mono w-8 flex-shrink-0">{{ pi + 1 }}</span>
-                    <span class="text-sm font-medium text-gray-800 flex-1 truncate">{{ plan.code }}</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-base font-semibold text-gray-900 leading-snug">
+                            {{ planItemsSummary(plan) || 'Chưa có dịch vụ' }}
+                        </p>
+                        <p class="text-xs text-gray-400 font-mono mt-0.5">{{ plan.code }}</p>
+                    </div>
                     <span class="text-xs text-gray-500 hidden sm:block">{{ plan.doctor }}</span>
                     <div class="relative flex-shrink-0" @click.stop>
                         <button
@@ -316,7 +322,7 @@ function saveDate(planId) {
 }
 
 // ── Expand/collapse plans ───────────────────────────────────────────────────
-const expanded = ref(new Set(props.treatmentPlans.length > 0 ? [props.treatmentPlans[0].id] : []));
+const expanded = ref(new Set(props.treatmentPlans.map(p => p.id)));
 function togglePlan(id) {
     if (expanded.value.has(id)) { expanded.value.delete(id); }
     else { expanded.value.add(id); }
@@ -337,6 +343,9 @@ function planDiscountTotal(plan) {
 }
 function planNetTotal(plan) {
     return planGrossTotal(plan) - planDiscountTotal(plan);
+}
+function planItemsSummary(plan) {
+    return (plan.items ?? []).map(i => i.name).join(', ');
 }
 function stageLabel(status) {
     if (status === 'cancelled') return 'Đã hủy';
