@@ -32,14 +32,24 @@ class ReportService
     {
         $today = today('Asia/Ho_Chi_Minh');
         $date ??= $today;
+        $prevDate = $date->copy()->subDay();
 
         $todayAppts = Appointment::whereDate('scheduled_at', $date)
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->whereNotIn('status', ['cancelled', 'no_show'])
+            ->count();
+        $prevAppts = Appointment::whereDate('scheduled_at', $prevDate)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->whereNotIn('status', ['cancelled', 'no_show'])
             ->count();
 
         $todayRevenue = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
             ->whereDate('patient_payments.payment_date', $date)
+            ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
+            ->where('patient_payments.amount', '>', 0)
+            ->sum('patient_payments.amount');
+        $prevRevenue = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
+            ->whereDate('patient_payments.payment_date', $prevDate)
             ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
             ->where('patient_payments.amount', '>', 0)
             ->sum('patient_payments.amount');
@@ -51,12 +61,37 @@ class ReportService
         $newLeads = Lead::where('created_at', '>=', $today->copy()->subDays(7))
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->count();
+        $prevNewLeads = Lead::whereBetween('created_at', [$today->copy()->subDays(14), $today->copy()->subDays(7)])
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->count();
 
         $activePatients = Patient::where('is_active', true)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->count();
 
-        return compact('todayAppts', 'todayRevenue', 'totalOutstanding', 'newLeads', 'activePatients');
+        return [
+            'todayAppts' => $todayAppts,
+            'todayApptsDelta' => $this->pctChange($todayAppts, $prevAppts),
+            'todayRevenue' => (int) $todayRevenue,
+            'todayRevenueDelta' => $this->pctChange((int) $todayRevenue, (int) $prevRevenue),
+            'totalOutstanding' => (int) $totalOutstanding,
+            'newLeads' => $newLeads,
+            'newLeadsDelta' => $this->pctChange($newLeads, $prevNewLeads),
+            'activePatients' => $activePatients,
+        ];
+    }
+
+    /**
+     * Percentage change of $current vs $previous, or null when there's no meaningful
+     * baseline to compare against (previous period was zero but current isn't).
+     */
+    private function pctChange(int $current, int $previous): ?float
+    {
+        if ($previous === 0) {
+            return $current === 0 ? 0.0 : null;
+        }
+
+        return round((($current - $previous) / $previous) * 100, 1);
     }
 
     public function revenueTrend(string $from, string $to, ?int $branchId = null): array

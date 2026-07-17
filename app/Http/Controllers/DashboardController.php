@@ -2,20 +2,60 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\DashboardReportExport;
 use App\Models\Appointment;
 use App\Models\Branch;
 use App\Models\FollowUpTask;
 use App\Models\PatientPayment;
 use App\Services\ReportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Maatwebsite\Excel\Facades\Excel;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class DashboardController extends Controller
 {
     public function __construct(private ReportService $reports) {}
 
     public function index(Request $request): Response
+    {
+        return Inertia::render('Dashboard', $this->buildDashboardData($request));
+    }
+
+    public function exportPdf(Request $request): HttpResponse
+    {
+        $data = $this->normalizeEnumLabels($this->buildDashboardData($request));
+        $pdf = Pdf::loadView('pdf.dashboard-report', $data)->setPaper('a4', 'portrait');
+
+        return $pdf->download("bao-cao-tong-quan-{$data['selectedDate']}.pdf");
+    }
+
+    public function exportExcel(Request $request): \Symfony\Component\HttpFoundation\BinaryFileResponse
+    {
+        $data = $this->normalizeEnumLabels($this->buildDashboardData($request));
+
+        return Excel::download(new DashboardReportExport($data), "bao-cao-tong-quan-{$data['selectedDate']}.xlsx");
+    }
+
+    /**
+     * Inertia::render() JSON-encodes props, which auto-unwraps backed enums (status, method)
+     * to their scalar value — the Vue side then maps that value to a Vietnamese label itself.
+     * The PDF/Excel exports consume the same arrays directly in PHP though, so the enum
+     * objects need converting to their label here instead.
+     */
+    private function normalizeEnumLabels(array $data): array
+    {
+        $label = fn ($status) => is_object($status) && method_exists($status, 'label') ? $status->label() : (string) $status;
+
+        $data['apptBreakdown'] = array_map(fn ($r) => ['status' => $label($r['status']), 'count' => $r['count']], $data['apptBreakdown']);
+        $data['leadFunnel'] = array_map(fn ($r) => ['status' => $label($r['status']), 'count' => $r['count']], $data['leadFunnel']);
+
+        return $data;
+    }
+
+    private function buildDashboardData(Request $request): array
     {
         $user = auth()->user();
         $branchId = null;
@@ -87,7 +127,11 @@ class DashboardController extends Controller
                 ])
             : collect();
 
-        return Inertia::render('Dashboard', [
+        $branchName = $branchId
+            ? Branch::find($branchId)?->name ?? 'Tất cả chi nhánh'
+            : 'Tất cả chi nhánh';
+
+        return [
             'kpis'                   => $kpis,
             'revenueTrend'           => $canFinancial ? $this->reports->revenueTrend($from, $to, $branchId) : [],
             'apptBreakdown'          => $canClinical ? $this->reports->appointmentBreakdown($branchId) : [],
@@ -101,11 +145,12 @@ class DashboardController extends Controller
             'branches'               => $user->hasRole(['owner', 'admin'])
                 ? Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name])
                 : [],
+            'branchName'    => $branchName,
             'canFinancial'  => $canFinancial,
             'canClinical'   => $canClinical,
             'selectedBranch'=> $branchId,
             'selectedDate'  => $selectedDate->toDateString(),
             'isToday'       => $selectedDate->isSameDay($today),
-        ]);
+        ];
     }
 }

@@ -56,6 +56,7 @@ use App\Http\Controllers\Crm\FollowUpTaskController;
 use App\Http\Controllers\Crm\LeadController;
 use App\Http\Controllers\Crm\PatientController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\SystemRecordController;
 use App\Http\Controllers\Crm\CareRuleController;
 use App\Http\Controllers\Crm\MessageController;
 use App\Http\Controllers\Hr\CommissionController;
@@ -83,6 +84,18 @@ Route::get('/', fn () => redirect()->route('login'));
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+Route::get('/dashboard/export/pdf', [DashboardController::class, 'exportPdf'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.export.pdf');
+Route::get('/dashboard/export/excel', [DashboardController::class, 'exportExcel'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.export.excel');
+Route::get('/system-records', [SystemRecordController::class, 'index'])
+    ->middleware(['auth', 'verified', 'can:reports.financial'])
+    ->name('system-records.index');
+Route::get('/system-records/export', [SystemRecordController::class, 'exportExcel'])
+    ->middleware(['auth', 'verified', 'can:reports.financial'])
+    ->name('system-records.export');
 
 // Reports
 Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function () {
