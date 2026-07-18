@@ -146,7 +146,7 @@ class TreatmentPlanController extends Controller
             'diagnosis' => 'nullable|string|max:255',
             'chief_complaint' => 'nullable|string|max:1000',
             'treatment_goal' => 'nullable|string|max:255',
-            'start_date' => 'nullable|date',
+            'start_date' => 'required|date',
             'expected_end_date' => 'nullable|date',
             'estimated_sessions' => 'nullable|integer|min:1',
             'frequency' => 'nullable|string|max:255',
@@ -370,7 +370,10 @@ class TreatmentPlanController extends Controller
             'diagnosis'          => 'nullable|string|max:255',
             'chief_complaint'    => 'nullable|string|max:1000',
             'treatment_goal'     => 'nullable|string|max:255',
-            'start_date'         => 'nullable|date',
+            // This endpoint also handles partial updates (staff-only, financials-only, etc.)
+            // that never touch start_date, so it stays optional in general — but the
+            // dedicated date-edit widgets (action=update_date) must always supply one.
+            'start_date'         => 'nullable|date|required_if:action,update_date',
             'expected_end_date'  => 'nullable|date',
             'estimated_sessions' => 'nullable|integer|min:1',
             'frequency'          => 'nullable|string|max:255',

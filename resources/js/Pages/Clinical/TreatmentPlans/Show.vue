@@ -377,8 +377,9 @@
                         <div v-else>
                             <input v-model="dateForm.start_date" type="date"
                                 class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            <p v-if="dateForm.errors.start_date" class="text-xs text-red-500 mt-1">Ngày điều trị là bắt buộc.</p>
                             <div class="mt-2 flex gap-2">
-                                <button @click="saveDate" :disabled="dateForm.processing"
+                                <button @click="saveDate" :disabled="dateForm.processing || !dateForm.start_date"
                                     class="flex-1 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
                                     Lưu
                                 </button>

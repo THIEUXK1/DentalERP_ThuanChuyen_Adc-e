@@ -18,6 +18,7 @@ use App\Models\PatientPayment;
 use App\Models\Payroll;
 use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class ReportService
@@ -94,52 +95,68 @@ class ReportService
         return round((($current - $previous) / $previous) * 100, 1);
     }
 
+    /**
+     * These dashboard-feeding aggregates run on every dashboard load and scan the growing
+     * payments/plans tables over a window, so a short cache absorbs repeat visits without
+     * showing data that's more than a few minutes stale.
+     */
+    private function cacheRemember(string $key, array $args, \Closure $callback): array
+    {
+        return Cache::remember('report:'.$key.':'.md5(serialize($args)), 300, $callback);
+    }
+
     public function revenueTrend(string $from, string $to, ?int $branchId = null): array
     {
-        $isSqlite = DB::getDriverName() === 'sqlite';
-        $dateExpr = $isSqlite
-            ? 'DATE(patient_payments.payment_date)'
-            : "DATE(patient_payments.payment_date AT TIME ZONE 'Asia/Ho_Chi_Minh')";
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($from, $to, $branchId) {
+            $isSqlite = DB::getDriverName() === 'sqlite';
+            $dateExpr = $isSqlite
+                ? 'DATE(patient_payments.payment_date)'
+                : "DATE(patient_payments.payment_date AT TIME ZONE 'Asia/Ho_Chi_Minh')";
 
-        $rows = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
-            ->select(
-                DB::raw("{$dateExpr} as day"),
-                DB::raw('SUM(CASE WHEN patient_payments.amount > 0 THEN patient_payments.amount ELSE 0 END) as revenue'),
-                DB::raw('SUM(CASE WHEN patient_payments.amount < 0 THEN ABS(patient_payments.amount) ELSE 0 END) as refunds')
-            )
-            ->whereBetween('patient_payments.payment_date', [$from, $to])
-            ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
-            ->groupBy(DB::raw($dateExpr))
-            ->orderBy('day')
-            ->get();
+            $rows = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
+                ->select(
+                    DB::raw("{$dateExpr} as day"),
+                    DB::raw('SUM(CASE WHEN patient_payments.amount > 0 THEN patient_payments.amount ELSE 0 END) as revenue'),
+                    DB::raw('SUM(CASE WHEN patient_payments.amount < 0 THEN ABS(patient_payments.amount) ELSE 0 END) as refunds')
+                )
+                ->whereBetween('patient_payments.payment_date', [$from, $to])
+                ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
+                ->groupBy(DB::raw($dateExpr))
+                ->orderBy('day')
+                ->get();
 
-        return $rows->map(fn ($r) => [
-            'day' => $r->day,
-            'revenue' => (int) $r->revenue,
-            'refunds' => (int) $r->refunds,
-            'net' => (int) $r->revenue - (int) $r->refunds,
-        ])->toArray();
+            return $rows->map(fn ($r) => [
+                'day' => $r->day,
+                'revenue' => (int) $r->revenue,
+                'refunds' => (int) $r->refunds,
+                'net' => (int) $r->revenue - (int) $r->refunds,
+            ])->toArray();
+        });
     }
 
     public function appointmentBreakdown(?int $branchId = null): array
     {
-        return Appointment::select('status', DB::raw('count(*) as count'))
-            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->groupBy('status')
-            ->get()
-            ->map(fn ($r) => ['status' => $r->status, 'count' => $r->count])
-            ->toArray();
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($branchId) {
+            return Appointment::select('status', DB::raw('count(*) as count'))
+                ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+                ->groupBy('status')
+                ->get()
+                ->map(fn ($r) => ['status' => $r->status, 'count' => $r->count])
+                ->toArray();
+        });
     }
 
     public function leadFunnel(?string $from = null, ?string $to = null): array
     {
-        return Lead::select('status', DB::raw('count(*) as count'))
-            ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
-            ->when($to, fn ($q) => $q->where('created_at', '<=', $to.' 23:59:59'))
-            ->groupBy('status')
-            ->get()
-            ->map(fn ($r) => ['status' => $r->status, 'count' => $r->count])
-            ->toArray();
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($from, $to) {
+            return Lead::select('status', DB::raw('count(*) as count'))
+                ->when($from, fn ($q) => $q->where('created_at', '>=', $from))
+                ->when($to, fn ($q) => $q->where('created_at', '<=', $to.' 23:59:59'))
+                ->groupBy('status')
+                ->get()
+                ->map(fn ($r) => ['status' => $r->status, 'count' => $r->count])
+                ->toArray();
+        });
     }
 
     public function revenue(string $from, string $to, ?int $branchId = null): array
@@ -177,44 +194,50 @@ class ReportService
 
     public function treatmentPlanConversion(?int $branchId = null): array
     {
-        $q = TreatmentPlan::query()->when($branchId, fn ($q) => $q->where('branch_id', $branchId));
-        $total = $q->count();
-        $approved = (clone $q)->whereIn('status', ['approved', 'in_progress', 'completed'])->count();
-        $rate = $total > 0 ? round($approved / $total * 100, 1) : 0;
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($branchId) {
+            $q = TreatmentPlan::query()->when($branchId, fn ($q) => $q->where('branch_id', $branchId));
+            $total = $q->count();
+            $approved = (clone $q)->whereIn('status', ['approved', 'in_progress', 'completed'])->count();
+            $rate = $total > 0 ? round($approved / $total * 100, 1) : 0;
 
-        return compact('total', 'approved', 'rate');
+            return compact('total', 'approved', 'rate');
+        });
     }
 
     public function revenueByDoctor(string $from, string $to, ?int $branchId = null): array
     {
-        return PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
-            ->join('treatment_plans', 'patient_invoices.treatment_plan_id', '=', 'treatment_plans.id')
-            ->join('employees', 'treatment_plans.doctor_id', '=', 'employees.id')
-            ->select('employees.id', 'employees.full_name', DB::raw('SUM(patient_payments.amount) as revenue'))
-            ->whereBetween('patient_payments.payment_date', [$from, $to])
-            ->where('patient_payments.amount', '>', 0)
-            ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
-            ->groupBy('employees.id', 'employees.full_name')
-            ->orderByDesc('revenue')
-            ->limit(5)
-            ->get()
-            ->map(fn ($r) => ['name' => $r->full_name, 'revenue' => (int) $r->revenue])
-            ->toArray();
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($from, $to, $branchId) {
+            return PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
+                ->join('treatment_plans', 'patient_invoices.treatment_plan_id', '=', 'treatment_plans.id')
+                ->join('employees', 'treatment_plans.doctor_id', '=', 'employees.id')
+                ->select('employees.id', 'employees.full_name', DB::raw('SUM(patient_payments.amount) as revenue'))
+                ->whereBetween('patient_payments.payment_date', [$from, $to])
+                ->where('patient_payments.amount', '>', 0)
+                ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
+                ->groupBy('employees.id', 'employees.full_name')
+                ->orderByDesc('revenue')
+                ->limit(5)
+                ->get()
+                ->map(fn ($r) => ['name' => $r->full_name, 'revenue' => (int) $r->revenue])
+                ->toArray();
+        });
     }
 
     public function revenueByService(string $from, string $to, ?int $branchId = null): array
     {
-        return TreatmentPlanItem::join('treatment_plans', 'treatment_plan_items.treatment_plan_id', '=', 'treatment_plans.id')
-            ->select('treatment_plan_items.name', DB::raw('SUM(treatment_plan_items.subtotal) as revenue'))
-            ->whereIn('treatment_plans.status', ['approved', 'in_progress', 'completed'])
-            ->whereBetween('treatment_plans.created_at', [$from.' 00:00:00', $to.' 23:59:59'])
-            ->when($branchId, fn ($q) => $q->where('treatment_plans.branch_id', $branchId))
-            ->groupBy('treatment_plan_items.name')
-            ->orderByDesc('revenue')
-            ->limit(5)
-            ->get()
-            ->map(fn ($r) => ['name' => $r->name, 'revenue' => (int) $r->revenue])
-            ->toArray();
+        return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($from, $to, $branchId) {
+            return TreatmentPlanItem::join('treatment_plans', 'treatment_plan_items.treatment_plan_id', '=', 'treatment_plans.id')
+                ->select('treatment_plan_items.name', DB::raw('SUM(treatment_plan_items.subtotal) as revenue'))
+                ->whereIn('treatment_plans.status', ['approved', 'in_progress', 'completed'])
+                ->whereBetween('treatment_plans.created_at', [$from.' 00:00:00', $to.' 23:59:59'])
+                ->when($branchId, fn ($q) => $q->where('treatment_plans.branch_id', $branchId))
+                ->groupBy('treatment_plan_items.name')
+                ->orderByDesc('revenue')
+                ->limit(5)
+                ->get()
+                ->map(fn ($r) => ['name' => $r->name, 'revenue' => (int) $r->revenue])
+                ->toArray();
+        });
     }
 
     public function revenueBySource(string $from, string $to, ?int $branchId = null): array

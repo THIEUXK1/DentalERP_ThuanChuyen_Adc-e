@@ -22,11 +22,16 @@
 
         <div v-else class="p-3 space-y-3">
             <div v-for="(plan, pi) in treatmentPlans" :key="plan.id"
-                class="group rounded-lg border border-gray-200 border-l-4 border-l-indigo-300 overflow-hidden">
+                :class="['group rounded-lg overflow-hidden',
+                    plan.status === 'draft'
+                        ? 'border-2 border-dashed border-gray-300'
+                        : 'border border-gray-200 border-l-4 border-l-indigo-300']">
                 <!-- Plan header row -->
                 <div
                     :class="['flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors',
-                        pendingKey('App\\Models\\TreatmentPlan', plan.id) ? 'bg-red-50/60 hover:bg-red-100/40' : 'bg-gray-50/60 hover:bg-indigo-50/40']"
+                        pendingKey('App\\Models\\TreatmentPlan', plan.id) ? 'bg-red-50/60 hover:bg-red-100/40'
+                            : plan.status === 'draft' ? 'bg-gray-100/70 hover:bg-gray-200/60'
+                            : 'bg-gray-50/60 hover:bg-indigo-50/40']"
                     @click="togglePlan(plan.id)">
                     <svg :class="['w-3.5 h-3.5 text-gray-400 transition-transform flex-shrink-0', expanded.has(plan.id) ? 'rotate-90' : '']"
                         fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -34,7 +39,7 @@
                     </svg>
                     <span class="text-xs text-gray-500 font-mono w-8 flex-shrink-0">{{ pi + 1 }}</span>
                     <div class="flex-1 min-w-0">
-                        <p class="text-base font-semibold text-gray-900 leading-snug">
+                        <p :class="['text-base font-semibold leading-snug', plan.status === 'draft' ? 'text-gray-500 italic' : 'text-gray-900']">
                             {{ planItemsSummary(plan) || 'Chưa có dịch vụ' }}
                         </p>
                         <p class="text-xs text-gray-400 font-mono mt-0.5">{{ plan.code }}</p>
@@ -126,19 +131,22 @@
                                     </svg>
                                 </button>
                             </div>
-                            <div v-else class="flex items-center gap-1 mt-0.5">
-                                <input type="date" :value="dateEdits[plan.id]"
-                                    @change="dateEdits[plan.id] = $event.target.value"
-                                    class="flex-1 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
-                                <button @click="saveDate(plan.id)"
-                                    class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-                                    Lưu
-                                </button>
-                                <button @click="dateEditOpen[plan.id] = false" class="text-gray-400 hover:text-gray-600 transition-colors" title="Hủy">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                                    </svg>
-                                </button>
+                            <div v-else>
+                                <div class="flex items-center gap-1 mt-0.5">
+                                    <input type="date" :value="dateEdits[plan.id]"
+                                        @change="dateEdits[plan.id] = $event.target.value"
+                                        class="flex-1 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                    <button @click="saveDate(plan.id)" :disabled="!dateEdits[plan.id]"
+                                        class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+                                        Lưu
+                                    </button>
+                                    <button @click="dateEditOpen[plan.id] = false" class="text-gray-400 hover:text-gray-600 transition-colors" title="Hủy">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <p v-if="!dateEdits[plan.id]" class="text-red-500 mt-1">Ngày điều trị là bắt buộc.</p>
                             </div>
                         </div>
                         <div v-if="plan.expected_end_date">
@@ -312,8 +320,10 @@ function formatDisplayDate(raw) {
 }
 
 function saveDate(planId) {
+    if (!dateEdits[planId]) return;
+
     router.put(route('clinical.treatment-plans.update', planId), {
-        start_date: dateEdits[planId] || null,
+        start_date: dateEdits[planId],
         action: 'update_date',
     }, {
         preserveScroll: true,
@@ -359,6 +369,7 @@ function stageClass(status) {
     if (status === 'completed') return 'bg-emerald-100 text-emerald-700';
     if (status === 'in_progress') return 'bg-indigo-100 text-indigo-700';
     if (status === 'approved') return 'bg-amber-100 text-amber-700';
+    if (status === 'draft') return 'bg-gray-100 text-gray-500 border border-dashed border-gray-400';
     return 'bg-gray-100 text-gray-600';
 }
 function stageDot(status) {

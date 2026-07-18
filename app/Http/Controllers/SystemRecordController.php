@@ -8,6 +8,7 @@ use App\Exports\SystemRecordExport;
 use App\Models\Branch;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -100,17 +101,22 @@ class SystemRecordController extends Controller
 
     private function availableYears(): array
     {
-        $serviceYears = DB::table('treatment_plan_items as ti')
-            ->join('treatment_plans as tp', 'ti.treatment_plan_id', '=', 'tp.id')
-            ->whereIn('tp.status', ['approved', 'in_progress', 'completed'])
-            ->selectRaw('DISTINCT EXTRACT(YEAR FROM COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at))::int as y')
-            ->pluck('y');
+        // This scans both tables in full (no sargable index for EXTRACT(YEAR FROM ...)), but
+        // the set of years barely ever changes, so an hourly cache avoids paying that cost
+        // on every page load.
+        return Cache::remember('system-records:available-years', 3600, function () {
+            $serviceYears = DB::table('treatment_plan_items as ti')
+                ->join('treatment_plans as tp', 'ti.treatment_plan_id', '=', 'tp.id')
+                ->whereIn('tp.status', ['approved', 'in_progress', 'completed'])
+                ->selectRaw('DISTINCT EXTRACT(YEAR FROM COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at))::int as y')
+                ->pluck('y');
 
-        $paymentYears = DB::table('patient_payments')
-            ->selectRaw('DISTINCT EXTRACT(YEAR FROM payment_date)::int as y')
-            ->pluck('y');
+            $paymentYears = DB::table('patient_payments')
+                ->selectRaw('DISTINCT EXTRACT(YEAR FROM payment_date)::int as y')
+                ->pluck('y');
 
-        return $serviceYears->merge($paymentYears)->unique()->sortDesc()->values()->all();
+            return $serviceYears->merge($paymentYears)->unique()->sortDesc()->values()->all();
+        });
     }
 
     private function serviceQuery(?int $branchId, ?string $search, ?string $dateFrom, ?string $dateTo, ?int $year): Builder

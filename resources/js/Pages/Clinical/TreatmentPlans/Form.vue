@@ -253,6 +253,14 @@
                             </select>
                             <p v-if="form.errors.branch_id" class="text-xs text-red-500 mt-1">{{ form.errors.branch_id }}</p>
                         </div>
+
+                        <!-- Treatment date: defaults to today, but can be set ahead of time -->
+                        <div>
+                            <label class="text-xs text-gray-500 mb-1 block">Ngày điều trị *</label>
+                            <input v-model="form.start_date" type="date"
+                                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            <p v-if="form.errors.start_date" class="text-xs text-red-500 mt-1">{{ form.errors.start_date }}</p>
+                        </div>
                     </div>
 
                     <!-- Nhân sự -->
@@ -388,6 +396,15 @@ function onTeethSelect(teeth) {
     addItem.tooth_number    = teeth.join(',');
 }
 
+// Local calendar date (not toISOString(), which is UTC and can land on the wrong
+// day for timezones ahead of UTC, e.g. late-night in Asia/Ho_Chi_Minh).
+function todayLocalDate() {
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${mm}-${dd}`;
+}
+
 // ── Main form ─────────────────────────────────────────────────────────────
 const form = useForm({
     patient_id:         props.plan?.patient_id    ?? props.selected_patient_id ?? '',
@@ -399,7 +416,7 @@ const form = useForm({
     diagnosis:          props.plan?.diagnosis     ?? '',
     chief_complaint:    props.plan?.chief_complaint ?? '',
     treatment_goal:     props.plan?.treatment_goal  ?? '',
-    start_date:         props.plan?.start_date    ?? new Date().toISOString().split('T')[0],
+    start_date:         props.plan?.start_date    ?? todayLocalDate(),
     expected_end_date:  props.plan?.expected_end_date ?? '',
     estimated_sessions: props.plan?.estimated_sessions ?? 1,
     frequency:          props.plan?.frequency     ?? '',

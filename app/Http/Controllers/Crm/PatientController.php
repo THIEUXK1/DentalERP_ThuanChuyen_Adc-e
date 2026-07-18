@@ -383,10 +383,20 @@ class PatientController extends Controller
         ]);
 
         // ── Treatment history (plans + items) ───────────────────────────────
+        // Today's plans first, then upcoming ones (soonest first), then past ones
+        // (most recent first); plans with no date at all trail at the very end.
+        // CURRENT_DATE is portable across Postgres, MySQL and SQLite.
         $treatmentPlansRaw = TreatmentPlan::where('patient_id', $patient->id)
             ->with(['doctor', 'items.service', 'invoices'])
-            // Portable "NULLS LAST": works unchanged on Postgres, MySQL and SQLite.
-            ->orderByRaw('(start_date IS NULL) ASC, start_date ASC')
+            ->orderByRaw('
+                CASE
+                    WHEN start_date IS NULL THEN 2
+                    WHEN start_date >= CURRENT_DATE THEN 0
+                    ELSE 1
+                END ASC
+            ')
+            ->orderByRaw('CASE WHEN start_date >= CURRENT_DATE THEN start_date END ASC')
+            ->orderByRaw('CASE WHEN start_date < CURRENT_DATE THEN start_date END DESC')
             ->orderByDesc('created_at')
             ->get();
 
