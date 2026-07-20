@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Enums\DebtStatus;
 use App\Enums\InvoiceStatus;
+use App\Models\HkdCashTransaction;
+use App\Models\HkdRevenueEntry;
 use App\Models\PatientDebt;
 use App\Models\PatientInvoice;
 use App\Models\PatientPayment;
@@ -135,6 +137,75 @@ class InvoiceService
             'notes' => "Hoàn tác khoản thanh toán #{$payment->id} ngày {$payment->payment_date->format('d/m/Y')}",
             'reverses_payment_id' => $payment->id,
         ]);
+    }
+
+    /**
+     * Correct the amount on a payment in place (e.g. cashier typo), keeping the
+     * same row instead of reverse+re-add so it doesn't disappear from the visible
+     * history. Keeps invoice/debt totals and the linked HKD journal rows in sync.
+     */
+    public function updatePaymentAmount(PatientPayment $payment, int $newAmount): PatientPayment
+    {
+        if ($payment->reverses_payment_id !== null) {
+            throw new \RuntimeException('Đây là một khoản hoàn tác, không thể sửa số tiền.');
+        }
+
+        if ($payment->reversal()->exists()) {
+            throw new \RuntimeException('Khoản thanh toán này đã được hoàn tác, không thể sửa.');
+        }
+
+        if ($newAmount <= 0) {
+            throw new \RuntimeException('Số tiền phải lớn hơn 0.');
+        }
+
+        $invoice = $payment->invoice;
+        $delta = $newAmount - $payment->amount;
+        $amountPaid = $invoice->amount_paid + $delta;
+
+        if ($amountPaid < 0) {
+            throw new \RuntimeException('Số tiền không hợp lệ: tổng đã thu trên hóa đơn sẽ bị âm.');
+        }
+
+        if ($amountPaid > $invoice->total) {
+            throw new \RuntimeException('Số tiền vượt quá số tiền còn nợ trên hóa đơn.');
+        }
+
+        return DB::transaction(function () use ($payment, $newAmount, $invoice, $amountPaid) {
+            $payment->update(['amount' => $newAmount]);
+
+            $remaining = $invoice->total - $amountPaid;
+
+            $invoiceStatus = $remaining <= 0
+                ? InvoiceStatus::Paid
+                : ($amountPaid > 0 ? InvoiceStatus::PartialPaid : InvoiceStatus::Sent);
+
+            $invoice->update([
+                'amount_paid' => $amountPaid,
+                'status' => $invoiceStatus,
+            ]);
+
+            $debtStatus = $remaining <= 0
+                ? DebtStatus::Paid
+                : ($amountPaid > 0 ? DebtStatus::Partial : DebtStatus::Pending);
+
+            $invoice->debt?->update([
+                'paid_amount' => $amountPaid,
+                'remaining' => max(0, $remaining),
+                'status' => $debtStatus,
+            ]);
+
+            if ($invoiceStatus === InvoiceStatus::Paid) {
+                (new CommissionService)->calculateForInvoice($invoice->fresh());
+            }
+
+            HkdRevenueEntry::where('source_type', 'patient_payment')->where('source_id', $payment->id)
+                ->update(['amount' => $newAmount]);
+
+            HkdCashTransaction::where('source_type', 'patient_payment')->where('source_id', $payment->id)
+                ->update(['amount' => abs($newAmount)]);
+
+            return $payment->fresh();
+        });
     }
 
     public function applyDiscount(PatientInvoice $invoice, int $discountAmount): void

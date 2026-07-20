@@ -75,6 +75,23 @@ class PatientPaymentController extends Controller
         return back()->with('success', 'Đã cập nhật ngày thanh toán.');
     }
 
+    public function updateAmount(Request $request, PatientPayment $payment): RedirectResponse
+    {
+        $this->authorize('cashier.manage');
+
+        $data = $request->validate([
+            'amount' => 'required|integer|min:1',
+        ]);
+
+        try {
+            $this->svc->updatePaymentAmount($payment, $data['amount']);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Đã cập nhật số tiền thanh toán.');
+    }
+
     public function reverse(PatientPayment $payment): RedirectResponse
     {
         $this->authorize('cashier.manage');

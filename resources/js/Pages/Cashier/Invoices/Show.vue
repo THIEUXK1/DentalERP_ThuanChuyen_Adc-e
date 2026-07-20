@@ -276,9 +276,9 @@
                                 </svg>
                                 Lịch sử thanh toán
                             </h3>
-                            <span class="text-xs text-gray-400">{{ payments.length }} lần</span>
+                            <span class="text-xs text-gray-400">{{ visiblePayments.length }} lần</span>
                         </div>
-                        <div v-if="payments.length === 0" class="text-center py-8 text-gray-400 text-sm">Chưa có thanh toán</div>
+                        <div v-if="visiblePayments.length === 0" class="text-center py-8 text-gray-400 text-sm">Chưa có thanh toán</div>
                         <table v-else class="w-full text-sm">
                             <thead class="bg-gray-50/60 text-gray-500 text-xs border-b border-gray-100">
                                 <tr>
@@ -292,7 +292,7 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
-                                <tr v-for="p in payments" :key="p.id" class="hover:bg-gray-50">
+                                <tr v-for="p in visiblePayments" :key="p.id" class="hover:bg-gray-50">
                                     <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
                                         <button @click="openDateModal(p)"
                                             class="inline-flex items-center gap-1 hover:text-emerald-700 hover:underline cursor-pointer"
@@ -315,15 +315,21 @@
                                     </td>
                                     <td class="px-4 py-3 text-right tabular-nums font-semibold whitespace-nowrap"
                                         :class="p.amount < 0 ? 'text-red-600' : 'text-emerald-700'">
-                                        {{ p.amount < 0 ? '−' : '' }}{{ formatVnd(Math.abs(p.amount)) }}
+                                        <button v-if="p.amount > 0" @click="openAmountModal(p)"
+                                            class="inline-flex items-center gap-1 hover:underline cursor-pointer"
+                                            title="Bấm để sửa số tiền">
+                                            {{ formatVnd(p.amount) }}
+                                            <svg class="w-2.5 h-2.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
+                                        <template v-else>−{{ formatVnd(Math.abs(p.amount)) }}</template>
                                     </td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.reference ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.notes ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ p.creator }}</td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
-                                        <span v-if="p.reversed" class="text-xs text-gray-400 italic">Đã hoàn tác</span>
-                                        <span v-else-if="p.is_reversal" class="text-xs text-gray-400 italic">Khoản hoàn tác</span>
-                                        <button v-else-if="canRefund && p.amount > 0" @click="openReverseModal(p)"
+                                        <button v-if="canRefund && p.amount > 0" @click="openReverseModal(p)"
                                             class="text-xs text-red-600 hover:text-red-800 hover:underline font-medium">
                                             Hoàn tác
                                         </button>
@@ -614,6 +620,47 @@
         </div>
     </Teleport>
 
+    <!-- ── Edit payment amount modal ───────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="amountModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+                <div class="px-5 pt-5 pb-4 border-b border-amber-200 bg-amber-50 rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        </svg>
+                        <h3 class="font-semibold text-base text-amber-800">Sửa số tiền thanh toán</h3>
+                    </div>
+                </div>
+                <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
+                        ⚠ Thay đổi số tiền sẽ ảnh hưởng đến công nợ và báo cáo tài chính. Chỉ thực hiện khi nhập sai.
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500 mb-2 font-medium">Số tiền mới</p>
+                        <input v-model.number="amountModal.selected" type="number" min="1" step="1000"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input v-model="amountModal.confirmed" type="checkbox" class="w-4 h-4 accent-amber-600 cursor-pointer" />
+                        <span class="text-xs font-medium text-gray-700">Tôi xác nhận muốn thay đổi số tiền thanh toán</span>
+                    </label>
+                </div>
+                <div class="px-5 pb-5 flex justify-end gap-2">
+                    <button @click="amountModal.open = false"
+                        class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        Hủy bỏ
+                    </button>
+                    <button @click="submitAmountChange"
+                        :disabled="!amountModal.confirmed || !amountModal.selected || amountModal.selected === amountModal.current"
+                        class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                        Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
     <!-- ── Reverse payment modal ───────────────────────────────────────── -->
     <Teleport to="body">
         <div v-if="reverseModal.open"
@@ -675,6 +722,8 @@ const props = defineProps({
     canDiscount: Boolean,
     plan_pending_deletion: { type: Object, default: null },
 });
+
+const visiblePayments = computed(() => props.payments.filter(p => !p.reversed && !p.is_reversal));
 
 const now = ref(Date.now());
 let _timer = null;
@@ -742,6 +791,22 @@ function submitDateChange() {
         payment_date: dateModal.value.selected,
     }, {
         onSuccess: () => { dateModal.value.open = false; },
+        preserveScroll: true,
+    });
+}
+
+// ── Edit payment amount ─────────────────────────────────────────────────────
+const amountModal = ref({ open: false, paymentId: null, current: null, selected: null, confirmed: false });
+
+function openAmountModal(p) {
+    amountModal.value = { open: true, paymentId: p.id, current: p.amount, selected: p.amount, confirmed: false };
+}
+function submitAmountChange() {
+    if (!amountModal.value.confirmed || !amountModal.value.selected || amountModal.value.selected === amountModal.value.current) return;
+    router.patch(route('cashier.payments.update-amount', amountModal.value.paymentId), {
+        amount: amountModal.value.selected,
+    }, {
+        onSuccess: () => { amountModal.value.open = false; },
         preserveScroll: true,
     });
 }
