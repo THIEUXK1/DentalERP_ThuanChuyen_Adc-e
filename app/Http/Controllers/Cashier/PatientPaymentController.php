@@ -74,4 +74,18 @@ class PatientPaymentController extends Controller
 
         return back()->with('success', 'Đã cập nhật ngày thanh toán.');
     }
+
+    public function reverse(PatientPayment $payment): RedirectResponse
+    {
+        $this->authorize('cashier.manage');
+        $this->authorize('cashier.approve_refund');
+
+        try {
+            $this->svc->reversePayment($payment);
+        } catch (\RuntimeException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Đã hoàn tác khoản thanh toán.');
+    }
 }

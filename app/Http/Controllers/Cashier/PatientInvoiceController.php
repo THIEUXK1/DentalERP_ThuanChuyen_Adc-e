@@ -127,7 +127,7 @@ class PatientInvoiceController extends Controller
     {
         $this->authorize('cashier.view');
 
-        $invoice->load(['patient', 'branch', 'treatmentPlan.items.service', 'payments.creator', 'debt']);
+        $invoice->load(['patient', 'branch', 'treatmentPlan.items.service', 'payments.creator', 'payments.reversal', 'debt']);
 
         $plan = $invoice->treatmentPlan;
 
@@ -198,6 +198,8 @@ class PatientInvoiceController extends Controller
                 'reference' => $p->reference,
                 'notes' => $p->notes,
                 'creator' => $p->creator->name,
+                'is_reversal' => $p->reverses_payment_id !== null,
+                'reversed' => $p->reversal !== null,
             ]),
             'debt' => $invoice->debt ? [
                 'amount' => $invoice->debt->amount,

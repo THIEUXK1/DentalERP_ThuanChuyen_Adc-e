@@ -288,6 +288,7 @@
                                     <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Tham chiếu</th>
                                     <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ghi chú</th>
                                     <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Người thu</th>
+                                    <th class="px-4 py-2.5 text-right font-medium">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-50">
@@ -319,6 +320,15 @@
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.reference ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.notes ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ p.creator }}</td>
+                                    <td class="px-4 py-3 text-right whitespace-nowrap">
+                                        <span v-if="p.reversed" class="text-xs text-gray-400 italic">Đã hoàn tác</span>
+                                        <span v-else-if="p.is_reversal" class="text-xs text-gray-400 italic">Khoản hoàn tác</span>
+                                        <button v-else-if="canRefund && p.amount > 0" @click="openReverseModal(p)"
+                                            class="text-xs text-red-600 hover:text-red-800 hover:underline font-medium">
+                                            Hoàn tác
+                                        </button>
+                                        <span v-else class="text-gray-300">—</span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -603,6 +613,46 @@
             </div>
         </div>
     </Teleport>
+
+    <!-- ── Reverse payment modal ───────────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="reverseModal.open"
+            class="fixed inset-0 z-50 flex items-center justify-center p-4"
+            @click.self="reverseModal.open = false">
+            <div class="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
+            <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md">
+                <div class="flex items-start gap-3 px-5 pt-5 pb-4 border-b border-gray-100">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Hoàn tác khoản thanh toán</h3>
+                        <p v-if="reverseModal.payment" class="text-sm text-gray-500 mt-0.5">
+                            {{ formatVnd(reverseModal.payment.amount) }} — {{ reverseModal.payment.payment_date }}
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mx-5 mt-4 px-3 py-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                    ⚠ Hệ thống sẽ ghi một khoản hoàn tiền tương ứng để đưa hóa đơn về đúng số nợ trước khi thu khoản này.
+                    Lịch sử không bị xóa — khoản thu gốc vẫn được giữ lại kèm khoản hoàn tác đối ứng.
+                </div>
+
+                <div class="flex gap-2 justify-end px-5 py-4">
+                    <button @click="reverseModal.open = false"
+                        class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 font-medium">
+                        Đóng
+                    </button>
+                    <button @click="confirmReverse"
+                        class="px-4 py-2 text-sm text-white bg-red-600 rounded-lg hover:bg-red-700 font-medium">
+                        Xác nhận hoàn tác
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
 </template>
 
 <script setup>
@@ -693,6 +743,20 @@ function submitDateChange() {
     }, {
         onSuccess: () => { dateModal.value.open = false; },
         preserveScroll: true,
+    });
+}
+
+// ── Reverse (undo) a payment ────────────────────────────────────────────────
+const reverseModal = ref({ open: false, payment: null });
+
+function openReverseModal(p) {
+    reverseModal.value = { open: true, payment: p };
+}
+function confirmReverse() {
+    if (!reverseModal.value.payment) return;
+    router.post(route('cashier.payments.reverse', reverseModal.value.payment.id), {}, {
+        preserveScroll: true,
+        onSuccess: () => { reverseModal.value.open = false; },
     });
 }
 

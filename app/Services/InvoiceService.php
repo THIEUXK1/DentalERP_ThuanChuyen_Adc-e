@@ -59,6 +59,7 @@ class InvoiceService
                 'reference' => $data['reference'] ?? null,
                 'notes' => $data['notes'] ?? null,
                 'created_by' => auth()->id(),
+                'reverses_payment_id' => $data['reverses_payment_id'] ?? null,
             ]);
 
             // Add to the existing amount_paid rather than recomputing from the sum of
@@ -99,6 +100,41 @@ class InvoiceService
 
             return $payment;
         });
+    }
+
+    /**
+     * Undo a mistaken payment without touching history: records an offsetting negative
+     * payment (same accounting/journal/debt path as a manual refund) rather than deleting
+     * or mutating the original row, so the ledger stays auditable.
+     */
+    public function reversePayment(PatientPayment $payment): PatientPayment
+    {
+        if ($payment->amount <= 0) {
+            throw new \RuntimeException('Chỉ có thể hoàn tác khoản thu (số tiền dương).');
+        }
+
+        if ($payment->reverses_payment_id !== null) {
+            throw new \RuntimeException('Đây là một khoản hoàn tác, không thể hoàn tác tiếp.');
+        }
+
+        if ($payment->reversal()->exists()) {
+            throw new \RuntimeException('Khoản thanh toán này đã được hoàn tác trước đó.');
+        }
+
+        $invoice = $payment->invoice;
+
+        if ($payment->amount > $invoice->amount_paid) {
+            throw new \RuntimeException('Không thể hoàn tác: số tiền vượt quá số đã thu trên hóa đơn.');
+        }
+
+        return $this->addPayment($invoice, [
+            'amount' => -$payment->amount,
+            'method' => $payment->method->value,
+            'payment_date' => now()->toDateString(),
+            'reference' => null,
+            'notes' => "Hoàn tác khoản thanh toán #{$payment->id} ngày {$payment->payment_date->format('d/m/Y')}",
+            'reverses_payment_id' => $payment->id,
+        ]);
     }
 
     public function applyDiscount(PatientInvoice $invoice, int $discountAmount): void
