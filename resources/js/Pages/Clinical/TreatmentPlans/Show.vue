@@ -372,10 +372,10 @@
                             </button>
                         </div>
                         <div v-if="!dateEditOpen" class="text-sm text-gray-800 font-medium">
-                            {{ formatDate(dateForm.start_date) || '—' }}
+                            {{ formatDateTime(dateForm.start_date) || '—' }}
                         </div>
                         <div v-else>
-                            <input v-model="dateForm.start_date" type="date"
+                            <input v-model="dateForm.start_date" type="datetime-local"
                                 class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                             <p v-if="dateForm.errors.start_date" class="text-xs text-red-500 mt-1">Ngày điều trị là bắt buộc.</p>
                             <div class="mt-2 flex gap-2">
@@ -828,6 +828,13 @@ function formatDate(dateStr) {
     if (!dateStr) return '';
     const [y, m, d] = dateStr.split('-');
     return `${d}/${m}/${y}`;
+}
+// dateForm.start_date is a datetime-local value ("YYYY-MM-DDTHH:mm") — formatDate() alone would
+// mis-split on the embedded "T", so start_date gets its own date+time formatter.
+function formatDateTime(val) {
+    if (!val) return '';
+    const [datePart, timePart] = val.split('T');
+    return timePart ? `${formatDate(datePart)} ${timePart}` : formatDate(datePart);
 }
 const props = defineProps({
     plan: Object, items: Array, services: Array,

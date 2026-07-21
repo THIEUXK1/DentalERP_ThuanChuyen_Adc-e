@@ -37,7 +37,7 @@ class TreatmentPlan extends Model
             'status' => TreatmentPlanStatus::class,
             'approved_at' => 'datetime',
             'payment_schedule' => 'array',
-            'start_date' => 'date',
+            'start_date' => 'datetime',
             'expected_end_date' => 'date',
         ];
     }
