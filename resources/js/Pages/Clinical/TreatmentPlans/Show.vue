@@ -375,8 +375,12 @@
                             {{ formatDateTime(dateForm.start_date) || '—' }}
                         </div>
                         <div v-else>
-                            <input v-model="dateForm.start_date" type="datetime-local"
-                                class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            <div class="flex gap-2">
+                                <input v-model="startDatePart" type="date"
+                                    class="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                                <input v-model="startTimePart" type="time"
+                                    class="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            </div>
                             <p v-if="dateForm.errors.start_date" class="text-xs text-red-500 mt-1">Ngày điều trị là bắt buộc.</p>
                             <div class="mt-2 flex gap-2">
                                 <button @click="saveDate" :disabled="dateForm.processing || !dateForm.start_date"
@@ -976,6 +980,23 @@ const dateEditOpen = ref(false);
 const dateForm = useForm({
     start_date: props.plan.start_date_raw ?? '',
     action:     'update_date',
+});
+
+// dateForm.start_date stays a single "YYYY-MM-DDTHH:mm" value (what the server expects) — these
+// just split it into separate date/time inputs so each can be edited on its own.
+const startDatePart = computed({
+    get: () => dateForm.start_date.split('T')[0] ?? '',
+    set: (v) => {
+        const time = dateForm.start_date.split('T')[1] || '00:00';
+        dateForm.start_date = v ? `${v}T${time}` : '';
+    },
+});
+const startTimePart = computed({
+    get: () => dateForm.start_date.split('T')[1] ?? '00:00',
+    set: (v) => {
+        const date = dateForm.start_date.split('T')[0];
+        if (date) dateForm.start_date = `${date}T${v || '00:00'}`;
+    },
 });
 
 function saveDate() {
