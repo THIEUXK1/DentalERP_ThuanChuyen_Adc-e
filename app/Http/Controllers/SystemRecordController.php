@@ -9,8 +9,8 @@ use App\Enums\TreatmentItemStatus;
 use App\Exports\SystemRecordExport;
 use App\Models\Branch;
 use App\Models\Employee;
+use App\Models\DentalService;
 use App\Models\ServiceCategory;
-use App\Models\ServiceGroup;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -80,7 +80,7 @@ class SystemRecordController extends Controller
             'filters' => $request->only([
                 'search', 'record_type', 'branch_id', 'date_from', 'date_to', 'year', 'per_page',
                 'patient_name', 'doctor_id', 'consultant_id', 'assistant_id', 'amount_min', 'amount_max', 'reference_code',
-                'group_id', 'category_id', 'source', 'status',
+                'group_id', 'category_id', 'source', 'status', 'service_id',
             ]),
             'branches' => $user->hasRole(['owner', 'admin'])
                 ? Branch::where('is_active', true)->get(['id', 'name'])
@@ -92,8 +92,11 @@ class SystemRecordController extends Controller
                 ->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
             'assistants' => Employee::where('role_type', RoleType::Assistant->value)->where('is_active', true)->orderBy('full_name')
                 ->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
-            'groups' => ServiceGroup::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            // "groups" (service_groups) intentionally not sent — no UI control for it right now
+            // (see comment in SystemRecords/Index.vue); the group_id filter itself still works
+            // if a request ever passes it directly.
             'categories' => ServiceCategory::where('is_active', true)->orderBy('name')->get(['id', 'name', 'group_id']),
+            'services' => DentalService::where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
             'statuses' => collect(TreatmentItemStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])
                 ->concat([
@@ -162,6 +165,7 @@ class SystemRecordController extends Controller
             'amount_max' => $request->filled('amount_max') ? (int) $request->amount_max : null,
             'group_id' => $request->filled('group_id') ? (int) $request->group_id : null,
             'category_id' => $request->filled('category_id') ? (int) $request->category_id : null,
+            'service_id' => $request->filled('service_id') ? (int) $request->service_id : null,
             'source' => $request->string('source')->trim()->value() ?: null,
             'status' => $status,
             'status_domain' => $statusDomain,
@@ -245,6 +249,7 @@ class SystemRecordController extends Controller
             ->when($advanced['amount_max'] ?? null, fn ($q, $v) => $q->whereRaw('(ti.subtotal - ti.discount) <= ?', [$v]))
             ->when($advanced['group_id'] ?? null, fn ($q, $v) => $q->where('svc_cat.group_id', $v))
             ->when($advanced['category_id'] ?? null, fn ($q, $v) => $q->where('svc.category_id', $v))
+            ->when($advanced['service_id'] ?? null, fn ($q, $v) => $q->where('svc.id', $v))
             ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
             ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'service'
                 ? $q->where('ti.status', $v)
@@ -300,9 +305,10 @@ class SystemRecordController extends Controller
             ->when($advanced['reference_code'] ?? null, fn ($q, $v) => $q->where('inv.code', 'ilike', "%{$v}%"))
             ->when($advanced['amount_min'] ?? null, fn ($q, $v) => $q->where('pay.amount', '>=', $v))
             ->when($advanced['amount_max'] ?? null, fn ($q, $v) => $q->where('pay.amount', '<=', $v))
-            // Payments aren't tied to a service — filtering by group/category should exclude them entirely.
+            // Payments aren't tied to a service — filtering by group/category/service should exclude them entirely.
             ->when($advanced['group_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['category_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['service_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
             ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'payment'
                 ? $q->whereRaw("(CASE WHEN pay.amount < 0 THEN 'refund' ELSE 'paid' END) = ?", [$v])

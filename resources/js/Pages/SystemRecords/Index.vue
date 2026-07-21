@@ -89,11 +89,8 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Bác sĩ</label>
-                            <select v-model="form.doctor_id" @change="applyFilters"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                <option value="">Tất cả bác sĩ</option>
-                                <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
-                            </select>
+                            <SearchableSelect :model-value="form.doctor_id" @update:model-value="v => setFilter('doctor_id', v)"
+                                :options="doctorOptions" placeholder="Tất cả bác sĩ" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Tư vấn</label>
@@ -111,21 +108,16 @@
                                 <option v-for="a in assistants" :key="a.id" :value="a.id">{{ a.name }}</option>
                             </select>
                         </div>
-                        <div>
-                            <label class="block text-xs font-medium text-gray-500 mb-1">Nhóm dịch vụ</label>
-                            <select v-model="form.group_id" @change="applyFilters"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                <option value="">Tất cả nhóm dịch vụ</option>
-                                <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
-                            </select>
-                        </div>
+                        <!-- "Nhóm dịch vụ" (service_groups) tạm ẩn — chưa có dữ liệu, sẽ bật lại khi Danh mục có nhóm. -->
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Nhóm thủ thuật</label>
-                            <select v-model="form.category_id" @change="applyFilters"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
-                                <option value="">Tất cả nhóm thủ thuật</option>
-                                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-                            </select>
+                            <SearchableSelect :model-value="form.category_id" @update:model-value="v => setFilter('category_id', v)"
+                                :options="categoryOptions" placeholder="Tất cả nhóm thủ thuật" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Diễn giải (dịch vụ)</label>
+                            <SearchableSelect :model-value="form.service_id" @update:model-value="v => setFilter('service_id', v)"
+                                :options="serviceOptions" placeholder="Tất cả dịch vụ" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Nguồn</label>
@@ -357,6 +349,7 @@ import { computed, reactive, ref } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
+import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
 
 const props = defineProps({
     records: Object,
@@ -366,8 +359,8 @@ const props = defineProps({
     doctors: { type: Array, default: () => [] },
     consultants: { type: Array, default: () => [] },
     assistants: { type: Array, default: () => [] },
-    groups: { type: Array, default: () => [] },
     categories: { type: Array, default: () => [] },
+    services: { type: Array, default: () => [] },
     sources: { type: Array, default: () => [] },
     statuses: { type: Array, default: () => [] },
     totals: { type: Object, default: () => ({ quantity: 0, discount: 0, gross: 0, service_amount: 0, payment_collected: 0, payment_refunded: 0 }) },
@@ -388,20 +381,30 @@ const form = reactive({
     reference_code:  props.filters?.reference_code  ?? '',
     amount_min:      props.filters?.amount_min      ?? '',
     amount_max:      props.filters?.amount_max      ?? '',
-    group_id:        props.filters?.group_id        ?? '',
     category_id:     props.filters?.category_id     ?? '',
+    service_id:      props.filters?.service_id       ?? '',
     source:          props.filters?.source          ?? '',
     status:          props.filters?.status          ?? '',
 });
 
+// SearchableSelect wants {value, label} — the props come as {id, name}.
+const doctorOptions   = computed(() => props.doctors.map(d => ({ value: d.id, label: d.name })));
+const categoryOptions = computed(() => props.categories.map(c => ({ value: c.id, label: c.name })));
+const serviceOptions  = computed(() => props.services.map(s => ({ value: s.id, label: s.name })));
+
+function setFilter(key, value) {
+    form[key] = value ?? '';
+    applyFilters();
+}
+
 const showAdvanced = ref(
     !!(form.patient_name || form.doctor_id || form.consultant_id || form.assistant_id || form.reference_code || form.amount_min || form.amount_max
-        || form.group_id || form.category_id || form.source || form.status)
+        || form.category_id || form.service_id || form.source || form.status)
 );
 
 const hasAdvancedFilters = computed(() =>
     form.patient_name || form.doctor_id || form.consultant_id || form.assistant_id || form.reference_code || form.amount_min || form.amount_max
-        || form.group_id || form.category_id || form.source || form.status
+        || form.category_id || form.service_id || form.source || form.status
 );
 
 const hasFilters = computed(() =>
@@ -433,8 +436,8 @@ function applyFilters() {
         reference_code:  form.reference_code  || undefined,
         amount_min:      form.amount_min      || undefined,
         amount_max:      form.amount_max      || undefined,
-        group_id:        form.group_id        || undefined,
         category_id:     form.category_id     || undefined,
+        service_id:      form.service_id      || undefined,
         source:          form.source          || undefined,
         status:          form.status          || undefined,
     }, { preserveState: true, replace: true });
@@ -449,7 +452,7 @@ function clearFilters() {
 function clearAdvancedFilters(apply = true) {
     form.patient_name = ''; form.doctor_id = ''; form.consultant_id = ''; form.assistant_id = '';
     form.reference_code = ''; form.amount_min = ''; form.amount_max = '';
-    form.group_id = ''; form.category_id = ''; form.source = ''; form.status = '';
+    form.category_id = ''; form.service_id = ''; form.source = ''; form.status = '';
     if (apply) applyFilters();
 }
 
@@ -549,8 +552,8 @@ async function confirmExport() {
             reference_code:  form.reference_code  || undefined,
             amount_min:      form.amount_min      || undefined,
             amount_max:      form.amount_max      || undefined,
-            group_id:        form.group_id        || undefined,
             category_id:     form.category_id     || undefined,
+            service_id:      form.service_id      || undefined,
             source:          form.source          || undefined,
             status:          form.status          || undefined,
         }), {
