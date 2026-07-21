@@ -390,10 +390,17 @@ const form = reactive({
 // SearchableSelect wants {value, label} — the props come as {id, name}.
 const doctorOptions   = computed(() => props.doctors.map(d => ({ value: d.id, label: d.name })));
 const categoryOptions = computed(() => props.categories.map(c => ({ value: c.id, label: c.name })));
-const serviceOptions  = computed(() => props.services.map(s => ({ value: s.id, label: s.name })));
+// Chọn "Nhóm thủ thuật" trước thì "Diễn giải (dịch vụ)" chỉ hiện dịch vụ thuộc nhóm đó.
+const serviceOptions  = computed(() => props.services
+    .filter(s => !form.category_id || String(s.category_id) === String(form.category_id))
+    .map(s => ({ value: s.id, label: s.name })));
 
 function setFilter(key, value) {
     form[key] = value ?? '';
+    if (key === 'category_id' && form.service_id) {
+        const stillValid = props.services.some(s => String(s.id) === String(form.service_id) && String(s.category_id) === String(value));
+        if (!stillValid) form.service_id = '';
+    }
     applyFilters();
 }
 

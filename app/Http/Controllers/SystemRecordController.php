@@ -96,7 +96,7 @@ class SystemRecordController extends Controller
             // (see comment in SystemRecords/Index.vue); the group_id filter itself still works
             // if a request ever passes it directly.
             'categories' => ServiceCategory::where('is_active', true)->orderBy('name')->get(['id', 'name', 'group_id']),
-            'services' => DentalService::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'services' => DentalService::where('is_active', true)->orderBy('name')->get(['id', 'name', 'category_id']),
             'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
             'statuses' => collect(TreatmentItemStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])
                 ->concat([
