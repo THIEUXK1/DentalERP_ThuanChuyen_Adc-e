@@ -8,7 +8,7 @@
                     <p class="text-xs text-gray-500 mt-0.5">Nhật ký giao dịch hợp nhất — dịch vụ đã thực hiện và thanh toán đã ghi nhận trong hệ thống</p>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-sm text-gray-500 whitespace-nowrap">{{ records.total.toLocaleString('vi-VN') }} bản ghi</span>
+                    <span class="text-sm text-gray-500 whitespace-nowrap">{{ filteredRecords.length.toLocaleString('vi-VN') }} bản ghi</span>
                     <button @click="openExport"
                         class="inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border border-green-300 text-green-700 hover:bg-green-50 transition-colors font-medium">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -24,36 +24,33 @@
                 <div class="flex flex-wrap gap-3">
                     <input v-model="form.search" type="search" list="patient-suggestions"
                         placeholder="Tìm tên KH, mã KH, dịch vụ, SĐT, mã chứng từ..."
-                        class="flex-1 min-w-[220px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @keyup.enter="applyFilters" />
+                        class="flex-1 min-w-[220px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
                     <select v-model="form.record_type"
-                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @change="applyFilters">
+                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                         <option value="">Tất cả loại</option>
                         <option value="service">Thủ thuật</option>
                         <option value="payment">Thanh toán</option>
                     </select>
                     <select v-if="branches.length > 0" v-model="form.branch_id"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @change="applyFilters">
+                        @change="reloadFromServer">
                         <option value="">Tất cả chi nhánh</option>
                         <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                     </select>
                     <select v-model="form.year"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @change="applyFilters">
+                        @change="reloadFromServer">
                         <option value="">Tất cả năm</option>
                         <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
                     </select>
                     <input v-model="form.date_from" type="date"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @change="applyFilters" />
+                        @change="reloadFromServer" />
                     <input v-model="form.date_to" type="date"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @change="applyFilters" />
+                        @change="reloadFromServer" />
                     <select v-model="form.per_page"
-                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        @change="applyFilters">
+                        class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                         <option value="20">20 / trang</option>
                         <option value="50">50 / trang</option>
                         <option value="100">100 / trang</option>
@@ -61,8 +58,6 @@
                         <option value="500">500 / trang</option>
                         <option value="1000">1000 / trang</option>
                     </select>
-                    <button @click="applyFilters"
-                        class="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">Lọc</button>
                     <button @click="showAdvanced = !showAdvanced"
                         :class="['inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border transition-colors font-medium',
                             showAdvanced || hasAdvancedFilters
@@ -84,8 +79,7 @@
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Tên khách hàng</label>
                             <input v-model="form.patient_name" type="text" list="patient-suggestions" placeholder="Tên khách hàng..."
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                @keyup.enter="applyFilters" />
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Bác sĩ</label>
@@ -94,7 +88,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Tư vấn</label>
-                            <select v-model="form.consultant_id" @change="applyFilters"
+                            <select v-model="form.consultant_id"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                                 <option value="">Tất cả tư vấn</option>
                                 <option v-for="c in consultants" :key="c.id" :value="c.id">{{ c.name }}</option>
@@ -102,7 +96,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Trợ thủ</label>
-                            <select v-model="form.assistant_id" @change="applyFilters"
+                            <select v-model="form.assistant_id"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                                 <option value="">Tất cả trợ thủ</option>
                                 <option v-for="a in assistants" :key="a.id" :value="a.id">{{ a.name }}</option>
@@ -121,7 +115,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Nguồn</label>
-                            <select v-model="form.source" @change="applyFilters"
+                            <select v-model="form.source"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                                 <option value="">Tất cả nguồn</option>
                                 <option v-for="s in sources" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -129,7 +123,7 @@
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Trạng thái</label>
-                            <select v-model="form.status" @change="applyFilters"
+                            <select v-model="form.status"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                                 <option value="">Tất cả trạng thái</option>
                                 <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -138,29 +132,24 @@
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Mã chứng từ</label>
                             <input v-model="form.reference_code" type="text" list="reference-suggestions" placeholder="Mã KHDT / hóa đơn..."
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                                @keyup.enter="applyFilters" />
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Thành tiền từ</label>
                             <input v-model="form.amount_min" type="number" placeholder="0"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums"
-                                @keyup.enter="applyFilters" />
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums" />
                         </div>
                         <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Thành tiền đến</label>
                             <input v-model="form.amount_max" type="number" placeholder="0"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums"
-                                @keyup.enter="applyFilters" />
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums" />
                         </div>
-                        <div class="flex items-end gap-2">
-                            <button @click="applyFilters"
-                                class="flex-1 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">Áp dụng</button>
-                            <button v-if="hasAdvancedFilters" @click="clearAdvancedFilters"
-                                class="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Xóa</button>
+                        <div v-if="hasAdvancedFilters" class="flex items-end">
+                            <button @click="clearAdvancedFilters"
+                                class="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Xóa lọc nâng cao</button>
                         </div>
                     </div>
-                    <p class="text-xs text-gray-400 mt-2">Có thể kết hợp với khoảng ngày (Từ ngày / Đến ngày) ở trên để thu hẹp kết quả.</p>
+                    <p class="text-xs text-gray-400 mt-2">Kết quả được lọc ngay khi bạn chọn — không cần bấm nút. Có thể kết hợp với khoảng ngày (Từ ngày / Đến ngày) ở trên để thu hẹp kết quả.</p>
                 </div>
 
                 <!-- Gợi ý gõ-tìm, lấy từ các bản ghi đang hiển thị -->
@@ -170,6 +159,11 @@
                 <datalist id="reference-suggestions">
                     <option v-for="code in referenceCodeSuggestions" :key="code" :value="code" />
                 </datalist>
+            </div>
+
+            <!-- Data-window cap warning -->
+            <div v-if="truncated" class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-amber-700">
+                Khoảng ngày đã chọn có quá nhiều bản ghi — chỉ tải {{ records.length.toLocaleString('vi-VN') }} dòng đầu tiên. Thu hẹp khoảng ngày để xem đầy đủ.
             </div>
 
             <!-- Totals for the currently filtered result set -->
@@ -207,10 +201,10 @@
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
-                            <tr v-if="records.data.length === 0">
+                            <tr v-if="pagedRecords.length === 0">
                                 <td colspan="15" class="px-4 py-12 text-center text-gray-400">Không có dữ liệu</td>
                             </tr>
-                            <tr v-for="r in records.data" :key="r.id" class="hover:bg-gray-50 transition-colors">
+                            <tr v-for="r in pagedRecords" :key="r.id" class="hover:bg-gray-50 transition-colors">
                                 <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ formatDate(r.record_date) }}</td>
                                 <td class="px-3 py-2.5">
                                     <Link v-if="r.patient_id" :href="route('patients.show', r.patient_id)"
@@ -245,19 +239,21 @@
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="records.last_page > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
+                <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
                     <span class="text-xs text-gray-500">
-                        Trang {{ records.current_page }} / {{ records.last_page }} — {{ records.total.toLocaleString('vi-VN') }} bản ghi
+                        Trang {{ currentPage }} / {{ totalPages }} — {{ filteredRecords.length.toLocaleString('vi-VN') }} bản ghi
                     </span>
                     <div class="flex gap-1">
-                        <button v-for="link in records.links" :key="link.label"
-                            :disabled="!link.url || link.active"
-                            @click="goToPage(link.url)"
-                            v-html="link.label"
+                        <button :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)"
                             :class="['px-3 py-1 rounded text-xs border transition-colors',
-                                link.active ? 'bg-primary-600 text-white border-primary-600'
-                                    : link.url ? 'border-gray-300 text-gray-600 hover:bg-gray-100'
-                                    : 'border-gray-200 text-gray-300 cursor-not-allowed']" />
+                                currentPage > 1 ? 'border-gray-300 text-gray-600 hover:bg-gray-100' : 'border-gray-200 text-gray-300 cursor-not-allowed']">‹ Trước</button>
+                        <button v-for="p in pageNumbers" :key="p"
+                            @click="goToPage(p)"
+                            :class="['px-3 py-1 rounded text-xs border transition-colors',
+                                p === currentPage ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-300 text-gray-600 hover:bg-gray-100']">{{ p }}</button>
+                        <button :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)"
+                            :class="['px-3 py-1 rounded text-xs border transition-colors',
+                                currentPage < totalPages ? 'border-gray-300 text-gray-600 hover:bg-gray-100' : 'border-gray-200 text-gray-300 cursor-not-allowed']">Sau ›</button>
                     </div>
                 </div>
             </div>
@@ -345,14 +341,16 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
+import { matchesQuery } from '@/utils/text';
 
 const props = defineProps({
-    records: Object,
+    records: Array,
+    truncated: { type: Boolean, default: false },
     filters: Object,
     branches: Array,
     years: Array,
@@ -363,28 +361,31 @@ const props = defineProps({
     services: { type: Array, default: () => [] },
     sources: { type: Array, default: () => [] },
     statuses: { type: Array, default: () => [] },
-    totals: { type: Object, default: () => ({ quantity: 0, discount: 0, gross: 0, service_amount: 0, payment_collected: 0, payment_refunded: 0 }) },
 });
 
+// Only date_from/date_to/year/branch_id bound what the server sends — they're the only fields
+// that need a fresh request. Everything else below is applied 100% client-side against
+// `props.records` (search, doctor/category/service/status/... filters, sorting, pagination),
+// so picking them never round-trips to the server.
 const form = reactive({
-    search:          props.filters?.search          ?? '',
-    record_type:     props.filters?.record_type     ?? '',
+    search:          '',
+    record_type:     '',
     branch_id:       props.filters?.branch_id       ?? '',
     year:            props.filters?.year            ?? '',
     date_from:       props.filters?.date_from       ?? '',
     date_to:         props.filters?.date_to         ?? '',
-    per_page:        props.filters?.per_page        ?? '50',
-    patient_name:    props.filters?.patient_name    ?? '',
-    doctor_id:       props.filters?.doctor_id       ?? '',
-    consultant_id:   props.filters?.consultant_id   ?? '',
-    assistant_id:    props.filters?.assistant_id    ?? '',
-    reference_code:  props.filters?.reference_code  ?? '',
-    amount_min:      props.filters?.amount_min      ?? '',
-    amount_max:      props.filters?.amount_max      ?? '',
-    category_id:     props.filters?.category_id     ?? '',
-    service_id:      props.filters?.service_id       ?? '',
-    source:          props.filters?.source          ?? '',
-    status:          props.filters?.status          ?? '',
+    per_page:        '50',
+    patient_name:    '',
+    doctor_id:       '',
+    consultant_id:   '',
+    assistant_id:    '',
+    reference_code:  '',
+    amount_min:      '',
+    amount_max:      '',
+    category_id:     '',
+    service_id:      '',
+    source:          '',
+    status:          '',
 });
 
 // SearchableSelect wants {value, label} — the props come as {id, name}.
@@ -401,7 +402,6 @@ function setFilter(key, value) {
         const stillValid = props.services.some(s => String(s.id) === String(form.service_id) && String(s.category_id) === String(value));
         if (!stillValid) form.service_id = '';
     }
-    applyFilters();
 }
 
 const showAdvanced = ref(
@@ -418,53 +418,103 @@ const hasFilters = computed(() =>
     form.search || form.record_type || form.branch_id || form.year || form.date_from || form.date_to || hasAdvancedFilters.value
 );
 
-// Gợi ý gõ-tìm cho ô "Tìm kiếm" / "Tên khách hàng" / "Mã chứng từ" — lấy từ các bản ghi
-// đang hiển thị trên trang hiện tại, không cần gọi API riêng.
+// Gợi ý gõ-tìm cho ô "Tìm kiếm" / "Tên khách hàng" / "Mã chứng từ" — lấy từ toàn bộ dữ liệu
+// đã tải cho khoảng ngày hiện tại, không cần gọi API riêng.
 const patientNameSuggestions = computed(() =>
-    [...new Set(props.records.data.map(r => r.patient_name).filter(Boolean))]
+    [...new Set(props.records.map(r => r.patient_name).filter(Boolean))]
 );
 const referenceCodeSuggestions = computed(() =>
-    [...new Set(props.records.data.map(r => r.reference_code).filter(Boolean))]
+    [...new Set(props.records.map(r => r.reference_code).filter(Boolean))]
 );
 
-function applyFilters() {
+// 100% client-side filtering — everything except the date/year/branch window (already applied
+// server-side) runs here against the already-loaded `props.records`.
+function matchesFilters(r) {
+    if (form.record_type && r.record_type !== form.record_type) return false;
+    if (form.search) {
+        const q = form.search;
+        const hit = matchesQuery(r.patient_name, q) || matchesQuery(r.patient_code, q) || matchesQuery(r.phone, q)
+            || matchesQuery(r.description, q) || matchesQuery(r.reference_code, q);
+        if (!hit) return false;
+    }
+    if (form.patient_name && !matchesQuery(r.patient_name, form.patient_name)) return false;
+    if (form.doctor_id && String(r.doctor_id) !== String(form.doctor_id)) return false;
+    if (form.consultant_id && String(r.consultant_id) !== String(form.consultant_id)) return false;
+    if (form.assistant_id && String(r.assistant_id) !== String(form.assistant_id)) return false;
+    if (form.reference_code && !matchesQuery(r.reference_code, form.reference_code)) return false;
+    if (form.amount_min !== '' && r.amount < Number(form.amount_min)) return false;
+    if (form.amount_max !== '' && r.amount > Number(form.amount_max)) return false;
+    if (form.category_id && String(r.category_id) !== String(form.category_id)) return false;
+    if (form.service_id && String(r.service_id) !== String(form.service_id)) return false;
+    if (form.source && r.source !== form.source) return false;
+    if (form.status && r.status !== form.status) return false;
+    return true;
+}
+
+const filteredRecords = computed(() => props.records.filter(matchesFilters));
+
+const totals = computed(() => {
+    const t = { quantity: 0, discount: 0, gross: 0, service_amount: 0, payment_collected: 0, payment_refunded: 0 };
+    for (const r of filteredRecords.value) {
+        const quantity = Number(r.quantity) || 0;
+        const unitPrice = Number(r.unit_price) || 0;
+        t.quantity += quantity;
+        t.discount += Number(r.discount) || 0;
+        t.gross += quantity * unitPrice;
+        if (r.record_type === 'service') t.service_amount += r.amount;
+        else if (r.amount > 0) t.payment_collected += r.amount;
+        else t.payment_refunded += r.amount;
+    }
+    return t;
+});
+
+// ── Client-side pagination ────────────────────────────────
+const currentPage = ref(1);
+const totalPages = computed(() => Math.max(1, Math.ceil(filteredRecords.value.length / Number(form.per_page))));
+const pagedRecords = computed(() => {
+    const perPage = Number(form.per_page);
+    const start = (currentPage.value - 1) * perPage;
+    return filteredRecords.value.slice(start, start + perPage);
+});
+const pageNumbers = computed(() => {
+    const span = 2;
+    const start = Math.max(1, currentPage.value - span);
+    const end = Math.min(totalPages.value, currentPage.value + span);
+    const pages = [];
+    for (let p = start; p <= end; p++) pages.push(p);
+    return pages;
+});
+
+watch(filteredRecords, () => { currentPage.value = 1; });
+watch(() => form.per_page, () => { currentPage.value = 1; });
+
+function goToPage(page) {
+    currentPage.value = Math.min(Math.max(page, 1), totalPages.value);
+}
+
+// Only these bound the server-side data window — changing them needs a fresh page load.
+function reloadFromServer() {
     router.get(route('system-records.index'), {
-        search:          form.search          || undefined,
-        record_type:     form.record_type     || undefined,
-        branch_id:       form.branch_id       || undefined,
-        year:            form.year            || undefined,
-        date_from:       form.date_from       || undefined,
-        date_to:         form.date_to         || undefined,
-        per_page:        form.per_page !== '50' ? form.per_page : undefined,
-        patient_name:    form.patient_name    || undefined,
-        doctor_id:       form.doctor_id       || undefined,
-        consultant_id:   form.consultant_id   || undefined,
-        assistant_id:    form.assistant_id    || undefined,
-        reference_code:  form.reference_code  || undefined,
-        amount_min:      form.amount_min      || undefined,
-        amount_max:      form.amount_max      || undefined,
-        category_id:     form.category_id     || undefined,
-        service_id:      form.service_id      || undefined,
-        source:          form.source          || undefined,
-        status:          form.status          || undefined,
+        branch_id: form.branch_id || undefined,
+        year:      form.year      || undefined,
+        date_from: form.date_from || undefined,
+        date_to:   form.date_to   || undefined,
     }, { preserveState: true, replace: true });
 }
 
 function clearFilters() {
-    form.search = ''; form.record_type = ''; form.branch_id = ''; form.year = ''; form.date_from = ''; form.date_to = '';
-    clearAdvancedFilters(false);
-    applyFilters();
+    form.search = ''; form.record_type = '';
+    clearAdvancedFilters();
+
+    const hadServerFilters = form.branch_id || form.year || form.date_from || form.date_to;
+    form.branch_id = ''; form.year = ''; form.date_from = ''; form.date_to = '';
+    if (hadServerFilters) reloadFromServer();
 }
 
-function clearAdvancedFilters(apply = true) {
+function clearAdvancedFilters() {
     form.patient_name = ''; form.doctor_id = ''; form.consultant_id = ''; form.assistant_id = '';
     form.reference_code = ''; form.amount_min = ''; form.amount_max = '';
     form.category_id = ''; form.service_id = ''; form.source = ''; form.status = '';
-    if (apply) applyFilters();
-}
-
-function goToPage(url) {
-    if (url) router.visit(url, { preserveState: true });
 }
 
 function fmt(val) {

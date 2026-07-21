@@ -28,6 +28,9 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class SystemRecordController extends Controller
 {
+    /** Max rows shipped to the browser per page load — filtering/pagination beyond this happen 100% client-side. */
+    private const MAX_ROWS = 20000;
+
     public function index(Request $request): Response
     {
         $user = auth()->user();
@@ -39,49 +42,27 @@ class SystemRecordController extends Controller
             $request->merge(['date_from' => $today, 'date_to' => $today]);
         }
 
-        $union = $this->buildUnionQuery($request, $user);
-        $union->orderByDesc('record_date')->orderByDesc('row_id');
+        $branchId = $this->resolveBranchId($request, $user);
+        $dateFrom = $request->date_from ?: null;
+        $dateTo = $request->date_to ?: null;
+        $year = $request->filled('year') ? (int) $request->year : null;
 
-        $perPageInput = $request->per_page ?? '50';
-        $perPage = min(max((int) $perPageInput, 1), 1000);
+        // Only the date/year window and branch bound how much data gets shipped to the browser.
+        // Everything else (search, doctor/category/status/... filters, sorting, pagination) is
+        // applied 100% client-side in Index.vue against this one payload — no server round-trip
+        // per filter change.
+        $union = $this->serviceQuery($branchId, null, $dateFrom, $dateTo, $year)
+            ->unionAll($this->paymentQuery($branchId, null, $dateFrom, $dateTo, $year))
+            ->orderByDesc('record_date')->orderByDesc('row_id');
 
-        $records = $union->paginate($perPage)->withQueryString();
-        $records->getCollection()->transform(fn ($row) => $this->normalizeRow($row));
-
-        // Sums over the whole filtered result set (not just the current page) — built from a
-        // fresh copy of the union query since $union above has already been mutated (order by,
-        // pagination) by the time we get here.
-        // "amount" mixes unrelated things: service revenue net of discount, cash actually
-        // collected, and — within payments — collections vs refunds netting each other out
-        // (a day with 20.2M collected and 10.4M refunded would otherwise just show "9.8M",
-        // hiding that 10.4M went back out). Keep every one of these apart.
-        $totals = DB::query()
-            ->fromSub($this->buildUnionQuery($request, $user), 'u')
-            ->selectRaw("
-                COALESCE(SUM(quantity), 0) as quantity,
-                COALESCE(SUM(discount), 0) as discount,
-                COALESCE(SUM(quantity * unit_price), 0) as gross,
-                COALESCE(SUM(amount) FILTER (WHERE record_type = 'service'), 0) as service_amount,
-                COALESCE(SUM(amount) FILTER (WHERE record_type = 'payment' AND amount > 0), 0) as payment_collected,
-                COALESCE(SUM(amount) FILTER (WHERE record_type = 'payment' AND amount < 0), 0) as payment_refunded
-            ")
-            ->first();
+        $rows = $union->limit(self::MAX_ROWS + 1)->get();
+        $truncated = $rows->count() > self::MAX_ROWS;
+        $records = $rows->take(self::MAX_ROWS)->map(fn ($row) => $this->normalizeRow($row))->values();
 
         return Inertia::render('SystemRecords/Index', [
             'records' => $records,
-            'totals' => [
-                'quantity' => (int) $totals->quantity,
-                'discount' => (int) $totals->discount,
-                'gross' => (int) $totals->gross,
-                'service_amount' => (int) $totals->service_amount,
-                'payment_collected' => (int) $totals->payment_collected,
-                'payment_refunded' => (int) $totals->payment_refunded,
-            ],
-            'filters' => $request->only([
-                'search', 'record_type', 'branch_id', 'date_from', 'date_to', 'year', 'per_page',
-                'patient_name', 'doctor_id', 'consultant_id', 'assistant_id', 'amount_min', 'amount_max', 'reference_code',
-                'group_id', 'category_id', 'source', 'status', 'service_id',
-            ]),
+            'truncated' => $truncated,
+            'filters' => $request->only(['branch_id', 'date_from', 'date_to', 'year']),
             'branches' => $user->hasRole(['owner', 'admin'])
                 ? Branch::where('is_active', true)->get(['id', 'name'])
                 : [],
@@ -126,8 +107,8 @@ class SystemRecordController extends Controller
         return Excel::download(new SystemRecordExport($rows), $filename);
     }
 
-    /** @return Builder Union of service + payment sub-queries, filtered per the request and the user's branch scope. */
-    private function buildUnionQuery(Request $request, $user): Builder
+    /** Non-admins are pinned to their own branch; admins/owners may pick one via the branch_id filter. */
+    private function resolveBranchId(Request $request, $user): ?int
     {
         $branchId = null;
         if (! $user->hasRole(['owner', 'admin']) && $user->branch_id) {
@@ -136,6 +117,14 @@ class SystemRecordController extends Controller
         if ($request->filled('branch_id') && $user->hasRole(['owner', 'admin'])) {
             $branchId = (int) $request->branch_id;
         }
+
+        return $branchId;
+    }
+
+    /** @return Builder Union of service + payment sub-queries, filtered per the request and the user's branch scope. Used by the Excel export, which still applies every filter server-side. */
+    private function buildUnionQuery(Request $request, $user): Builder
+    {
+        $branchId = $this->resolveBranchId($request, $user);
 
         $search = $request->string('search')->trim()->value() ?: null;
         $type = $request->string('record_type')->value() ?: null;
@@ -276,6 +265,12 @@ class SystemRecordController extends Controller
                 'tp.code as reference_code',
                 DB::raw("'treatment_plan' as reference_type"),
                 'tp.id as reference_id',
+                DB::raw('COALESCE(item_doc.id, plan_doc.id) as doctor_id'),
+                'consult.id as consultant_id',
+                'asst.id as assistant_id',
+                'svc.category_id as category_id',
+                'svc.id as service_id',
+                'p.source as source',
             ]);
     }
 
@@ -335,6 +330,12 @@ class SystemRecordController extends Controller
                 'inv.code as reference_code',
                 DB::raw("'invoice' as reference_type"),
                 'inv.id as reference_id',
+                DB::raw('CAST(NULL AS integer) as doctor_id'),
+                DB::raw('CAST(NULL AS integer) as consultant_id'),
+                DB::raw('CAST(NULL AS integer) as assistant_id'),
+                DB::raw('CAST(NULL AS integer) as category_id'),
+                DB::raw('CAST(NULL AS integer) as service_id'),
+                'p.source as source',
             ]);
     }
 
@@ -361,9 +362,19 @@ class SystemRecordController extends Controller
             'status_label' => $isService
                 ? (TreatmentItemStatus::tryFrom($row->status_raw)?->label() ?? $row->status_raw)
                 : ($row->status_raw === 'refund' ? 'Hoàn tiền' : 'Đã thu'),
+            // Raw status value — 'status_domain' in buildUnionQuery() shows why comparing this
+            // directly against either a TreatmentItemStatus value or 'paid'/'refund' is safe:
+            // the two domains never share a value, so client-side filtering needs no extra check.
+            'status' => $row->status_raw,
             'doctor_name' => $row->doctor_name,
+            'doctor_id' => $row->doctor_id,
             'consultant_name' => $row->consultant_name,
+            'consultant_id' => $row->consultant_id,
             'assistant_name' => $row->assistant_name,
+            'assistant_id' => $row->assistant_id,
+            'category_id' => $row->category_id,
+            'service_id' => $row->service_id,
+            'source' => $row->source,
             'branch_name' => $row->branch_name,
             'reference_code' => $row->reference_code,
             'reference_type' => $row->reference_type,
