@@ -3,7 +3,7 @@ export const menuConfig = [
         label: 'TỔNG QUAN',
         items: [
             { label: 'Tổng quan', route: 'dashboard', icon: 'home' },
-            { label: 'Dữ liệu hệ thống', route: 'system-records.index', icon: 'general-ledger', permission: 'reports.financial' }
+            { label: 'Bảng kế hoạch báo cáo theo ngày', route: 'system-records.index', icon: 'general-ledger', permission: 'reports.financial' }
         ]
     },
     {

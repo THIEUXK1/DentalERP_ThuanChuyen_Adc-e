@@ -1,10 +1,10 @@
 <template>
-    <AppLayout title="Dữ liệu hệ thống">
+    <AppLayout title="Bảng kế hoạch báo cáo theo ngày">
         <div class="space-y-4">
             <!-- Header -->
             <div class="flex items-center justify-between gap-3">
                 <div>
-                    <h1 class="text-xl font-bold text-gray-800">Dữ liệu hệ thống</h1>
+                    <h1 class="text-xl font-bold text-gray-800">Bảng kế hoạch báo cáo theo ngày</h1>
                     <p class="text-xs text-gray-500 mt-0.5">Nhật ký giao dịch hợp nhất — dịch vụ đã thực hiện và thanh toán đã ghi nhận trong hệ thống</p>
                 </div>
                 <div class="flex items-center gap-2">
@@ -22,7 +22,7 @@
             <!-- Filters -->
             <div class="bg-white rounded-xl border border-gray-200 p-4">
                 <div class="flex flex-wrap gap-3">
-                    <input v-model="form.search" type="search"
+                    <input v-model="form.search" type="search" list="patient-suggestions"
                         placeholder="Tìm tên KH, mã KH, dịch vụ, SĐT, mã chứng từ..."
                         class="flex-1 min-w-[220px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
                         @keyup.enter="applyFilters" />
@@ -63,9 +63,132 @@
                     </select>
                     <button @click="applyFilters"
                         class="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">Lọc</button>
+                    <button @click="showAdvanced = !showAdvanced"
+                        :class="['inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border transition-colors font-medium',
+                            showAdvanced || hasAdvancedFilters
+                                ? 'border-primary-400 text-primary-700 bg-primary-50'
+                                : 'border-gray-300 text-gray-600 hover:bg-gray-50']">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                        </svg>
+                        Lọc nâng cao
+                        <span v-if="hasAdvancedFilters" class="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
+                    </button>
                     <button v-if="hasFilters" @click="clearFilters"
                         class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Xóa lọc</button>
                 </div>
+
+                <!-- Advanced filter panel -->
+                <div v-if="showAdvanced" class="mt-3 pt-3 border-t border-gray-100">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Tên khách hàng</label>
+                            <input v-model="form.patient_name" type="text" list="patient-suggestions" placeholder="Tên khách hàng..."
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                @keyup.enter="applyFilters" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Bác sĩ</label>
+                            <select v-model="form.doctor_id" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả bác sĩ</option>
+                                <option v-for="d in doctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Tư vấn</label>
+                            <select v-model="form.consultant_id" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả tư vấn</option>
+                                <option v-for="c in consultants" :key="c.id" :value="c.id">{{ c.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Trợ thủ</label>
+                            <select v-model="form.assistant_id" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả trợ thủ</option>
+                                <option v-for="a in assistants" :key="a.id" :value="a.id">{{ a.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Nhóm dịch vụ</label>
+                            <select v-model="form.group_id" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả nhóm dịch vụ</option>
+                                <option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Nhóm thủ thuật</label>
+                            <select v-model="form.category_id" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả nhóm thủ thuật</option>
+                                <option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Nguồn</label>
+                            <select v-model="form.source" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả nguồn</option>
+                                <option v-for="s in sources" :key="s.value" :value="s.value">{{ s.label }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Trạng thái</label>
+                            <select v-model="form.status" @change="applyFilters"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả trạng thái</option>
+                                <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Mã chứng từ</label>
+                            <input v-model="form.reference_code" type="text" list="reference-suggestions" placeholder="Mã KHDT / hóa đơn..."
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                @keyup.enter="applyFilters" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Thành tiền từ</label>
+                            <input v-model="form.amount_min" type="number" placeholder="0"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums"
+                                @keyup.enter="applyFilters" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Thành tiền đến</label>
+                            <input v-model="form.amount_max" type="number" placeholder="0"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 tabular-nums"
+                                @keyup.enter="applyFilters" />
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <button @click="applyFilters"
+                                class="flex-1 px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors">Áp dụng</button>
+                            <button v-if="hasAdvancedFilters" @click="clearAdvancedFilters"
+                                class="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Xóa</button>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-2">Có thể kết hợp với khoảng ngày (Từ ngày / Đến ngày) ở trên để thu hẹp kết quả.</p>
+                </div>
+
+                <!-- Gợi ý gõ-tìm, lấy từ các bản ghi đang hiển thị -->
+                <datalist id="patient-suggestions">
+                    <option v-for="name in patientNameSuggestions" :key="name" :value="name" />
+                </datalist>
+                <datalist id="reference-suggestions">
+                    <option v-for="code in referenceCodeSuggestions" :key="code" :value="code" />
+                </datalist>
+            </div>
+
+            <!-- Totals for the currently filtered result set -->
+            <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
+                <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Tổng theo bộ lọc</span>
+                <span class="text-gray-600">SL: <strong class="text-gray-800 tabular-nums">{{ fmt(totals.quantity) }}</strong></span>
+                <span class="text-gray-600">Đơn giá × SL: <strong class="text-gray-800 tabular-nums">{{ fmt(totals.gross) }}</strong></span>
+                <span class="text-gray-600">Khuyến mại: <strong class="text-orange-600 tabular-nums">{{ fmt(totals.discount) }}</strong></span>
+                <span class="text-gray-600">Thành tiền dịch vụ: <strong class="tabular-nums" :class="totals.service_amount < 0 ? 'text-red-600' : 'text-gray-800'">{{ fmt(totals.service_amount) }}</strong></span>
+                <span class="text-gray-600">Tiền thu: <strong class="text-emerald-700 tabular-nums">{{ fmt(totals.payment_collected) }}</strong></span>
+                <span class="text-gray-600">Tiền hoàn: <strong class="text-red-600 tabular-nums">{{ fmt(totals.payment_refunded) }}</strong></span>
             </div>
 
             <!-- Table -->
@@ -240,37 +363,94 @@ const props = defineProps({
     filters: Object,
     branches: Array,
     years: Array,
+    doctors: { type: Array, default: () => [] },
+    consultants: { type: Array, default: () => [] },
+    assistants: { type: Array, default: () => [] },
+    groups: { type: Array, default: () => [] },
+    categories: { type: Array, default: () => [] },
+    sources: { type: Array, default: () => [] },
+    statuses: { type: Array, default: () => [] },
+    totals: { type: Object, default: () => ({ quantity: 0, discount: 0, gross: 0, service_amount: 0, payment_collected: 0, payment_refunded: 0 }) },
 });
 
 const form = reactive({
-    search:      props.filters?.search      ?? '',
-    record_type: props.filters?.record_type ?? '',
-    branch_id:   props.filters?.branch_id   ?? '',
-    year:        props.filters?.year        ?? '',
-    date_from:   props.filters?.date_from   ?? '',
-    date_to:     props.filters?.date_to     ?? '',
-    per_page:    props.filters?.per_page    ?? '50',
+    search:          props.filters?.search          ?? '',
+    record_type:     props.filters?.record_type     ?? '',
+    branch_id:       props.filters?.branch_id       ?? '',
+    year:            props.filters?.year            ?? '',
+    date_from:       props.filters?.date_from       ?? '',
+    date_to:         props.filters?.date_to         ?? '',
+    per_page:        props.filters?.per_page        ?? '50',
+    patient_name:    props.filters?.patient_name    ?? '',
+    doctor_id:       props.filters?.doctor_id       ?? '',
+    consultant_id:   props.filters?.consultant_id   ?? '',
+    assistant_id:    props.filters?.assistant_id    ?? '',
+    reference_code:  props.filters?.reference_code  ?? '',
+    amount_min:      props.filters?.amount_min      ?? '',
+    amount_max:      props.filters?.amount_max      ?? '',
+    group_id:        props.filters?.group_id        ?? '',
+    category_id:     props.filters?.category_id     ?? '',
+    source:          props.filters?.source          ?? '',
+    status:          props.filters?.status          ?? '',
 });
 
+const showAdvanced = ref(
+    !!(form.patient_name || form.doctor_id || form.consultant_id || form.assistant_id || form.reference_code || form.amount_min || form.amount_max
+        || form.group_id || form.category_id || form.source || form.status)
+);
+
+const hasAdvancedFilters = computed(() =>
+    form.patient_name || form.doctor_id || form.consultant_id || form.assistant_id || form.reference_code || form.amount_min || form.amount_max
+        || form.group_id || form.category_id || form.source || form.status
+);
+
 const hasFilters = computed(() =>
-    form.search || form.record_type || form.branch_id || form.year || form.date_from || form.date_to
+    form.search || form.record_type || form.branch_id || form.year || form.date_from || form.date_to || hasAdvancedFilters.value
+);
+
+// Gợi ý gõ-tìm cho ô "Tìm kiếm" / "Tên khách hàng" / "Mã chứng từ" — lấy từ các bản ghi
+// đang hiển thị trên trang hiện tại, không cần gọi API riêng.
+const patientNameSuggestions = computed(() =>
+    [...new Set(props.records.data.map(r => r.patient_name).filter(Boolean))]
+);
+const referenceCodeSuggestions = computed(() =>
+    [...new Set(props.records.data.map(r => r.reference_code).filter(Boolean))]
 );
 
 function applyFilters() {
     router.get(route('system-records.index'), {
-        search:      form.search      || undefined,
-        record_type: form.record_type || undefined,
-        branch_id:   form.branch_id   || undefined,
-        year:        form.year        || undefined,
-        date_from:   form.date_from   || undefined,
-        date_to:     form.date_to     || undefined,
-        per_page:    form.per_page !== '50' ? form.per_page : undefined,
+        search:          form.search          || undefined,
+        record_type:     form.record_type     || undefined,
+        branch_id:       form.branch_id       || undefined,
+        year:            form.year            || undefined,
+        date_from:       form.date_from       || undefined,
+        date_to:         form.date_to         || undefined,
+        per_page:        form.per_page !== '50' ? form.per_page : undefined,
+        patient_name:    form.patient_name    || undefined,
+        doctor_id:       form.doctor_id       || undefined,
+        consultant_id:   form.consultant_id   || undefined,
+        assistant_id:    form.assistant_id    || undefined,
+        reference_code:  form.reference_code  || undefined,
+        amount_min:      form.amount_min      || undefined,
+        amount_max:      form.amount_max      || undefined,
+        group_id:        form.group_id        || undefined,
+        category_id:     form.category_id     || undefined,
+        source:          form.source          || undefined,
+        status:          form.status          || undefined,
     }, { preserveState: true, replace: true });
 }
 
 function clearFilters() {
     form.search = ''; form.record_type = ''; form.branch_id = ''; form.year = ''; form.date_from = ''; form.date_to = '';
+    clearAdvancedFilters(false);
     applyFilters();
+}
+
+function clearAdvancedFilters(apply = true) {
+    form.patient_name = ''; form.doctor_id = ''; form.consultant_id = ''; form.assistant_id = '';
+    form.reference_code = ''; form.amount_min = ''; form.amount_max = '';
+    form.group_id = ''; form.category_id = ''; form.source = ''; form.status = '';
+    if (apply) applyFilters();
 }
 
 function goToPage(url) {
@@ -356,12 +536,23 @@ async function confirmExport() {
 
     try {
         const response = await axios.get(route('system-records.export', {
-            search:      form.search      || undefined,
-            record_type: form.record_type || undefined,
-            branch_id:   form.branch_id   || undefined,
-            year:        form.year        || undefined,
-            date_from:   exportForm.date_from,
-            date_to:     exportForm.date_to,
+            search:          form.search          || undefined,
+            record_type:     form.record_type     || undefined,
+            branch_id:       form.branch_id       || undefined,
+            year:            form.year            || undefined,
+            date_from:       exportForm.date_from,
+            date_to:         exportForm.date_to,
+            patient_name:    form.patient_name    || undefined,
+            doctor_id:       form.doctor_id       || undefined,
+            consultant_id:   form.consultant_id   || undefined,
+            assistant_id:    form.assistant_id    || undefined,
+            reference_code:  form.reference_code  || undefined,
+            amount_min:      form.amount_min      || undefined,
+            amount_max:      form.amount_max      || undefined,
+            group_id:        form.group_id        || undefined,
+            category_id:     form.category_id     || undefined,
+            source:          form.source          || undefined,
+            status:          form.status          || undefined,
         }), {
             responseType: 'blob',
             onDownloadProgress(e) {

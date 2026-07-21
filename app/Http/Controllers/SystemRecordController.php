@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\LeadSource;
 use App\Enums\PaymentMethod;
+use App\Enums\RoleType;
 use App\Enums\TreatmentItemStatus;
 use App\Exports\SystemRecordExport;
 use App\Models\Branch;
+use App\Models\Employee;
+use App\Models\ServiceCategory;
+use App\Models\ServiceGroup;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -27,6 +32,13 @@ class SystemRecordController extends Controller
     {
         $user = auth()->user();
 
+        // No date/year filter picked yet (fresh page load): default to today only, rather than
+        // scanning/showing the entire history every time someone opens this page.
+        if (! $request->filled('date_from') && ! $request->filled('date_to') && ! $request->filled('year')) {
+            $today = now()->toDateString();
+            $request->merge(['date_from' => $today, 'date_to' => $today]);
+        }
+
         $union = $this->buildUnionQuery($request, $user);
         $union->orderByDesc('record_date')->orderByDesc('row_id');
 
@@ -36,13 +48,58 @@ class SystemRecordController extends Controller
         $records = $union->paginate($perPage)->withQueryString();
         $records->getCollection()->transform(fn ($row) => $this->normalizeRow($row));
 
+        // Sums over the whole filtered result set (not just the current page) — built from a
+        // fresh copy of the union query since $union above has already been mutated (order by,
+        // pagination) by the time we get here.
+        // "amount" mixes unrelated things: service revenue net of discount, cash actually
+        // collected, and — within payments — collections vs refunds netting each other out
+        // (a day with 20.2M collected and 10.4M refunded would otherwise just show "9.8M",
+        // hiding that 10.4M went back out). Keep every one of these apart.
+        $totals = DB::query()
+            ->fromSub($this->buildUnionQuery($request, $user), 'u')
+            ->selectRaw("
+                COALESCE(SUM(quantity), 0) as quantity,
+                COALESCE(SUM(discount), 0) as discount,
+                COALESCE(SUM(quantity * unit_price), 0) as gross,
+                COALESCE(SUM(amount) FILTER (WHERE record_type = 'service'), 0) as service_amount,
+                COALESCE(SUM(amount) FILTER (WHERE record_type = 'payment' AND amount > 0), 0) as payment_collected,
+                COALESCE(SUM(amount) FILTER (WHERE record_type = 'payment' AND amount < 0), 0) as payment_refunded
+            ")
+            ->first();
+
         return Inertia::render('SystemRecords/Index', [
             'records' => $records,
-            'filters' => $request->only(['search', 'record_type', 'branch_id', 'date_from', 'date_to', 'year', 'per_page']),
+            'totals' => [
+                'quantity' => (int) $totals->quantity,
+                'discount' => (int) $totals->discount,
+                'gross' => (int) $totals->gross,
+                'service_amount' => (int) $totals->service_amount,
+                'payment_collected' => (int) $totals->payment_collected,
+                'payment_refunded' => (int) $totals->payment_refunded,
+            ],
+            'filters' => $request->only([
+                'search', 'record_type', 'branch_id', 'date_from', 'date_to', 'year', 'per_page',
+                'patient_name', 'doctor_id', 'consultant_id', 'assistant_id', 'amount_min', 'amount_max', 'reference_code',
+                'group_id', 'category_id', 'source', 'status',
+            ]),
             'branches' => $user->hasRole(['owner', 'admin'])
                 ? Branch::where('is_active', true)->get(['id', 'name'])
                 : [],
             'years' => $this->availableYears(),
+            'doctors' => Employee::doctors()->where('is_active', true)->orderBy('full_name')
+                ->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+            'consultants' => Employee::where('role_type', RoleType::Consultant->value)->where('is_active', true)->orderBy('full_name')
+                ->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+            'assistants' => Employee::where('role_type', RoleType::Assistant->value)->where('is_active', true)->orderBy('full_name')
+                ->get()->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+            'groups' => ServiceGroup::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'categories' => ServiceCategory::where('is_active', true)->orderBy('name')->get(['id', 'name', 'group_id']),
+            'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            'statuses' => collect(TreatmentItemStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])
+                ->concat([
+                    ['value' => 'paid', 'label' => 'Đã thu (thanh toán)'],
+                    ['value' => 'refund', 'label' => 'Hoàn tiền (thanh toán)'],
+                ]),
         ]);
     }
 
@@ -83,12 +140,39 @@ class SystemRecordController extends Controller
         $dateTo = $request->date_to ?: null;
         $year = $request->filled('year') ? (int) $request->year : null;
 
+        // "Trạng thái" spans two unrelated domains: treatment-item status (service rows) and
+        // paid/refund (payment rows, derived from amount sign — see paymentQuery()). Figure out
+        // up front which domain the picked value belongs to, so each side of the union knows
+        // whether to filter on it or exclude itself entirely.
+        $status = $request->string('status')->trim()->value() ?: null;
+        $statusDomain = null;
+        if ($status) {
+            $statusDomain = in_array($status, array_column(TreatmentItemStatus::cases(), 'value'), true)
+                ? 'service'
+                : (in_array($status, ['paid', 'refund'], true) ? 'payment' : null);
+        }
+
+        $advanced = [
+            'patient_name' => $request->string('patient_name')->trim()->value() ?: null,
+            'doctor_id' => $request->filled('doctor_id') ? (int) $request->doctor_id : null,
+            'consultant_id' => $request->filled('consultant_id') ? (int) $request->consultant_id : null,
+            'assistant_id' => $request->filled('assistant_id') ? (int) $request->assistant_id : null,
+            'reference_code' => $request->string('reference_code')->trim()->value() ?: null,
+            'amount_min' => $request->filled('amount_min') ? (int) $request->amount_min : null,
+            'amount_max' => $request->filled('amount_max') ? (int) $request->amount_max : null,
+            'group_id' => $request->filled('group_id') ? (int) $request->group_id : null,
+            'category_id' => $request->filled('category_id') ? (int) $request->category_id : null,
+            'source' => $request->string('source')->trim()->value() ?: null,
+            'status' => $status,
+            'status_domain' => $statusDomain,
+        ];
+
         $queries = [];
         if ($type !== 'payment') {
-            $queries[] = $this->serviceQuery($branchId, $search, $dateFrom, $dateTo, $year);
+            $queries[] = $this->serviceQuery($branchId, $search, $dateFrom, $dateTo, $year, $advanced);
         }
         if ($type !== 'service') {
-            $queries[] = $this->paymentQuery($branchId, $search, $dateFrom, $dateTo, $year);
+            $queries[] = $this->paymentQuery($branchId, $search, $dateFrom, $dateTo, $year, $advanced);
         }
 
         $union = array_shift($queries);
@@ -119,15 +203,18 @@ class SystemRecordController extends Controller
         });
     }
 
-    private function serviceQuery(?int $branchId, ?string $search, ?string $dateFrom, ?string $dateTo, ?int $year): Builder
+    private function serviceQuery(?int $branchId, ?string $search, ?string $dateFrom, ?string $dateTo, ?int $year, array $advanced = []): Builder
     {
         return DB::table('treatment_plan_items as ti')
             ->join('treatment_plans as tp', 'ti.treatment_plan_id', '=', 'tp.id')
             ->join('patients as p', 'tp.patient_id', '=', 'p.id')
-            ->leftJoin('employees as doc', 'tp.doctor_id', '=', 'doc.id')
+            ->leftJoin('employees as item_doc', 'ti.responsible_doctor_id', '=', 'item_doc.id')
+            ->leftJoin('employees as plan_doc', 'tp.doctor_id', '=', 'plan_doc.id')
             ->leftJoin('employees as consult', 'tp.consultant_id', '=', 'consult.id')
             ->leftJoin('employees as asst', 'ti.assistant_doctor_id', '=', 'asst.id')
             ->leftJoin('branches as br', 'tp.branch_id', '=', 'br.id')
+            ->leftJoin('dental_services as svc', 'ti.service_id', '=', 'svc.id')
+            ->leftJoin('service_categories as svc_cat', 'svc.category_id', '=', 'svc_cat.id')
             ->whereIn('tp.status', ['approved', 'in_progress', 'completed'])
             ->when($branchId, fn ($q) => $q->where('tp.branch_id', $branchId))
             ->when($dateFrom, fn ($q) => $q->whereRaw(
@@ -147,6 +234,21 @@ class SystemRecordController extends Controller
                     ->orWhere('ti.name', 'ilike', $like)
                     ->orWhere('tp.code', 'ilike', $like);
             }))
+            ->when($advanced['patient_name'] ?? null, fn ($q, $v) => $q->where('p.full_name', 'ilike', "%{$v}%"))
+            ->when($advanced['doctor_id'] ?? null, fn ($q, $v) => $q->whereRaw(
+                'COALESCE(item_doc.id, plan_doc.id) = ?', [$v]
+            ))
+            ->when($advanced['consultant_id'] ?? null, fn ($q, $v) => $q->where('consult.id', $v))
+            ->when($advanced['assistant_id'] ?? null, fn ($q, $v) => $q->where('asst.id', $v))
+            ->when($advanced['reference_code'] ?? null, fn ($q, $v) => $q->where('tp.code', 'ilike', "%{$v}%"))
+            ->when($advanced['amount_min'] ?? null, fn ($q, $v) => $q->whereRaw('(ti.subtotal - ti.discount) >= ?', [$v]))
+            ->when($advanced['amount_max'] ?? null, fn ($q, $v) => $q->whereRaw('(ti.subtotal - ti.discount) <= ?', [$v]))
+            ->when($advanced['group_id'] ?? null, fn ($q, $v) => $q->where('svc_cat.group_id', $v))
+            ->when($advanced['category_id'] ?? null, fn ($q, $v) => $q->where('svc.category_id', $v))
+            ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
+            ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'service'
+                ? $q->where('ti.status', $v)
+                : $q->whereRaw('1 = 0'))
             ->select([
                 DB::raw("'service' as record_type"),
                 'ti.id as row_id',
@@ -161,7 +263,7 @@ class SystemRecordController extends Controller
                 'ti.discount as discount',
                 DB::raw('(ti.subtotal - ti.discount) as amount'),
                 'ti.status as status_raw',
-                'doc.full_name as doctor_name',
+                DB::raw('COALESCE(item_doc.full_name, plan_doc.full_name) as doctor_name'),
                 'consult.full_name as consultant_name',
                 'asst.full_name as assistant_name',
                 'tp.branch_id as branch_id',
@@ -172,7 +274,7 @@ class SystemRecordController extends Controller
             ]);
     }
 
-    private function paymentQuery(?int $branchId, ?string $search, ?string $dateFrom, ?string $dateTo, ?int $year): Builder
+    private function paymentQuery(?int $branchId, ?string $search, ?string $dateFrom, ?string $dateTo, ?int $year, array $advanced = []): Builder
     {
         return DB::table('patient_payments as pay')
             ->join('patient_invoices as inv', 'pay.invoice_id', '=', 'inv.id')
@@ -190,6 +292,21 @@ class SystemRecordController extends Controller
                     ->orWhere('inv.code', 'ilike', $like)
                     ->orWhere('pay.reference', 'ilike', $like);
             }))
+            ->when($advanced['patient_name'] ?? null, fn ($q, $v) => $q->where('p.full_name', 'ilike', "%{$v}%"))
+            // Payments have no doctor/consultant/assistant — filtering by any of these should exclude payment rows entirely.
+            ->when($advanced['doctor_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['consultant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['assistant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['reference_code'] ?? null, fn ($q, $v) => $q->where('inv.code', 'ilike', "%{$v}%"))
+            ->when($advanced['amount_min'] ?? null, fn ($q, $v) => $q->where('pay.amount', '>=', $v))
+            ->when($advanced['amount_max'] ?? null, fn ($q, $v) => $q->where('pay.amount', '<=', $v))
+            // Payments aren't tied to a service — filtering by group/category should exclude them entirely.
+            ->when($advanced['group_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['category_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
+            ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'payment'
+                ? $q->whereRaw("(CASE WHEN pay.amount < 0 THEN 'refund' ELSE 'paid' END) = ?", [$v])
+                : $q->whereRaw('1 = 0'))
             ->select([
                 DB::raw("'payment' as record_type"),
                 'pay.id as row_id',
