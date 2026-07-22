@@ -133,7 +133,7 @@
                             </div>
                             <div v-else>
                                 <div class="flex items-center gap-1 mt-0.5">
-                                    <input type="date" :value="datePartOf(dateEdits[plan.id])"
+                                    <input type="date" :ref="el => setDateInputRef(plan.id, el)" :value="datePartOf(dateEdits[plan.id])"
                                         @change="setDatePart(plan.id, $event.target.value)"
                                         class="flex-1 min-w-0 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
                                     <input type="time" lang="vi" :value="timePartOf(dateEdits[plan.id])"
@@ -236,7 +236,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
 
@@ -349,6 +349,12 @@ function nowDateTimeStr() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// Bấm "Sửa" thì bấm chuột thẳng vào ô ngày luôn, khỏi phải bấm thêm lần nữa.
+const dateInputRefs = {};
+function setDateInputRef(planId, el) {
+    if (el) dateInputRefs[planId] = el;
+}
+
 // Mặc định theo thời điểm hiện tại khi mở sửa: chưa có ngày nào thì lấy cả ngày+giờ hiện tại,
 // đã có ngày nhưng chưa có giờ cụ thể (dữ liệu cũ) thì chỉ bù thêm giờ hiện tại vào.
 function openDateEdit(planId) {
@@ -359,6 +365,7 @@ function openDateEdit(planId) {
         dateEdits[planId] = `${raw}T${currentTimeStr()}`;
     }
     dateEditOpen[planId] = true;
+    nextTick(() => dateInputRefs[planId]?.focus());
 }
 
 function saveDate(planId) {

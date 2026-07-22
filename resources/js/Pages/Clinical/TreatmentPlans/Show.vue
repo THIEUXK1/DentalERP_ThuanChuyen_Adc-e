@@ -376,7 +376,7 @@
                         </div>
                         <div v-else>
                             <div class="flex gap-2">
-                                <input v-model="startDatePart" type="date"
+                                <input v-model="startDatePart" ref="startDateInput" type="date"
                                     class="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                                 <input v-model="startTimePart" type="time" lang="vi"
                                     class="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
@@ -817,7 +817,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, nextTick } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
@@ -1012,6 +1012,8 @@ function nowDateTimeStr() {
 
 // Mặc định theo thời điểm hiện tại khi mở sửa: chưa có ngày nào thì lấy cả ngày+giờ hiện tại,
 // đã có ngày nhưng chưa có giờ cụ thể (dữ liệu cũ) thì chỉ bù thêm giờ hiện tại vào.
+const startDateInput = ref(null);
+
 function openDateEdit() {
     if (!dateForm.start_date) {
         dateForm.start_date = nowDateTimeStr();
@@ -1019,6 +1021,8 @@ function openDateEdit() {
         dateForm.start_date = `${dateForm.start_date}T${currentTimeStr()}`;
     }
     dateEditOpen.value = true;
+    // Bấm "Sửa" thì bấm chuột thẳng vào ô ngày luôn, khỏi phải bấm thêm lần nữa.
+    nextTick(() => startDateInput.value?.focus());
 }
 
 function saveDate() {
