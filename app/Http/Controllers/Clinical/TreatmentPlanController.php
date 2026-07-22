@@ -349,7 +349,7 @@ class TreatmentPlanController extends Controller
         return $this->form($treatmentPlan);
     }
 
-    public function update(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
+    public function update(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
 
@@ -442,6 +442,22 @@ class TreatmentPlanController extends Controller
                 ->with('success', 'Đã cập nhật kế hoạch. Tiếp tục thanh toán.');
         }
         if (in_array($action, ['update_date', 'update_staff'], true)) {
+            // Inline-edit widgets (e.g. "Ngày điều trị" on the patient's treatment history
+            // tab) call this endpoint directly via axios instead of Inertia's router, so they
+            // can apply the change to just that one widget's local state — no Inertia visit,
+            // no re-render of the rest of the page. Requests that DO go through Inertia's
+            // router (the X-Inertia header) keep the normal redirect-back behavior.
+            if (! $request->header('X-Inertia')) {
+                return response()->json([
+                    'success'        => true,
+                    'start_date'     => $treatmentPlan->start_date?->format('d/m/Y H:i'),
+                    'start_date_raw' => $treatmentPlan->start_date?->format('Y-m-d\TH:i'),
+                    'doctor_id'      => $treatmentPlan->doctor_id,
+                    'doctor'         => $treatmentPlan->doctor?->full_name ?? '—',
+                    'consultant_id'  => $treatmentPlan->consultant_id,
+                ]);
+            }
+
             // These are inline-edit widgets that can be triggered from other pages
             // (e.g. the patient's treatment history tab) — stay put instead of
             // jumping into the treatment plan's own detail page.

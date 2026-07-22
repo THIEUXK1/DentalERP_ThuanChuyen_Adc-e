@@ -139,17 +139,18 @@
                                     <input type="time" lang="vi" :value="timePartOf(dateEdits[plan.id])"
                                         @change="setTimePart(plan.id, $event.target.value)"
                                         class="w-20 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
-                                    <button @click="saveDate(plan.id)" :disabled="!dateEdits[plan.id]"
+                                    <button @click="saveDate(plan.id)" :disabled="!dateEdits[plan.id] || dateSaving[plan.id]"
                                         class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
-                                        Lưu
+                                        {{ dateSaving[plan.id] ? 'Đang lưu...' : 'Lưu' }}
                                     </button>
-                                    <button @click="dateEditOpen[plan.id] = false" class="text-gray-400 hover:text-gray-600 transition-colors" title="Hủy">
+                                    <button @click="dateEditOpen[plan.id] = false" :disabled="dateSaving[plan.id]" class="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50" title="Hủy">
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                         </svg>
                                     </button>
                                 </div>
                                 <p v-if="!dateEdits[plan.id]" class="text-red-500 mt-1">Ngày điều trị là bắt buộc.</p>
+                                <p v-else-if="dateSaveErrors[plan.id]" class="text-red-500 mt-1">{{ dateSaveErrors[plan.id] }}</p>
                             </div>
                         </div>
                         <div v-if="plan.expected_end_date">
@@ -238,6 +239,7 @@
 <script setup>
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
 
 const props = defineProps({
@@ -364,16 +366,30 @@ function openDateEdit(planId) {
     nextTick(() => dateInputRefs[planId]?.focus());
 }
 
-function saveDate(planId) {
-    if (!dateEdits[planId]) return;
+const dateSaving = reactive({});
+const dateSaveErrors = reactive({});
 
-    router.put(route('clinical.treatment-plans.update', planId), {
-        start_date: dateEdits[planId],
-        action: 'update_date',
-    }, {
-        preserveScroll: true,
-        onSuccess: () => { dateEditOpen[planId] = false; },
-    });
+// Gọi thẳng axios thay vì router.put() của Inertia — chỉ cập nhật state cục bộ của widget này,
+// không re-render lại cả trang (tab đang mở, các state khác của trang được giữ nguyên).
+async function saveDate(planId) {
+    if (!dateEdits[planId] || dateSaving[planId]) return;
+
+    dateSaving[planId] = true;
+    dateSaveErrors[planId] = '';
+    try {
+        const { data } = await axios.put(route('clinical.treatment-plans.update', planId), {
+            start_date: dateEdits[planId],
+            action: 'update_date',
+        });
+        dateEdits[planId] = data.start_date_raw ?? dateEdits[planId];
+        dateEditOpen[planId] = false;
+    } catch (err) {
+        dateSaveErrors[planId] = err.response?.data?.errors?.start_date?.[0]
+            ?? err.response?.data?.message
+            ?? 'Có lỗi xảy ra, vui lòng thử lại.';
+    } finally {
+        dateSaving[planId] = false;
+    }
 }
 
 // ── Expand/collapse plans ───────────────────────────────────────────────────
