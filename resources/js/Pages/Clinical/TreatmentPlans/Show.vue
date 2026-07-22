@@ -1004,22 +1004,19 @@ function currentTimeStr() {
     return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function nowDateTimeStr() {
+function todayStr() {
     const d = new Date();
     const pad = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-// Mặc định theo thời điểm hiện tại khi mở sửa: chưa có ngày nào thì lấy cả ngày+giờ hiện tại,
-// đã có ngày nhưng chưa có giờ cụ thể (dữ liệu cũ) thì chỉ bù thêm giờ hiện tại vào.
 const startDateInput = ref(null);
 
+// Luôn mặc định giờ theo thời điểm bấm sửa (không giữ giờ cũ đã lưu — thường là 00:00 "giả"
+// do dữ liệu cũ chưa từng chọn giờ). Giữ nguyên ngày đang có, nếu chưa có ngày thì lấy ngày hôm nay.
 function openDateEdit() {
-    if (!dateForm.start_date) {
-        dateForm.start_date = nowDateTimeStr();
-    } else if (!dateForm.start_date.includes('T')) {
-        dateForm.start_date = `${dateForm.start_date}T${currentTimeStr()}`;
-    }
+    const date = dateForm.start_date.split('T')[0] || todayStr();
+    dateForm.start_date = `${date}T${currentTimeStr()}`;
     dateEditOpen.value = true;
     // Bấm "Sửa" thì bấm chuột thẳng vào ô ngày luôn, khỏi phải bấm thêm lần nữa.
     nextTick(() => startDateInput.value?.focus());
