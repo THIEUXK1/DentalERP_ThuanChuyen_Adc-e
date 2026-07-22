@@ -364,7 +364,7 @@
                     <div class="bg-white rounded-xl border border-gray-200 p-4">
                         <div class="flex items-center justify-between mb-2">
                             <h3 class="text-sm font-semibold text-gray-700">Ngày điều trị</h3>
-                            <button v-if="!dateEditOpen" @click="dateEditOpen = true"
+                            <button v-if="!dateEditOpen" @click="openDateEdit"
                                 class="text-gray-400 hover:text-indigo-600 transition-colors" title="Sửa ngày điều trị">
                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
@@ -378,7 +378,7 @@
                             <div class="flex gap-2">
                                 <input v-model="startDatePart" type="date"
                                     class="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
-                                <input v-model="startTimePart" type="time"
+                                <input v-model="startTimePart" type="time" lang="vi"
                                     class="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                             </div>
                             <p v-if="dateForm.errors.start_date" class="text-xs text-red-500 mt-1">Ngày điều trị là bắt buộc.</p>
@@ -998,6 +998,28 @@ const startTimePart = computed({
         if (date) dateForm.start_date = `${date}T${v || '00:00'}`;
     },
 });
+
+function currentTimeStr() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function nowDateTimeStr() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Mặc định theo thời điểm hiện tại khi mở sửa: chưa có ngày nào thì lấy cả ngày+giờ hiện tại,
+// đã có ngày nhưng chưa có giờ cụ thể (dữ liệu cũ) thì chỉ bù thêm giờ hiện tại vào.
+function openDateEdit() {
+    if (!dateForm.start_date) {
+        dateForm.start_date = nowDateTimeStr();
+    } else if (!dateForm.start_date.includes('T')) {
+        dateForm.start_date = `${dateForm.start_date}T${currentTimeStr()}`;
+    }
+    dateEditOpen.value = true;
+}
 
 function saveDate() {
     dateForm.put(route('clinical.treatment-plans.update', props.plan.id), {

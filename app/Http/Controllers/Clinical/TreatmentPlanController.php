@@ -441,6 +441,12 @@ class TreatmentPlanController extends Controller
             return redirect()->route('cashier.invoices.index', ['patient_id' => $treatmentPlan->patient_id])
                 ->with('success', 'Đã cập nhật kế hoạch. Tiếp tục thanh toán.');
         }
+        if (in_array($action, ['update_date', 'update_staff'], true)) {
+            // These are inline-edit widgets that can be triggered from other pages
+            // (e.g. the patient's treatment history tab) — stay put instead of
+            // jumping into the treatment plan's own detail page.
+            return back()->with('success', 'Đã cập nhật kế hoạch điều trị.');
+        }
 
         return redirect()->route('clinical.treatment-plans.show', $treatmentPlan)
             ->with('success', 'Đã cập nhật kế hoạch điều trị.');

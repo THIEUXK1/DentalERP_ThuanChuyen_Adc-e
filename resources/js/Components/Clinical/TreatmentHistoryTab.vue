@@ -125,7 +125,7 @@
                             <p class="text-gray-400 uppercase tracking-wide font-medium mb-0.5">Ngày điều trị</p>
                             <div v-if="!dateEditOpen[plan.id]" class="flex items-center gap-1.5 mt-0.5">
                                 <span class="text-gray-800 font-medium">{{ formatDisplayDate(dateEdits[plan.id]) || '—' }}</span>
-                                <button @click="dateEditOpen[plan.id] = true" class="text-gray-400 hover:text-indigo-600 transition-colors" title="Sửa ngày điều trị">
+                                <button @click="openDateEdit(plan.id)" class="text-gray-400 hover:text-indigo-600 transition-colors" title="Sửa ngày điều trị">
                                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
                                     </svg>
@@ -133,9 +133,12 @@
                             </div>
                             <div v-else>
                                 <div class="flex items-center gap-1 mt-0.5">
-                                    <input type="date" :value="dateEdits[plan.id]"
-                                        @change="dateEdits[plan.id] = $event.target.value"
-                                        class="flex-1 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                    <input type="date" :value="datePartOf(dateEdits[plan.id])"
+                                        @change="setDatePart(plan.id, $event.target.value)"
+                                        class="flex-1 min-w-0 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                    <input type="time" lang="vi" :value="timePartOf(dateEdits[plan.id])"
+                                        @change="setTimePart(plan.id, $event.target.value)"
+                                        class="w-20 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
                                     <button @click="saveDate(plan.id)" :disabled="!dateEdits[plan.id]"
                                         class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
                                         Lưu
@@ -314,9 +317,48 @@ const dateEditOpen = reactive(
 
 function formatDisplayDate(raw) {
     if (!raw) return '';
-    const [y, m, d] = raw.split('-');
+    const [datePart, timePart] = raw.split('T');
+    const [y, m, d] = datePart.split('-');
     if (!y || !m || !d) return raw;
-    return `${d}/${m}/${y}`;
+    return timePart ? `${d}/${m}/${y} ${timePart}` : `${d}/${m}/${y}`;
+}
+
+function datePartOf(raw) {
+    return raw ? raw.split('T')[0] ?? '' : '';
+}
+function timePartOf(raw) {
+    return raw ? raw.split('T')[1] ?? '00:00' : '00:00';
+}
+function setDatePart(planId, v) {
+    const time = timePartOf(dateEdits[planId]);
+    dateEdits[planId] = v ? `${v}T${time}` : '';
+}
+function setTimePart(planId, v) {
+    const date = datePartOf(dateEdits[planId]);
+    if (date) dateEdits[planId] = `${date}T${v || '00:00'}`;
+}
+
+function currentTimeStr() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function nowDateTimeStr() {
+    const d = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// Mặc định theo thời điểm hiện tại khi mở sửa: chưa có ngày nào thì lấy cả ngày+giờ hiện tại,
+// đã có ngày nhưng chưa có giờ cụ thể (dữ liệu cũ) thì chỉ bù thêm giờ hiện tại vào.
+function openDateEdit(planId) {
+    const raw = dateEdits[planId];
+    if (!raw) {
+        dateEdits[planId] = nowDateTimeStr();
+    } else if (!raw.includes('T')) {
+        dateEdits[planId] = `${raw}T${currentTimeStr()}`;
+    }
+    dateEditOpen[planId] = true;
 }
 
 function saveDate(planId) {
