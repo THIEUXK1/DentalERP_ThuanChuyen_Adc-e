@@ -143,7 +143,7 @@
                                         class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
                                         {{ dateSaving[plan.id] ? 'Đang lưu...' : 'Lưu' }}
                                     </button>
-                                    <button @click="dateEditOpen[plan.id] = false" :disabled="dateSaving[plan.id]" class="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50" title="Hủy">
+                                    <button @click="cancelDateEdit(plan.id)" :disabled="dateSaving[plan.id]" class="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50" title="Hủy">
                                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                         </svg>
@@ -359,11 +359,19 @@ function setDateInputRef(planId, el) {
 
 // Luôn mặc định giờ theo thời điểm bấm sửa (không giữ giờ cũ đã lưu — thường là 00:00 "giả"
 // do dữ liệu cũ chưa từng chọn giờ). Giữ nguyên ngày đang có, nếu chưa có ngày thì lấy ngày hôm nay.
+const dateEditOriginal = reactive({});
 function openDateEdit(planId) {
+    dateEditOriginal[planId] = dateEdits[planId];
     const date = datePartOf(dateEdits[planId]) || todayStr();
     dateEdits[planId] = `${date}T${currentTimeStr()}`;
     dateEditOpen[planId] = true;
     nextTick(() => dateInputRefs[planId]?.focus());
+}
+
+// Bấm "X" thì khôi phục lại giá trị trước khi mở sửa, không giữ giờ "hiện tại" đã gán tạm.
+function cancelDateEdit(planId) {
+    dateEdits[planId] = dateEditOriginal[planId];
+    dateEditOpen[planId] = false;
 }
 
 const dateSaving = reactive({});
@@ -381,7 +389,7 @@ async function saveDate(planId) {
             start_date: dateEdits[planId],
             action: 'update_date',
         });
-        dateEdits[planId] = data.start_date_raw ?? dateEdits[planId];
+        dateEdits[planId] = data.plan?.start_date_raw ?? dateEdits[planId];
         dateEditOpen[planId] = false;
     } catch (err) {
         dateSaveErrors[planId] = err.response?.data?.errors?.start_date?.[0]

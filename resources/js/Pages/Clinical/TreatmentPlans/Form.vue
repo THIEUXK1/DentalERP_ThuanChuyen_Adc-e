@@ -257,8 +257,12 @@
                         <!-- Treatment date: defaults to today, but can be set ahead of time -->
                         <div>
                             <label class="text-xs text-gray-500 mb-1 block">Ngày điều trị *</label>
-                            <input v-model="form.start_date" type="date"
-                                class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            <div class="flex items-center gap-1.5">
+                                <input v-model="startDatePart" type="date"
+                                    class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                                <input v-model="startTimePart" type="time" lang="vi"
+                                    class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            </div>
                             <p v-if="form.errors.start_date" class="text-xs text-red-500 mt-1">{{ form.errors.start_date }}</p>
                         </div>
                     </div>
@@ -404,6 +408,29 @@ function todayLocalDate() {
     const dd = String(d.getDate()).padStart(2, '0');
     return `${d.getFullYear()}-${mm}-${dd}`;
 }
+function nowLocalTime() {
+    const d = new Date();
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+// ── Ngày điều trị: tách ô ngày/giờ, ghép lại thành form.start_date ──────────
+function datePartOf(raw) {
+    return raw ? raw.split('T')[0] ?? '' : '';
+}
+function timePartOf(raw) {
+    return raw ? (raw.split('T')[1] ?? '00:00') : '00:00';
+}
+const startDatePart = computed({
+    get: () => datePartOf(form.start_date),
+    set: (v) => { form.start_date = v ? `${v}T${timePartOf(form.start_date)}` : ''; },
+});
+const startTimePart = computed({
+    get: () => timePartOf(form.start_date),
+    set: (v) => {
+        const date = datePartOf(form.start_date) || todayLocalDate();
+        form.start_date = `${date}T${v || '00:00'}`;
+    },
+});
 
 // ── Main form ─────────────────────────────────────────────────────────────
 const form = useForm({
@@ -416,7 +443,7 @@ const form = useForm({
     diagnosis:          props.plan?.diagnosis     ?? '',
     chief_complaint:    props.plan?.chief_complaint ?? '',
     treatment_goal:     props.plan?.treatment_goal  ?? '',
-    start_date:         props.plan?.start_date    ?? todayLocalDate(),
+    start_date:         props.plan?.start_date    ?? `${todayLocalDate()}T${nowLocalTime()}`,
     expected_end_date:  props.plan?.expected_end_date ?? '',
     estimated_sessions: props.plan?.estimated_sessions ?? 1,
     frequency:          props.plan?.frequency     ?? '',

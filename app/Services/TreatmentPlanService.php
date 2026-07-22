@@ -164,4 +164,94 @@ class TreatmentPlanService
             }
         });
     }
+
+    /**
+     * Shared shape for the treatment plan's "show" page — used both for the initial
+     * Inertia render and for the JSON responses that axios-driven inline widgets
+     * (see TreatmentPlans/Show.vue) use to refresh their local state without a full
+     * page visit.
+     */
+    public function payload(TreatmentPlan $plan): array
+    {
+        $plan->refresh()->load(['patient', 'doctor', 'consultant', 'branch', 'items.service', 'items.responsibleDoctor', 'items.assistantDoctor']);
+        $allowed = $plan->status->allowedTransitions();
+
+        $installmentInvoiceMap = $plan->invoices()
+            ->whereNotNull('installment_index')
+            ->get(['id', 'installment_index', 'status', 'amount_paid', 'total'])
+            ->keyBy('installment_index')
+            ->map(fn ($inv) => [
+                'id'           => $inv->id,
+                'status'       => $inv->status->value,
+                'status_label' => $inv->status->label(),
+                'status_color' => $inv->status->color(),
+                'amount_paid'  => $inv->amount_paid,
+                'total'        => $inv->total,
+                'locked'       => $inv->amount_paid > 0,
+            ]);
+
+        $primaryInvoice = $plan->invoices()->whereNull('installment_index')->first(['id']);
+
+        return [
+            'plan' => [
+                'id'               => $plan->id,
+                'code'             => $plan->code,
+                'patient'          => $plan->patient->full_name,
+                'patient_id'       => $plan->patient_id,
+                'doctor'           => $plan->doctor?->full_name ?? '—',
+                'doctor_id'        => $plan->doctor_id,
+                'consultant'       => $plan->consultant?->full_name ?? '—',
+                'consultant_id'    => $plan->consultant_id,
+                'branch'           => $plan->branch->name,
+                'status'           => $plan->status->value,
+                'status_label'     => $plan->status->label(),
+                'status_color'     => $plan->status->color(),
+                'is_editable'      => $plan->status->isEditable(),
+                'items_editable'   => $plan->status->isItemsEditable(),
+                'total_amount'     => $plan->total_amount,
+                'discount_amount'  => $plan->discount_amount,
+                'deposit_amount'   => $plan->deposit_amount,
+                'net_total'        => $plan->net_total,
+                'notes'            => $plan->notes,
+                'payment_notes'    => $plan->payment_notes,
+                'approved_at'      => $plan->approved_at?->format('d/m/Y H:i'),
+                'payment_schedule' => $plan->payment_schedule ?? [],
+                'installment_invoice_map' => $installmentInvoiceMap,
+                'created_at'       => $plan->created_at->format('d/m/Y'),
+                'diagnosis'        => $plan->diagnosis,
+                'chief_complaint'  => $plan->chief_complaint,
+                'treatment_goal'   => $plan->treatment_goal,
+                'start_date'       => $plan->start_date?->format('d/m/Y H:i'),
+                'start_date_raw'   => $plan->start_date?->format('Y-m-d\TH:i'),
+                'expected_end_date'=> $plan->expected_end_date?->format('d/m/Y'),
+                'estimated_sessions'=> $plan->estimated_sessions,
+                'frequency'        => $plan->frequency,
+                'priority'         => $plan->priority,
+                'has_payments'        => $plan->hasPayments(),
+                'primary_invoice_id'  => $primaryInvoice?->id,
+            ],
+            'items' => $plan->items->map(fn ($i) => [
+                'id'           => $i->id,
+                'service_name' => $i->name,
+                'tooth_number' => $i->tooth_number,
+                'quantity'     => $i->quantity,
+                'unit_price'   => $i->unit_price,
+                'subtotal'     => $i->subtotal,
+                'status'       => $i->status->value,
+                'status_label' => $i->status->label(),
+                'status_color' => $i->status->color(),
+                'notes'        => $i->notes,
+                'diagnosis'    => $i->diagnosis,
+                'discount'     => $i->discount,
+                'amount'       => $i->amount,
+                'estimated_sessions' => $i->estimated_sessions,
+                'stage_name'         => $i->stage_name,
+                'responsible_doctor_id' => $i->responsible_doctor_id,
+                'assistant_doctor_id'   => $i->assistant_doctor_id,
+                'doctor_name'           => $i->responsibleDoctor?->full_name,
+                'assistant_name'        => $i->assistantDoctor?->full_name,
+            ])->values(),
+            'transitions' => collect($allowed)->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])->values(),
+        ];
+    }
 }

@@ -817,8 +817,9 @@
 </template>
 
 <script setup>
-import { ref, computed, nextTick } from 'vue';
+import { ref, reactive, computed, nextTick } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
+import axios from 'axios';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
 import ToothChart from '@/Components/Shared/ToothChart.vue';
@@ -845,6 +846,25 @@ const props = defineProps({
     priceLists: Array, transitions: Array,
     doctors: Array,
 });
+
+// ── Local mutable copies ─────────────────────────────────────────────────────
+// Every mutation on this page (date, staff, items, transitions, payment schedule)
+// calls its endpoint via axios and applies the JSON response here — never an
+// Inertia visit — so the rest of the page's local UI state (open panels, scroll
+// position, expanded rows) never gets reset by a page re-render.
+const plan = reactive({ ...props.plan });
+const items = ref(props.items.map(i => ({ ...i })));
+const transitionsList = ref([...props.transitions]);
+
+function applyPayload(data) {
+    Object.assign(plan, data.plan);
+    items.value = data.items;
+    transitionsList.value = data.transitions;
+}
+
+function reportError(err, fallback = 'Có lỗi xảy ra, vui lòng thử lại.') {
+    alert(err.response?.data?.message ?? fallback);
+}
 
 // ── 4-stage stepper ───────────────────────────────────────────────────────
 const STAGES = [
@@ -883,7 +903,7 @@ const STAGES = [
 ];
 
 const currentStepIdx = computed(() => {
-    const s = props.plan.status;
+    const s = plan.status;
     if (s === 'draft')                        return 0;
     if (s === 'approved')                      return 1;
     if (s === 'in_progress')                  return 2;
@@ -892,30 +912,30 @@ const currentStepIdx = computed(() => {
 });
 
 function canGoToStep(idx) {
-    return props.transitions.some(t => t.value === STAGES[idx].targetStatus);
+    return transitionsList.value.some(t => t.value === STAGES[idx].targetStatus);
 }
 
-const canEditItems = computed(() => props.plan.items_editable);
+const canEditItems = computed(() => plan.items_editable);
 
-const tableTotal = computed(() => props.items.reduce((sum, i) => sum + (i.quantity * i.unit_price - (i.discount ?? 0)), 0));
+const tableTotal = computed(() => items.value.reduce((sum, i) => sum + (i.quantity * i.unit_price - (i.discount ?? 0)), 0));
 
 const allItemsCompleted = computed(() =>
-    props.items.length > 0 && props.items.every(i => i.status === 'completed')
+    items.value.length > 0 && items.value.every(i => i.status === 'completed')
 );
 
 const pendingItemCount = computed(() =>
-    props.items.filter(i => i.status !== 'completed').length
+    items.value.filter(i => i.status !== 'completed').length
 );
 
 const canCancel = computed(() =>
-    props.plan.status !== 'cancelled' &&
-    props.plan.status !== 'completed' &&
-    props.transitions.some(t => t.value === 'cancelled')
+    plan.status !== 'cancelled' &&
+    plan.status !== 'completed' &&
+    transitionsList.value.some(t => t.value === 'cancelled')
 );
 
 // ──────────────────────────────────────────────────────────────────────────
 const selectedTeeth    = ref([]);
-const treatedTeethList = props.items.filter(i => i.tooth_number).map(i => i.tooth_number);
+const treatedTeethList = computed(() => items.value.filter(i => i.tooth_number).map(i => i.tooth_number));
 
 // Detail slide-over
 const detailItem = ref(null);
@@ -950,10 +970,29 @@ function closeDetail() {
     detailItem.value = null;
 }
 
-function saveDetail() {
-    detailForm.put(route('clinical.treatment-plan-items.update', detailItem.value.id), {
-        onSuccess: () => closeDetail(),
-    });
+async function saveDetail() {
+    detailForm.processing = true;
+    detailForm.clearErrors();
+    try {
+        const { data } = await axios.put(route('clinical.treatment-plan-items.update', detailItem.value.id), {
+            quantity:               detailForm.quantity,
+            unit_price:             detailForm.unit_price,
+            discount:               detailForm.discount,
+            tooth_number:           detailForm.tooth_number,
+            stage_name:             detailForm.stage_name,
+            estimated_sessions:     detailForm.estimated_sessions,
+            diagnosis:              detailForm.diagnosis,
+            responsible_doctor_id:  detailForm.responsible_doctor_id,
+            assistant_doctor_id:    detailForm.assistant_doctor_id,
+            notes:                  detailForm.notes,
+        });
+        applyPayload(data);
+        closeDetail();
+    } catch (err) {
+        reportError(err, 'Không thể lưu thay đổi.');
+    } finally {
+        detailForm.processing = false;
+    }
 }
 
 const addForm = useForm({
@@ -971,14 +1010,14 @@ const addForm = useForm({
 });
 
 const updateForm = useForm({
-    discount_amount: props.plan.discount_amount,
-    deposit_amount:  props.plan.deposit_amount,
-    notes:           props.plan.notes ?? '',
+    discount_amount: plan.discount_amount,
+    deposit_amount:  plan.deposit_amount,
+    notes:           plan.notes ?? '',
 });
 
 const dateEditOpen = ref(false);
 const dateForm = useForm({
-    start_date: props.plan.start_date_raw ?? '',
+    start_date: plan.start_date_raw ?? '',
     action:     'update_date',
 });
 
@@ -1022,20 +1061,47 @@ function openDateEdit() {
     nextTick(() => startDateInput.value?.focus());
 }
 
-function saveDate() {
-    dateForm.put(route('clinical.treatment-plans.update', props.plan.id), {
-        onSuccess: () => { dateEditOpen.value = false; },
-    });
+async function saveDate() {
+    if (!dateForm.start_date || dateForm.processing) return;
+    dateForm.processing = true;
+    dateForm.clearErrors();
+    try {
+        const { data } = await axios.put(route('clinical.treatment-plans.update', plan.id), {
+            start_date: dateForm.start_date,
+            action:     'update_date',
+        });
+        applyPayload(data);
+        dateForm.start_date = plan.start_date_raw ?? '';
+        dateEditOpen.value = false;
+    } catch (err) {
+        dateForm.errors.start_date = err.response?.data?.errors?.start_date?.[0]
+            ?? err.response?.data?.message
+            ?? 'Có lỗi xảy ra.';
+    } finally {
+        dateForm.processing = false;
+    }
 }
 
 const staffForm = useForm({
-    doctor_id:     props.plan.doctor_id ?? null,
-    consultant_id: props.plan.consultant_id ?? null,
+    doctor_id:     plan.doctor_id ?? null,
+    consultant_id: plan.consultant_id ?? null,
     action:        'update_staff',
 });
 
-function saveStaff() {
-    staffForm.put(route('clinical.treatment-plans.update', props.plan.id));
+async function saveStaff() {
+    staffForm.processing = true;
+    try {
+        const { data } = await axios.put(route('clinical.treatment-plans.update', plan.id), {
+            doctor_id:     staffForm.doctor_id,
+            consultant_id: staffForm.consultant_id,
+            action:        'update_staff',
+        });
+        applyPayload(data);
+    } catch (err) {
+        reportError(err, 'Không thể lưu nhân sự phụ trách.');
+    } finally {
+        staffForm.processing = false;
+    }
 }
 
 // Item status options for inline change
@@ -1046,14 +1112,14 @@ const itemStatuses = [
 ];
 
 // Payment schedule
-const schedule         = ref(props.plan.payment_schedule ?? []);
+const schedule         = ref(plan.payment_schedule ?? []);
 const showScheduleForm = ref(false);
 const newInst          = ref({ due_date: '', amount: '', note: '' });
-const isScheduleLocked = computed(() => ['completed', 'cancelled'].includes(props.plan.status));
+const isScheduleLocked = computed(() => ['completed', 'cancelled'].includes(plan.status));
 const scheduleTotal    = computed(() => schedule.value.reduce((s, i) => s + (parseInt(i.amount) || 0), 0));
 
 function instInvoice(idx) {
-    return props.plan.installment_invoice_map?.[idx] ?? null;
+    return plan.installment_invoice_map?.[idx] ?? null;
 }
 
 function addInstallment() {
@@ -1070,7 +1136,8 @@ function removeInstallment(idx) {
 }
 
 function saveSchedule() {
-    router.patch(route('clinical.treatment-plans.payment-schedule', props.plan.id), { schedule: schedule.value }, { preserveState: true });
+    axios.patch(route('clinical.treatment-plans.payment-schedule', plan.id), { schedule: schedule.value })
+        .catch(err => reportError(err, 'Không thể lưu lịch thanh toán.'));
 }
 
 // Auto-fill unit price when service selected
@@ -1084,26 +1151,60 @@ function onTeethSelect(teeth) {
     addForm.tooth_number = teeth.join(',');
 }
 
-function submitAddItem() {
-    addForm.post(route('clinical.treatment-plans.items.store', props.plan.id), {
-        onSuccess: () => {
-            addForm.reset('service_id', 'tooth_number', 'unit_price', 'discount', 'stage_name', 'estimated_sessions', 'diagnosis', 'responsible_doctor_id', 'assistant_doctor_id', 'notes');
-            addForm.quantity = 1;
-            selectedTeeth.value = [];
-        },
-    });
+async function submitAddItem() {
+    addForm.processing = true;
+    addForm.clearErrors();
+    try {
+        const { data } = await axios.post(route('clinical.treatment-plans.items.store', plan.id), {
+            service_id:            addForm.service_id,
+            quantity:              addForm.quantity,
+            tooth_number:          addForm.tooth_number,
+            unit_price:            addForm.unit_price,
+            discount:              addForm.discount,
+            stage_name:            addForm.stage_name,
+            estimated_sessions:    addForm.estimated_sessions,
+            diagnosis:             addForm.diagnosis,
+            responsible_doctor_id: addForm.responsible_doctor_id,
+            assistant_doctor_id:   addForm.assistant_doctor_id,
+            notes:                 addForm.notes,
+        });
+        applyPayload(data);
+        addForm.reset('service_id', 'tooth_number', 'unit_price', 'discount', 'stage_name', 'estimated_sessions', 'diagnosis', 'responsible_doctor_id', 'assistant_doctor_id', 'notes');
+        addForm.quantity = 1;
+        selectedTeeth.value = [];
+    } catch (err) {
+        reportError(err, 'Không thể thêm dịch vụ.');
+    } finally {
+        addForm.processing = false;
+    }
 }
 
-function removeItem(id) {
-    if (confirm('Xóa dịch vụ này?')) router.delete(route('clinical.treatment-plan-items.destroy', id));
+async function removeItem(id) {
+    if (!confirm('Xóa dịch vụ này?')) return;
+    try {
+        const { data } = await axios.delete(route('clinical.treatment-plan-items.destroy', id));
+        applyPayload(data);
+    } catch (err) {
+        reportError(err, 'Không thể xóa dịch vụ.');
+    }
 }
 
-function completeItem(id) {
-    router.post(route('clinical.treatment-plan-items.complete', id));
+async function completeItem(id) {
+    try {
+        const { data } = await axios.post(route('clinical.treatment-plan-items.complete', id));
+        applyPayload(data);
+    } catch (err) {
+        reportError(err, 'Không thể đánh dấu hoàn thành.');
+    }
 }
 
-function changeItemStatus(id, status) {
-    router.patch(route('clinical.treatment-plan-items.update-status', id), { status }, { preserveScroll: true, preserveState: true });
+async function changeItemStatus(id, status) {
+    try {
+        const { data } = await axios.patch(route('clinical.treatment-plan-items.update-status', id), { status });
+        applyPayload(data);
+    } catch (err) {
+        reportError(err, 'Không thể cập nhật trạng thái.');
+    }
 }
 
 // ── Transition confirmation ───────────────────────────────────────────────
@@ -1112,7 +1213,7 @@ const transitionModal    = ref({ open: false, status: '', label: '', isCancellin
 const transitionConfirmed = ref(false);
 
 function confirmTransition(status, label) {
-    const fromIdx      = STATUS_ORDER.indexOf(props.plan.status);
+    const fromIdx      = STATUS_ORDER.indexOf(plan.status);
     const toIdx        = STATUS_ORDER.indexOf(status);
     const isCancelling = status === 'cancelled';
     transitionModal.value = {
@@ -1133,26 +1234,35 @@ function executeTransition() {
     doTransition(status, forceCompleteItems);
 }
 
-function doTransition(status, forceCompleteItems = false) {
-    router.post(route('clinical.treatment-plans.transition', props.plan.id), {
-        status,
-        force_complete_items: forceCompleteItems,
-    });
+async function doTransition(status, forceCompleteItems = false) {
+    try {
+        const { data } = await axios.post(route('clinical.treatment-plans.transition', plan.id), {
+            status,
+            force_complete_items: forceCompleteItems,
+        });
+        applyPayload(data);
+        if (data.warning) alert(data.warning);
+    } catch (err) {
+        reportError(err, 'Không thể chuyển trạng thái.');
+    }
 }
 
 
 function saveFinancials() {
-    updateForm.put(route('clinical.treatment-plans.update', props.plan.id));
+    updateForm.put(route('clinical.treatment-plans.update', plan.id));
 }
 
 // ── Delete plan ───────────────────────────────────────────────────────────
+// Deleting the plan removes the very resource this page shows, so this is the one
+// action that still has to navigate away — back to the patient's profile — rather
+// than update local state in place.
 const showDeleteModal = ref(false);
 const deleteReason    = ref('');
 const deleteError     = ref('');
 
 function submitDelete() {
     if (!deleteReason.value.trim()) return;
-    router.delete(route('clinical.treatment-plans.destroy', props.plan.id), {
+    router.delete(route('clinical.treatment-plans.destroy', plan.id), {
         data: { reason: deleteReason.value },
         onError: (errors) => { deleteError.value = errors.reason ?? 'Có lỗi xảy ra.'; },
         onSuccess: () => { showDeleteModal.value = false; deleteReason.value = ''; deleteError.value = ''; },

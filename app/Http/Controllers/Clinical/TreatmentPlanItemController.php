@@ -8,6 +8,7 @@ use App\Models\PriceList;
 use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
 use App\Services\TreatmentPlanService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rules\Enum;
@@ -16,7 +17,7 @@ class TreatmentPlanItemController extends Controller
 {
     public function __construct(private TreatmentPlanService $svc) {}
 
-    public function store(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
+    public function store(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
 
@@ -58,13 +59,24 @@ class TreatmentPlanItemController extends Controller
                 $extra
             );
         } catch (\RuntimeException $e) {
+            if (! $request->header('X-Inertia')) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage());
+        }
+
+        // Widgets on TreatmentPlans/Show.vue call these endpoints directly via axios instead
+        // of Inertia's router, so they can apply the change locally — no Inertia visit, no
+        // re-render/scroll-reset of the rest of the page.
+        if (! $request->header('X-Inertia')) {
+            return response()->json($this->svc->payload($treatmentPlan));
         }
 
         return back()->with('success', 'Đã thêm dịch vụ vào kế hoạch.');
     }
 
-    public function update(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse
+    public function update(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
 
@@ -84,26 +96,44 @@ class TreatmentPlanItemController extends Controller
         try {
             $this->svc->updateItem($treatmentPlanItem, $data);
         } catch (\RuntimeException $e) {
+            if (! $request->header('X-Inertia')) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage());
+        }
+
+        if (! $request->header('X-Inertia')) {
+            return response()->json($this->svc->payload($treatmentPlanItem->plan));
         }
 
         return back()->with('success', 'Đã cập nhật.');
     }
 
-    public function destroy(TreatmentPlanItem $treatmentPlanItem): RedirectResponse
+    public function destroy(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
+
+        $plan = $treatmentPlanItem->plan;
 
         try {
             $this->svc->removeItem($treatmentPlanItem);
         } catch (\RuntimeException $e) {
+            if (! $request->header('X-Inertia')) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage());
+        }
+
+        if (! $request->header('X-Inertia')) {
+            return response()->json($this->svc->payload($plan));
         }
 
         return back()->with('success', 'Đã xóa dịch vụ.');
     }
 
-    public function updateStatus(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse
+    public function updateStatus(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
 
@@ -113,13 +143,21 @@ class TreatmentPlanItemController extends Controller
 
         $treatmentPlanItem->update(['status' => $data['status']]);
 
+        if (! $request->header('X-Inertia')) {
+            return response()->json($this->svc->payload($treatmentPlanItem->plan));
+        }
+
         return back()->with('success', 'Đã cập nhật trạng thái.');
     }
 
-    public function complete(TreatmentPlanItem $treatmentPlanItem): RedirectResponse
+    public function complete(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
         $this->svc->completeItem($treatmentPlanItem);
+
+        if (! $request->header('X-Inertia')) {
+            return response()->json($this->svc->payload($treatmentPlanItem->plan));
+        }
 
         return back()->with('success', 'Đã đánh dấu hoàn thành.');
     }

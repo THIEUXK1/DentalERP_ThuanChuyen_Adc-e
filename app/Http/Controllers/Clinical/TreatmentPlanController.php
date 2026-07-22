@@ -249,95 +249,17 @@ class TreatmentPlanController extends Controller
     {
         $this->authorize('treatment_plans.view');
 
-        $treatmentPlan->load(['patient', 'doctor', 'consultant', 'branch', 'items.service', 'items.responsibleDoctor', 'items.assistantDoctor']);
-        $allowed = $treatmentPlan->status->allowedTransitions();
-
-        // Map installment_index → invoice info for installments that have payments
-        $installmentInvoiceMap = $treatmentPlan->invoices()
-            ->whereNotNull('installment_index')
-            ->get(['id', 'installment_index', 'status', 'amount_paid', 'total'])
-            ->keyBy('installment_index')
-            ->map(fn ($inv) => [
-                'id'           => $inv->id,
-                'status'       => $inv->status->value,
-                'status_label' => $inv->status->label(),
-                'status_color' => $inv->status->color(),
-                'amount_paid'  => $inv->amount_paid,
-                'total'        => $inv->total,
-                'locked'       => $inv->amount_paid > 0,
-            ]);
-
-        $primaryInvoice = $treatmentPlan->invoices()
-            ->whereNull('installment_index')
-            ->first(['id']);
-
-        return Inertia::render('Clinical/TreatmentPlans/Show', [
-            'plan' => [
-                'id'               => $treatmentPlan->id,
-                'code'             => $treatmentPlan->code,
-                'patient'          => $treatmentPlan->patient->full_name,
-                'patient_id'       => $treatmentPlan->patient_id,
-                'doctor'           => $treatmentPlan->doctor?->full_name ?? '—',
-                'doctor_id'        => $treatmentPlan->doctor_id,
-                'consultant'       => $treatmentPlan->consultant?->full_name ?? '—',
-                'consultant_id'    => $treatmentPlan->consultant_id,
-                'branch'           => $treatmentPlan->branch->name,
-                'status'           => $treatmentPlan->status->value,
-                'status_label'     => $treatmentPlan->status->label(),
-                'status_color'     => $treatmentPlan->status->color(),
-                'is_editable'      => $treatmentPlan->status->isEditable(),
-                'items_editable'   => $treatmentPlan->status->isItemsEditable(),
-                'total_amount'     => $treatmentPlan->total_amount,
-                'discount_amount'  => $treatmentPlan->discount_amount,
-                'deposit_amount'   => $treatmentPlan->deposit_amount,
-                'net_total'        => $treatmentPlan->net_total,
-                'notes'            => $treatmentPlan->notes,
-                'payment_notes'    => $treatmentPlan->payment_notes,
-                'approved_at'      => $treatmentPlan->approved_at?->format('d/m/Y H:i'),
-                'payment_schedule' => $treatmentPlan->payment_schedule ?? [],
-                'installment_invoice_map' => $installmentInvoiceMap,
-                'created_at'       => $treatmentPlan->created_at->format('d/m/Y'),
-                'diagnosis'        => $treatmentPlan->diagnosis,
-                'chief_complaint'  => $treatmentPlan->chief_complaint,
-                'treatment_goal'   => $treatmentPlan->treatment_goal,
-                'start_date'       => $treatmentPlan->start_date?->format('d/m/Y H:i'),
-                'start_date_raw'   => $treatmentPlan->start_date?->format('Y-m-d\TH:i'),
-                'expected_end_date'=> $treatmentPlan->expected_end_date?->format('d/m/Y'),
-                'estimated_sessions'=> $treatmentPlan->estimated_sessions,
-                'frequency'        => $treatmentPlan->frequency,
-                'priority'         => $treatmentPlan->priority,
-                'has_payments'        => $treatmentPlan->hasPayments(),
-                'primary_invoice_id'  => $primaryInvoice?->id,
-            ],
-            'items' => $treatmentPlan->items->map(fn ($i) => [
-                'id'           => $i->id,
-                'service_name' => $i->name,
-                'tooth_number' => $i->tooth_number,
-                'quantity'     => $i->quantity,
-                'unit_price'   => $i->unit_price,
-                'subtotal'     => $i->subtotal,
-                'status'       => $i->status->value,
-                'status_label' => $i->status->label(),
-                'status_color' => $i->status->color(),
-                'notes'        => $i->notes,
-                'diagnosis'    => $i->diagnosis,
-                'discount'     => $i->discount,
-                'amount'       => $i->amount,
-                'estimated_sessions' => $i->estimated_sessions,
-                'stage_name'         => $i->stage_name,
-                'responsible_doctor_id' => $i->responsible_doctor_id,
-                'assistant_doctor_id'   => $i->assistant_doctor_id,
-                'doctor_name'           => $i->responsibleDoctor?->full_name,
-                'assistant_name'        => $i->assistantDoctor?->full_name,
-            ]),
-            'services' => DentalService::where('is_active', true)->orderBy('name')->get()
-                ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'selling_price' => $s->selling_price]),
-            'priceLists' => PriceList::where('is_active', true)->get()
-                ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name]),
-            'transitions' => collect($allowed)->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
-            'doctors'     => Employee::doctors()->where('is_active', true)->get()
-                ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
-        ]);
+        return Inertia::render('Clinical/TreatmentPlans/Show', array_merge(
+            $this->svc->payload($treatmentPlan),
+            [
+                'services' => DentalService::where('is_active', true)->orderBy('name')->get()
+                    ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'selling_price' => $s->selling_price]),
+                'priceLists' => PriceList::where('is_active', true)->get()
+                    ->map(fn ($p) => ['id' => $p->id, 'name' => $p->name]),
+                'doctors'     => Employee::doctors()->where('is_active', true)->get()
+                    ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name]),
+            ]
+        ));
     }
 
     public function edit(TreatmentPlan $treatmentPlan): \Inertia\Response
@@ -426,6 +348,15 @@ class TreatmentPlanController extends Controller
             }
         });
 
+        // Inline-edit widgets on Show.vue and TreatmentHistoryTab.vue call this endpoint
+        // directly via axios instead of Inertia's router, so they can apply the change
+        // locally — no Inertia visit, no re-render/scroll-reset of the rest of the page.
+        // Requests that DO go through Inertia's router (the X-Inertia header) keep the
+        // normal redirect behavior below.
+        if (! $request->header('X-Inertia')) {
+            return response()->json($this->svc->payload($treatmentPlan));
+        }
+
         $action = $data['action'] ?? 'show';
         if ($action === 'appointment') {
             return redirect()->route('schedule.appointments.create', [
@@ -442,22 +373,6 @@ class TreatmentPlanController extends Controller
                 ->with('success', 'Đã cập nhật kế hoạch. Tiếp tục thanh toán.');
         }
         if (in_array($action, ['update_date', 'update_staff'], true)) {
-            // Inline-edit widgets (e.g. "Ngày điều trị" on the patient's treatment history
-            // tab) call this endpoint directly via axios instead of Inertia's router, so they
-            // can apply the change to just that one widget's local state — no Inertia visit,
-            // no re-render of the rest of the page. Requests that DO go through Inertia's
-            // router (the X-Inertia header) keep the normal redirect-back behavior.
-            if (! $request->header('X-Inertia')) {
-                return response()->json([
-                    'success'        => true,
-                    'start_date'     => $treatmentPlan->start_date?->format('d/m/Y H:i'),
-                    'start_date_raw' => $treatmentPlan->start_date?->format('Y-m-d\TH:i'),
-                    'doctor_id'      => $treatmentPlan->doctor_id,
-                    'doctor'         => $treatmentPlan->doctor?->full_name ?? '—',
-                    'consultant_id'  => $treatmentPlan->consultant_id,
-                ]);
-            }
-
             // These are inline-edit widgets that can be triggered from other pages
             // (e.g. the patient's treatment history tab) — stay put instead of
             // jumping into the treatment plan's own detail page.
@@ -493,7 +408,7 @@ class TreatmentPlanController extends Controller
             ->with('success', 'Kế hoạch sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
     }
 
-    public function transition(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
+    public function transition(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
 
@@ -502,14 +417,20 @@ class TreatmentPlanController extends Controller
             'force_complete_items'  => 'sometimes|boolean',
         ]);
         $newStatus = TreatmentPlanStatus::from($data['status']);
+        $isAxios   = ! $request->header('X-Inertia');
 
         try {
             $this->svc->transition($treatmentPlan, $newStatus, (bool) ($data['force_complete_items'] ?? false));
         } catch (\RuntimeException $e) {
+            if ($isAxios) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage());
         }
 
         $msg = 'Đã cập nhật trạng thái.';
+        $warning = null;
 
         // Auto-create invoices when entering in_progress or completed without existing invoices
         if (in_array($newStatus, [TreatmentPlanStatus::InProgress, TreatmentPlanStatus::Completed, TreatmentPlanStatus::Approved])) {
@@ -519,9 +440,16 @@ class TreatmentPlanController extends Controller
                     $this->invoiceSvc->fromTreatmentPlan($fresh);
                     $msg = 'Đã cập nhật trạng thái. Tự động tạo hóa đơn.';
                 } catch (\RuntimeException $e) {
-                    return back()->with('success', $msg)->with('warning', 'Không thể tạo hóa đơn: ' . $e->getMessage());
+                    $warning = 'Không thể tạo hóa đơn: ' . $e->getMessage();
+                    if (! $isAxios) {
+                        return back()->with('success', $msg)->with('warning', $warning);
+                    }
                 }
             }
+        }
+
+        if ($isAxios) {
+            return response()->json(array_merge($this->svc->payload($treatmentPlan), ['warning' => $warning]));
         }
 
         return back()->with('success', $msg);
@@ -542,11 +470,15 @@ class TreatmentPlanController extends Controller
         return back()->with('success', $msg);
     }
 
-    public function savePaymentSchedule(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse
+    public function savePaymentSchedule(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse|JsonResponse
     {
         $this->authorize('treatment_plans.edit');
 
         if (in_array($treatmentPlan->status, [TreatmentPlanStatus::Completed, TreatmentPlanStatus::Cancelled])) {
+            if (! $request->header('X-Inertia')) {
+                return response()->json(['message' => 'Không thể cập nhật kế hoạch đã đóng.'], 422);
+            }
+
             return back()->with('error', 'Không thể cập nhật kế hoạch đã đóng.');
         }
 
@@ -561,6 +493,10 @@ class TreatmentPlanController extends Controller
 
         // Lịch thanh toán chỉ là nhắc hẹn — không tạo/đồng bộ hóa đơn theo đợt.
         $treatmentPlan->update(['payment_schedule' => $schedule]);
+
+        if (! $request->header('X-Inertia')) {
+            return response()->json(['success' => true]);
+        }
 
         return back()->with('success', 'Đã lưu lịch thanh toán.');
     }
@@ -604,7 +540,7 @@ class TreatmentPlanController extends Controller
                 'diagnosis'          => $plan->diagnosis,
                 'chief_complaint'    => $plan->chief_complaint,
                 'treatment_goal'     => $plan->treatment_goal,
-                'start_date'         => $plan->start_date?->format('Y-m-d'),
+                'start_date'         => $plan->start_date?->format('Y-m-d\TH:i'),
                 'expected_end_date'  => $plan->expected_end_date?->format('Y-m-d'),
                 'estimated_sessions' => $plan->estimated_sessions,
                 'frequency'          => $plan->frequency,
