@@ -184,10 +184,12 @@
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
                                 <th class="px-3 py-3 text-left">Ngày</th>
+                                <th class="px-3 py-3 text-left">Giờ</th>
                                 <th class="px-3 py-3 text-left">Mã KH</th>
                                 <th class="px-3 py-3 text-left">Tên khách hàng</th>
                                 <th class="px-3 py-3 text-left">Loại</th>
                                 <th class="px-3 py-3 text-left">Diễn giải</th>
+                                <th class="px-3 py-3 text-left hidden lg:table-cell">Ghi chú</th>
                                 <th class="px-3 py-3 text-right">Đơn giá</th>
                                 <th class="px-3 py-3 text-right">SL</th>
                                 <th class="px-3 py-3 text-right">Khuyến mại</th>
@@ -202,15 +204,20 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100">
                             <tr v-if="pagedRecords.length === 0">
-                                <td colspan="15" class="px-4 py-12 text-center text-gray-400">Không có dữ liệu</td>
+                                <td colspan="17" class="px-4 py-12 text-center text-gray-400">Không có dữ liệu</td>
                             </tr>
                             <tr v-for="r in pagedRecords" :key="r.id" class="hover:bg-gray-50 transition-colors">
                                 <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ formatDate(r.record_date) }}</td>
+                                <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ r.record_time ?? '—' }}</td>
                                 <td class="px-3 py-2.5">
                                     <Link v-if="r.patient_id" :href="route('patients.show', r.patient_id)"
                                         class="font-mono text-xs text-primary-700 hover:underline">{{ r.patient_code }}</Link>
                                 </td>
-                                <td class="px-3 py-2.5 font-medium text-gray-800">{{ r.patient_name }}</td>
+                                <td class="px-3 py-2.5 font-medium">
+                                    <Link v-if="r.patient_id" :href="route('patients.show', r.patient_id)"
+                                        class="text-gray-800 hover:text-primary-700 hover:underline">{{ r.patient_name }}</Link>
+                                    <span v-else class="text-gray-800">{{ r.patient_name }}</span>
+                                </td>
                                 <td class="px-3 py-2.5">
                                     <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
                                         r.record_type === 'payment' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700']">
@@ -218,6 +225,7 @@
                                     </span>
                                 </td>
                                 <td class="px-3 py-2.5 text-gray-700 max-w-[200px] truncate" :title="r.description">{{ r.description }}</td>
+                                <td class="px-3 py-2.5 text-gray-500 max-w-[200px] truncate hidden lg:table-cell" :title="r.notes">{{ r.notes ?? '—' }}</td>
                                 <td class="px-3 py-2.5 text-right text-gray-700">{{ fmt(r.unit_price) }}</td>
                                 <td class="px-3 py-2.5 text-right text-gray-700">{{ r.quantity ?? '—' }}</td>
                                 <td class="px-3 py-2.5 text-right text-orange-600">{{ fmt(r.discount) }}</td>

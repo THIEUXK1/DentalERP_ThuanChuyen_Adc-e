@@ -21,7 +21,7 @@ class SystemRecordExport implements FromArray, WithHeadings, WithStyles, WithTit
     public function headings(): array
     {
         return [
-            'Ngày', 'Mã KH', 'Tên khách hàng', 'SĐT', 'Loại', 'Diễn giải',
+            'Ngày', 'Giờ', 'Mã KH', 'Tên khách hàng', 'SĐT', 'Loại', 'Diễn giải', 'Ghi chú',
             'Đơn giá', 'SL', 'Khuyến mại', 'Thành tiền',
             'Chứng từ', 'Bác sĩ', 'Tư vấn', 'Trợ thủ', 'Chi nhánh', 'Trạng thái',
         ];
@@ -31,11 +31,13 @@ class SystemRecordExport implements FromArray, WithHeadings, WithStyles, WithTit
     {
         return array_map(fn ($r) => [
             \Carbon\Carbon::parse($r['record_date'])->format('d/m/Y'),
+            $r['record_time'],
             $r['patient_code'],
             $r['patient_name'],
             $r['phone'],
             $r['record_type_label'],
             $r['description'],
+            $r['notes'],
             $r['unit_price'],
             $r['quantity'],
             $r['discount'],

@@ -189,6 +189,7 @@
                                 <td class="px-4 py-2 text-gray-400">{{ ii + 1 }}</td>
                                 <td class="px-4 py-2">
                                     <p class="font-medium text-gray-800">{{ item.name }}</p>
+                                    <p v-if="item.doctor_name" class="text-indigo-500 text-xs mt-0.5">{{ item.doctor_name }}</p>
                                     <p v-if="item.notes" class="text-gray-400 text-xs mt-0.5">{{ item.notes }}</p>
                                 </td>
                                 <td class="px-4 py-2 hidden sm:table-cell">

@@ -387,7 +387,7 @@ class PatientController extends Controller
         // (most recent first); plans with no date at all trail at the very end.
         // CURRENT_DATE is portable across Postgres, MySQL and SQLite.
         $treatmentPlansRaw = TreatmentPlan::where('patient_id', $patient->id)
-            ->with(['doctor', 'items.service', 'invoices'])
+            ->with(['doctor', 'items.service', 'items.responsibleDoctor', 'invoices'])
             ->orderByRaw('
                 CASE
                     WHEN start_date IS NULL THEN 2
@@ -445,6 +445,7 @@ class PatientController extends Controller
                         default       => $item->status,
                     },
                     'notes'  => $item->notes,
+                    'doctor_name' => $item->responsibleDoctor?->full_name ?? $plan->doctor?->full_name,
                 ])->values()->all(),
             ];
         });
