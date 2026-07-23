@@ -7,6 +7,7 @@ use App\Enums\KpiBaseType;
 use App\Enums\TreatmentItemStatus;
 use App\Models\DentalServiceStep;
 use App\Models\KpiAllocation;
+use App\Models\PatientPayment;
 use App\Models\TreatmentPlanItem;
 use App\Models\TreatmentStepExecution;
 use Illuminate\Support\Facades\DB;
@@ -83,14 +84,33 @@ class DentalKpiService
                 }
             }
 
-            // Main doctor residual KPI (pool - steps deducted by others)
-            $mainDoctorId = $item->responsible_doctor_id ?? ($item->plan?->doctor_id);
-            if ($mainDoctorId) {
-                $mainDoctorKpi = max(0, $kpiPool - $allocatedPool);
-                if ($mainDoctorKpi > 0) {
-                    $this->createAllocation($item, $service, null, $mainDoctorId, 'main_doctor',
-                        $eligibleRevenue, $directCost, $kpiPool, 100, $mainDoctorKpi,
-                        $collectionFactor, $service->kpi_base_type->value, $period);
+            // Main doctor residual KPI (pool - steps deducted by others), split by which
+            // doctor actually collected the payments recorded against this item — falls
+            // back to the single responsible_doctor_id when no payment is tagged to the
+            // item yet (legacy data, or cashier left the picker on its default).
+            $mainDoctorKpi = max(0, $kpiPool - $allocatedPool);
+            if ($mainDoctorKpi > 0) {
+                $doctorShares = $this->resolveDoctorPaymentShares($item);
+
+                if ($doctorShares->isEmpty()) {
+                    $fallbackDoctorId = $item->responsible_doctor_id ?? $item->plan?->doctor_id;
+                    if ($fallbackDoctorId) {
+                        $this->createAllocation($item, $service, null, $fallbackDoctorId, 'main_doctor',
+                            $eligibleRevenue, $directCost, $kpiPool, 100, $mainDoctorKpi,
+                            $collectionFactor, $service->kpi_base_type->value, $period);
+                    }
+                } else {
+                    $totalPaid = $doctorShares->sum();
+                    foreach ($doctorShares as $doctorId => $doctorPaid) {
+                        $sharePercent = round($doctorPaid / $totalPaid * 100, 2);
+                        $doctorKpi    = (int) round($mainDoctorKpi * $doctorPaid / $totalPaid);
+                        if ($doctorKpi <= 0) {
+                            continue;
+                        }
+                        $this->createAllocation($item, $service, null, (int) $doctorId, 'main_doctor',
+                            $eligibleRevenue, $directCost, $kpiPool, $sharePercent, $doctorKpi,
+                            $collectionFactor, $service->kpi_base_type->value, $period);
+                    }
                 }
             }
         });
@@ -157,6 +177,25 @@ class DentalKpiService
     }
 
     // ── Private helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Net amount collected per doctor for this item, from patient_payments explicitly
+     * tagged to it. Payments with no doctor_id set fall back to the item's/plan's doctor.
+     * Summing (rather than filtering to amount > 0) lets a reversal row net out against
+     * the payment it reverses instead of still counting the reversed money. Doctors whose
+     * net comes out to zero or negative are dropped — they contribute no share.
+     */
+    private function resolveDoctorPaymentShares(TreatmentPlanItem $item): \Illuminate\Support\Collection
+    {
+        $fallbackDoctorId = $item->responsible_doctor_id ?? $item->plan?->doctor_id;
+
+        return PatientPayment::where('treatment_plan_item_id', $item->id)
+            ->get(['amount', 'doctor_id'])
+            ->groupBy(fn ($p) => $p->doctor_id ?? $fallbackDoctorId)
+            ->reject(fn ($payments, $doctorId) => $doctorId === null)
+            ->map(fn ($payments) => $payments->sum('amount'))
+            ->filter(fn ($net) => $net > 0);
+    }
 
     private function resolveDirectCost(TreatmentPlanItem $item, $service): int
     {

@@ -6,6 +6,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Models\Branch;
+use App\Models\Employee;
 use App\Models\PatientInvoice;
 use App\Models\PendingDeletion;
 use App\Models\TreatmentPlan;
@@ -127,9 +128,25 @@ class PatientInvoiceController extends Controller
     {
         $this->authorize('cashier.view');
 
-        $invoice->load(['patient', 'branch', 'treatmentPlan.items.service', 'payments.creator', 'payments.reversal', 'debt']);
+        $invoice->load([
+            'patient', 'branch', 'treatmentPlan.doctor', 'treatmentPlan.items.service', 'treatmentPlan.items.responsibleDoctor',
+            'payments.creator', 'payments.reversal', 'payments.doctor', 'payments.treatmentPlanItem', 'debt',
+        ]);
 
         $plan = $invoice->treatmentPlan;
+
+        // Full active doctor list for the payment form's picker — cashier can attribute a
+        // payment to any doctor, not just the one(s) formally assigned on this plan's items
+        // (e.g. someone who helped out that day without being set as responsible_doctor_id).
+        $planDoctors = Employee::doctors()->where('is_active', true)->orderBy('full_name')
+            ->get()->map(fn ($d) => ['id' => $d->id, 'name' => $d->full_name]);
+
+        // Default suggestion for a new payment: whichever item was touched most recently
+        // (by completion, start, or last update) — "whoever is treating the patient right
+        // now" in the common case. Cashier can still override in the form.
+        $suggestedItem = $plan
+            ? $plan->items->sortByDesc(fn ($i) => $i->completed_at ?? $i->started_at ?? $i->updated_at)->first()
+            : null;
 
         $planPendingDeletion = null;
         if ($plan) {
@@ -174,6 +191,8 @@ class PatientInvoiceController extends Controller
                 'plan_doctor'      => $plan?->doctor?->full_name,
                 'plan_net_total'          => $plan?->net_total,
                 'plan_payment_schedule'  => $plan?->payment_schedule ?? [],
+                'suggested_item_id'   => $suggestedItem?->id,
+                'suggested_doctor_id' => $suggestedItem?->responsible_doctor_id ?? $plan?->doctor_id,
             ],
             'plan_items' => $plan ? $plan->items->map(fn ($i) => [
                 'id'           => $i->id,
@@ -186,7 +205,10 @@ class PatientInvoiceController extends Controller
                 'notes'        => $i->notes,
                 'status_label' => $i->status->label(),
                 'status_color' => $i->status->color(),
+                'doctor_id'    => $i->responsible_doctor_id ?? $plan->doctor_id,
+                'doctor_name'  => $i->responsibleDoctor?->full_name ?? $plan->doctor?->full_name,
             ])->values()->all() : [],
+            'plan_doctors' => $planDoctors,
             'payments' => $invoice->payments->map(fn ($p) => [
                 'id' => $p->id,
                 'amount' => $p->amount,
@@ -200,6 +222,8 @@ class PatientInvoiceController extends Controller
                 'creator' => $p->creator->name,
                 'is_reversal' => $p->reverses_payment_id !== null,
                 'reversed' => $p->reversal !== null,
+                'doctor_name' => $p->doctor?->full_name,
+                'item_name' => $p->treatmentPlanItem?->name,
             ]),
             'debt' => $invoice->debt ? [
                 'amount' => $invoice->debt->amount,

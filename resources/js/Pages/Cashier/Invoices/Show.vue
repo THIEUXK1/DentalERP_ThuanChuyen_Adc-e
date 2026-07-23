@@ -179,7 +179,15 @@
                             </div>
                         </div>
 
-
+                        <!-- Bác sĩ điều trị: số tiền thu này sẽ ghi công cho đúng người này -->
+                        <div v-if="planDoctors.length > 0" class="mb-4">
+                            <label class="text-xs text-gray-500 mb-1.5 block font-medium">Bác sĩ điều trị</label>
+                            <select v-model="payForm.doctor_id"
+                                class="block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none sm:max-w-xs">
+                                <option :value="null">— Không chọn —</option>
+                                <option v-for="d in planDoctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                            </select>
+                        </div>
 
                         <p v-if="payForm.errors.amount" class="text-xs text-red-500 mb-3">{{ payForm.errors.amount }}</p>
 
@@ -287,6 +295,7 @@
                                     <th class="px-4 py-2.5 text-right font-medium">Số tiền</th>
                                     <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Tham chiếu</th>
                                     <th class="px-4 py-2.5 text-left font-medium hidden sm:table-cell">Ghi chú</th>
+                                    <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Bác sĩ điều trị</th>
                                     <th class="px-4 py-2.5 text-left font-medium hidden md:table-cell">Người thu</th>
                                     <th class="px-4 py-2.5 text-right font-medium">Thao tác</th>
                                 </tr>
@@ -327,6 +336,9 @@
                                     </td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.reference ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.notes ?? '—' }}</td>
+                                    <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell" :title="p.item_name">
+                                        {{ p.doctor_name ?? '—' }}
+                                    </td>
                                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ p.creator }}</td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
                                         <button v-if="canRefund && p.amount > 0" @click="openReverseModal(p)"
@@ -716,6 +728,7 @@ const props = defineProps({
     payments: Array,
     debt: Object,
     plan_items: { type: Array, default: () => [] },
+    plan_doctors: { type: Array, default: () => [] },
     plan_payment_schedule: { type: Array, default: () => [] },
     methods: Array,
     canRefund: Boolean,
@@ -748,6 +761,7 @@ function undoPlanDeletion() {
 }
 
 const planItems      = props.plan_items ?? [];
+const planDoctors    = props.plan_doctors ?? [];
 const planSchedule   = props.plan_payment_schedule ?? [];
 const discountAmount = ref(props.invoice.discount);
 
@@ -840,6 +854,8 @@ const payForm = useForm({
     payment_date: dayjs().format('YYYY-MM-DD'),
     reference:    '',
     notes:        '',
+    treatment_plan_item_id: props.invoice.suggested_item_id ?? null,
+    doctor_id:    props.invoice.suggested_doctor_id ?? null,
 });
 
 function fillFullAmount() {

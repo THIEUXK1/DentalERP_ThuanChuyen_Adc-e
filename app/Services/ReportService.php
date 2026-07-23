@@ -209,7 +209,7 @@ class ReportService
         return $this->cacheRemember(__FUNCTION__, func_get_args(), function () use ($from, $to, $branchId) {
             return PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
                 ->join('treatment_plans', 'patient_invoices.treatment_plan_id', '=', 'treatment_plans.id')
-                ->join('employees', 'treatment_plans.doctor_id', '=', 'employees.id')
+                ->join('employees', DB::raw('COALESCE(patient_payments.doctor_id, treatment_plans.doctor_id)'), '=', 'employees.id')
                 ->select('employees.id', 'employees.full_name', DB::raw('SUM(patient_payments.amount) as revenue'))
                 ->whereBetween('patient_payments.payment_date', [$from, $to])
                 ->where('patient_payments.amount', '>', 0)
@@ -373,7 +373,7 @@ class ReportService
 
         $revenueRows = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
             ->join('treatment_plans', 'patient_invoices.treatment_plan_id', '=', 'treatment_plans.id')
-            ->join('employees', 'treatment_plans.doctor_id', '=', 'employees.id')
+            ->join('employees', DB::raw('COALESCE(patient_payments.doctor_id, treatment_plans.doctor_id)'), '=', 'employees.id')
             ->select(
                 'employees.id',
                 'employees.full_name',

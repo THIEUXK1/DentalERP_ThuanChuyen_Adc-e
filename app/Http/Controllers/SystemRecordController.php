@@ -282,6 +282,7 @@ class SystemRecordController extends Controller
             ->join('patient_invoices as inv', 'pay.invoice_id', '=', 'inv.id')
             ->join('patients as p', 'inv.patient_id', '=', 'p.id')
             ->leftJoin('branches as br', 'inv.branch_id', '=', 'br.id')
+            ->leftJoin('employees as pay_doc', 'pay.doctor_id', '=', 'pay_doc.id')
             ->when($branchId, fn ($q) => $q->where('inv.branch_id', $branchId))
             ->when($dateFrom, fn ($q) => $q->where('pay.payment_date', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->where('pay.payment_date', '<=', $dateTo))
@@ -295,8 +296,8 @@ class SystemRecordController extends Controller
                     ->orWhere('pay.reference', 'ilike', $like);
             }))
             ->when($advanced['patient_name'] ?? null, fn ($q, $v) => $q->where('p.full_name', 'ilike', "%{$v}%"))
-            // Payments have no doctor/consultant/assistant — filtering by any of these should exclude payment rows entirely.
-            ->when($advanced['doctor_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            ->when($advanced['doctor_id'] ?? null, fn ($q, $v) => $q->where('pay.doctor_id', $v))
+            // Payments have no consultant/assistant — filtering by either should exclude payment rows entirely.
             ->when($advanced['consultant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['assistant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['reference_code'] ?? null, fn ($q, $v) => $q->where('inv.code', 'ilike', "%{$v}%"))
@@ -326,7 +327,7 @@ class SystemRecordController extends Controller
                 DB::raw('CAST(NULL AS bigint) as discount'),
                 'pay.amount as amount',
                 DB::raw("(CASE WHEN pay.amount < 0 THEN 'refund' ELSE 'paid' END) as status_raw"),
-                DB::raw('CAST(NULL AS varchar) as doctor_name'),
+                'pay_doc.full_name as doctor_name',
                 DB::raw('CAST(NULL AS varchar) as consultant_name'),
                 DB::raw('CAST(NULL AS varchar) as assistant_name'),
                 'inv.branch_id as branch_id',
@@ -334,7 +335,7 @@ class SystemRecordController extends Controller
                 'inv.code as reference_code',
                 DB::raw("'invoice' as reference_type"),
                 'inv.id as reference_id',
-                DB::raw('CAST(NULL AS integer) as doctor_id'),
+                'pay.doctor_id as doctor_id',
                 DB::raw('CAST(NULL AS integer) as consultant_id'),
                 DB::raw('CAST(NULL AS integer) as assistant_id'),
                 DB::raw('CAST(NULL AS integer) as category_id'),

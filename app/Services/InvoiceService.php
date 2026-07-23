@@ -6,10 +6,12 @@ use App\Enums\DebtStatus;
 use App\Enums\InvoiceStatus;
 use App\Models\HkdCashTransaction;
 use App\Models\HkdRevenueEntry;
+use App\Enums\TreatmentItemStatus;
 use App\Models\PatientDebt;
 use App\Models\PatientInvoice;
 use App\Models\PatientPayment;
 use App\Models\TreatmentPlan;
+use App\Services\Dental\DentalKpiService;
 use App\Services\Hkd\HkdJournalService;
 use Illuminate\Support\Facades\DB;
 
@@ -62,6 +64,8 @@ class InvoiceService
                 'notes' => $data['notes'] ?? null,
                 'created_by' => auth()->id(),
                 'reverses_payment_id' => $data['reverses_payment_id'] ?? null,
+                'treatment_plan_item_id' => $data['treatment_plan_item_id'] ?? null,
+                'doctor_id' => $data['doctor_id'] ?? null,
             ]);
 
             // Add to the existing amount_paid rather than recomputing from the sum of
@@ -95,6 +99,17 @@ class InvoiceService
             // Trigger commission calculation when invoice becomes fully paid
             if ($invoiceStatus === InvoiceStatus::Paid) {
                 (new CommissionService)->calculateForInvoice($invoice->fresh());
+            }
+
+            // Item was already completed (KPI calculated) before this payment came in —
+            // recalculate so the doctor-split (see DentalKpiService) picks up the new
+            // payment. Idempotent: only replaces still-accrued/pending allocations, never
+            // approved/paid ones.
+            if ($payment->treatment_plan_item_id) {
+                $item = $payment->treatmentPlanItem;
+                if ($item && $item->status === TreatmentItemStatus::Completed) {
+                    app(DentalKpiService::class)->calculateForItem($item);
+                }
             }
 
             // Ghi sổ doanh thu + sổ tiền TT152 (bỏ qua nếu chi nhánh không có HKD profile)
@@ -136,6 +151,8 @@ class InvoiceService
             'reference' => null,
             'notes' => "Hoàn tác khoản thanh toán #{$payment->id} ngày {$payment->payment_date->format('d/m/Y')}",
             'reverses_payment_id' => $payment->id,
+            'treatment_plan_item_id' => $payment->treatment_plan_item_id,
+            'doctor_id' => $payment->doctor_id,
         ]);
     }
 

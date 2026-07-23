@@ -24,6 +24,8 @@ class PatientPaymentController extends Controller
             'payment_date' => 'required|date',
             'reference' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
+            'treatment_plan_item_id' => 'nullable|exists:treatment_plan_items,id',
+            'doctor_id' => 'nullable|exists:employees,id',
         ]);
 
         // Refund (negative) requires special permission
