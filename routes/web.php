@@ -263,6 +263,7 @@ Route::middleware(['auth'])->prefix('cashier')->name('cashier.')->group(function
     Route::patch('payments/{payment}/method', [PatientPaymentController::class, 'updateMethod'])->name('payments.update-method')->middleware('can:cashier.manage');
     Route::patch('payments/{payment}/date', [PatientPaymentController::class, 'updateDate'])->name('payments.update-date')->middleware('can:cashier.manage');
     Route::patch('payments/{payment}/amount', [PatientPaymentController::class, 'updateAmount'])->name('payments.update-amount')->middleware('can:cashier.manage');
+    Route::patch('payments/{payment}/doctor', [PatientPaymentController::class, 'updateDoctor'])->name('payments.update-doctor')->middleware('can:cashier.manage');
     Route::post('payments/{payment}/reverse', [PatientPaymentController::class, 'reverse'])->name('payments.reverse')->middleware('can:cashier.approve_refund');
     Route::post('invoices/{invoice}/discount', [PatientInvoiceController::class, 'discount'])->name('invoices.discount')->middleware('can:cashier.approve_discount');
     Route::post('invoices/{invoice}/cancel', [PatientInvoiceController::class, 'cancel'])->name('invoices.cancel')->middleware('can:cashier.manage');

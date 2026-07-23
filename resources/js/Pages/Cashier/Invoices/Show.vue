@@ -337,7 +337,14 @@
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.reference ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-400 text-xs hidden sm:table-cell">{{ p.notes ?? '—' }}</td>
                                     <td class="px-4 py-3 text-gray-500 text-xs hidden md:table-cell" :title="p.item_name">
-                                        {{ p.doctor_name ?? '—' }}
+                                        <button @click="openDoctorModal(p)"
+                                            class="inline-flex items-center gap-1 hover:text-emerald-700 hover:underline cursor-pointer"
+                                            title="Bấm để sửa bác sĩ điều trị">
+                                            {{ p.doctor_name ?? '—' }}
+                                            <svg class="w-2.5 h-2.5 opacity-40" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                            </svg>
+                                        </button>
                                     </td>
                                     <td class="px-4 py-3 text-gray-500 hidden md:table-cell">{{ p.creator }}</td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -591,6 +598,43 @@
         </div>
     </Teleport>
 
+    <!-- ── Edit payment doctor modal ───────────────────────────────────── -->
+    <Teleport to="body">
+        <div v-if="doctorModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
+                <div class="px-5 pt-5 pb-4 border-b border-amber-200 bg-amber-50 rounded-t-2xl">
+                    <div class="flex items-center gap-2">
+                        <svg class="w-5 h-5 text-amber-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        </svg>
+                        <h3 class="font-semibold text-base text-amber-800">Sửa bác sĩ điều trị</h3>
+                    </div>
+                </div>
+                <div class="px-5 py-4 space-y-4 text-sm text-gray-700">
+                    <div>
+                        <p class="text-xs text-gray-500 mb-2 font-medium">Chọn bác sĩ</p>
+                        <select v-model="doctorModal.selected"
+                            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                            <option :value="null">— Không chọn —</option>
+                            <option v-for="d in planDoctors" :key="d.id" :value="d.id">{{ d.name }}</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="px-5 pb-5 flex justify-end gap-2">
+                    <button @click="doctorModal.open = false"
+                        class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        Hủy bỏ
+                    </button>
+                    <button @click="submitDoctorChange"
+                        :disabled="doctorModal.selected === doctorModal.current"
+                        class="px-4 py-2 text-sm font-medium text-white bg-amber-600 rounded-lg hover:bg-amber-700 disabled:opacity-40 disabled:cursor-not-allowed">
+                        Lưu thay đổi
+                    </button>
+                </div>
+            </div>
+        </div>
+    </Teleport>
+
     <!-- ── Edit payment date modal ─────────────────────────────────────── -->
     <Teleport to="body">
         <div v-if="dateModal.open" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -788,6 +832,22 @@ function submitMethodChange() {
         method: methodModal.value.selected,
     }, {
         onSuccess: () => { methodModal.value.open = false; },
+        preserveScroll: true,
+    });
+}
+
+// ── Edit payment doctor ─────────────────────────────────────────────────────
+const doctorModal = ref({ open: false, paymentId: null, current: null, selected: null });
+
+function openDoctorModal(p) {
+    doctorModal.value = { open: true, paymentId: p.id, current: p.doctor_id, selected: p.doctor_id };
+}
+function submitDoctorChange() {
+    if (doctorModal.value.selected === doctorModal.value.current) return;
+    router.patch(route('cashier.payments.update-doctor', doctorModal.value.paymentId), {
+        doctor_id: doctorModal.value.selected,
+    }, {
+        onSuccess: () => { doctorModal.value.open = false; },
         preserveScroll: true,
     });
 }

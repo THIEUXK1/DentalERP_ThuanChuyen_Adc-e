@@ -222,6 +222,7 @@ class PatientInvoiceController extends Controller
                 'creator' => $p->creator->name,
                 'is_reversal' => $p->reverses_payment_id !== null,
                 'reversed' => $p->reversal !== null,
+                'doctor_id' => $p->doctor_id,
                 'doctor_name' => $p->doctor?->full_name,
                 'item_name' => $p->treatmentPlanItem?->name,
             ]),

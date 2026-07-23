@@ -94,6 +94,19 @@ class PatientPaymentController extends Controller
         return back()->with('success', 'Đã cập nhật số tiền thanh toán.');
     }
 
+    public function updateDoctor(Request $request, PatientPayment $payment): RedirectResponse
+    {
+        $this->authorize('cashier.manage');
+
+        $data = $request->validate([
+            'doctor_id' => 'nullable|exists:employees,id',
+        ]);
+
+        $payment->update(['doctor_id' => $data['doctor_id']]);
+
+        return back()->with('success', 'Đã cập nhật bác sĩ điều trị.');
+    }
+
     public function reverse(PatientPayment $payment): RedirectResponse
     {
         $this->authorize('cashier.manage');
