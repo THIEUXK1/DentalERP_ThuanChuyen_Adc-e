@@ -175,16 +175,25 @@
                 <span class="text-gray-600">Thành tiền dịch vụ: <strong class="tabular-nums" :class="totals.service_amount < 0 ? 'text-red-600' : 'text-gray-800'">{{ fmt(totals.service_amount) }}</strong></span>
                 <span class="text-gray-600">Tiền thu{{ showPlanTotals ? ' (theo KHDT)' : '' }}: <strong class="text-emerald-700 tabular-nums">{{ fmt(totals.payment_collected) }}</strong></span>
                 <span class="text-gray-600">Tiền hoàn{{ showPlanTotals ? ' (theo KHDT)' : '' }}: <strong class="text-red-600 tabular-nums">{{ fmt(totals.payment_refunded) }}</strong></span>
-                <label class="ml-auto flex items-center gap-2 cursor-pointer select-none" title="Khi bật: hiển thị thêm mọi khoản thanh toán của các KHDT đang có trong danh sách, kể cả những khoản thu nằm ngoài khoảng ngày đang lọc.">
-                    <span class="text-xs font-medium text-gray-500">
-                        Tiền thu đầy đủ theo KHDT
-                        <span v-if="loadingPlanPayments" class="text-gray-400">(đang tải...)</span>
-                    </span>
-                    <button type="button" role="switch" :aria-checked="showPlanTotals" @click="showPlanTotals = !showPlanTotals"
-                        :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors', showPlanTotals ? 'bg-emerald-500' : 'bg-gray-300']">
-                        <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform', showPlanTotals ? 'translate-x-5' : 'translate-x-1']" />
-                    </button>
-                </label>
+                <div class="ml-auto flex items-center gap-4">
+                    <label class="flex items-center gap-2 cursor-pointer select-none" title="Khi bật: chỉ giữ lại các dòng thanh toán thuộc về KHDT có dòng dịch vụ (thủ thuật) đang hiển thị trong bảng; ẩn thanh toán của KHDT khác hoặc không gắn KHDT nào.">
+                        <span class="text-xs font-medium text-gray-500">Ẩn thanh toán không liên quan KHDT</span>
+                        <button type="button" role="switch" :aria-checked="hideUnrelatedPayments" @click="hideUnrelatedPayments = !hideUnrelatedPayments"
+                            :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors', hideUnrelatedPayments ? 'bg-red-500' : 'bg-gray-300']">
+                            <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform', hideUnrelatedPayments ? 'translate-x-5' : 'translate-x-1']" />
+                        </button>
+                    </label>
+                    <label class="flex items-center gap-2 cursor-pointer select-none" title="Khi bật: hiển thị thêm mọi khoản thanh toán của các KHDT đang có trong danh sách, kể cả những khoản thu nằm ngoài khoảng ngày đang lọc.">
+                        <span class="text-xs font-medium text-gray-500">
+                            Tiền thu đầy đủ theo KHDT
+                            <span v-if="loadingPlanPayments" class="text-gray-400">(đang tải...)</span>
+                        </span>
+                        <button type="button" role="switch" :aria-checked="showPlanTotals" @click="showPlanTotals = !showPlanTotals"
+                            :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors', showPlanTotals ? 'bg-emerald-500' : 'bg-gray-300']">
+                            <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform', showPlanTotals ? 'translate-x-5' : 'translate-x-1']" />
+                        </button>
+                    </label>
+                </div>
             </div>
 
             <!-- Table -->
@@ -513,7 +522,20 @@ function isOutsideDateFilter(r) {
     return false;
 }
 
-const filteredRecords = computed(() => baseRecords.value.filter(matchesFilters));
+// When on, drops payment rows whose KHDT isn't one of the treatment plans that currently
+// have a service (thủ thuật) row in view — i.e. hides payments unrelated to the visible KHDTs.
+const hideUnrelatedPayments = ref(false);
+
+const currentPlanIds = computed(() =>
+    new Set(baseRecords.value.filter(r => r.record_type === 'service' && r.plan_id).map(r => r.plan_id))
+);
+
+function matchesRelatedPlan(r) {
+    if (!hideUnrelatedPayments.value || r.record_type !== 'payment') return true;
+    return r.plan_id && currentPlanIds.value.has(r.plan_id);
+}
+
+const filteredRecords = computed(() => baseRecords.value.filter(r => matchesFilters(r) && matchesRelatedPlan(r)));
 
 const totals = computed(() => {
     const t = { quantity: 0, discount: 0, gross: 0, service_amount: 0, payment_collected: 0, payment_refunded: 0 };
