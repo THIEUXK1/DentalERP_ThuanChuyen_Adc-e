@@ -79,6 +79,7 @@ class SystemRecordController extends Controller
             'categories' => ServiceCategory::where('is_active', true)->orderBy('name')->get(['id', 'name', 'group_id']),
             'services' => DentalService::where('is_active', true)->orderBy('name')->get(['id', 'name', 'category_id']),
             'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            'methods' => collect(PaymentMethod::cases())->map(fn ($m) => ['value' => $m->value, 'label' => $m->label()]),
             'statuses' => collect(TreatmentItemStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])
                 ->concat([
                     ['value' => 'paid', 'label' => 'Đã thu (thanh toán)'],
@@ -181,6 +182,7 @@ class SystemRecordController extends Controller
             'category_id' => $request->filled('category_id') ? (int) $request->category_id : null,
             'service_id' => $request->filled('service_id') ? (int) $request->service_id : null,
             'source' => $request->string('source')->trim()->value() ?: null,
+            'method' => $request->string('method')->trim()->value() ?: null,
             'status' => $status,
             'status_domain' => $statusDomain,
         ];
@@ -265,6 +267,9 @@ class SystemRecordController extends Controller
             ->when($advanced['category_id'] ?? null, fn ($q, $v) => $q->where('svc.category_id', $v))
             ->when($advanced['service_id'] ?? null, fn ($q, $v) => $q->where('svc.id', $v))
             ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
+            // Payments carry a "phương thức" (cash/transfer/...); service rows have none, so
+            // picking a method filter excludes the whole service side of the union.
+            ->when($advanced['method'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'service'
                 ? $q->where('ti.status', $v)
                 : $q->whereRaw('1 = 0'))
@@ -299,6 +304,7 @@ class SystemRecordController extends Controller
                 'svc.id as service_id',
                 'p.source as source',
                 'tp.id as plan_id',
+                DB::raw('CAST(NULL AS varchar) as payment_method'),
             ]);
     }
 
@@ -340,6 +346,7 @@ class SystemRecordController extends Controller
             ->when($advanced['category_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['service_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
+            ->when($advanced['method'] ?? null, fn ($q, $v) => $q->where('pay.method', $v))
             ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'payment' && $v === 'paid'
                 ? $q
                 : $q->whereRaw('1 = 0'))
@@ -374,6 +381,7 @@ class SystemRecordController extends Controller
                 DB::raw('CAST(NULL AS integer) as service_id'),
                 'p.source as source',
                 'pay_plan.id as plan_id',
+                'pay.method as payment_method',
             ]);
     }
 
@@ -420,6 +428,7 @@ class SystemRecordController extends Controller
             'reference_type' => $row->reference_type,
             'reference_id' => $row->reference_id,
             'plan_id' => $row->plan_id,
+            'payment_method' => $row->payment_method,
         ];
     }
 }

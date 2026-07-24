@@ -122,6 +122,14 @@
                             </select>
                         </div>
                         <div>
+                            <label class="block text-xs font-medium text-gray-500 mb-1">Hình thức thanh toán</label>
+                            <select v-model="form.method"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
+                                <option value="">Tất cả hình thức</option>
+                                <option v-for="m in methods" :key="m.value" :value="m.value">{{ m.label }}</option>
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-xs font-medium text-gray-500 mb-1">Trạng thái</label>
                             <select v-model="form.status"
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
@@ -391,6 +399,7 @@ const props = defineProps({
     categories: { type: Array, default: () => [] },
     services: { type: Array, default: () => [] },
     sources: { type: Array, default: () => [] },
+    methods: { type: Array, default: () => [] },
     statuses: { type: Array, default: () => [] },
 });
 
@@ -416,6 +425,7 @@ const form = reactive({
     category_id:     '',
     service_id:      '',
     source:          '',
+    method:          '',
     status:          '',
 });
 
@@ -437,12 +447,12 @@ function setFilter(key, value) {
 
 const showAdvanced = ref(
     !!(form.patient_name || form.doctor_id || form.consultant_id || form.assistant_id || form.reference_code || form.amount_min || form.amount_max
-        || form.category_id || form.service_id || form.source || form.status)
+        || form.category_id || form.service_id || form.source || form.method || form.status)
 );
 
 const hasAdvancedFilters = computed(() =>
     form.patient_name || form.doctor_id || form.consultant_id || form.assistant_id || form.reference_code || form.amount_min || form.amount_max
-        || form.category_id || form.service_id || form.source || form.status
+        || form.category_id || form.service_id || form.source || form.method || form.status
 );
 
 const hasFilters = computed(() =>
@@ -478,6 +488,7 @@ function matchesFilters(r) {
     if (form.category_id && String(r.category_id) !== String(form.category_id)) return false;
     if (form.service_id && String(r.service_id) !== String(form.service_id)) return false;
     if (form.source && r.source !== form.source) return false;
+    if (form.method && r.payment_method !== form.method) return false;
     if (form.status && r.status !== form.status) return false;
     return true;
 }
@@ -598,7 +609,7 @@ function clearFilters() {
 function clearAdvancedFilters() {
     form.patient_name = ''; form.doctor_id = ''; form.consultant_id = ''; form.assistant_id = '';
     form.reference_code = ''; form.amount_min = ''; form.amount_max = '';
-    form.category_id = ''; form.service_id = ''; form.source = ''; form.status = '';
+    form.category_id = ''; form.service_id = ''; form.source = ''; form.method = ''; form.status = '';
 }
 
 function fmt(val) {
@@ -696,6 +707,7 @@ async function confirmExport() {
             category_id:     form.category_id     || undefined,
             service_id:      form.service_id      || undefined,
             source:          form.source          || undefined,
+            method:          form.method          || undefined,
             status:          form.status          || undefined,
         }), {
             responseType: 'blob',
