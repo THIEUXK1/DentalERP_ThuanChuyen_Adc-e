@@ -82,7 +82,6 @@ class SystemRecordController extends Controller
             'statuses' => collect(TreatmentItemStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])
                 ->concat([
                     ['value' => 'paid', 'label' => 'Đã thu (thanh toán)'],
-                    ['value' => 'refund', 'label' => 'Hoàn tiền (thanh toán)'],
                 ]),
         ]);
     }
@@ -159,15 +158,15 @@ class SystemRecordController extends Controller
         $year = $request->filled('year') ? (int) $request->year : null;
 
         // "Trạng thái" spans two unrelated domains: treatment-item status (service rows) and
-        // paid/refund (payment rows, derived from amount sign — see paymentQuery()). Figure out
-        // up front which domain the picked value belongs to, so each side of the union knows
-        // whether to filter on it or exclude itself entirely.
+        // paid (payment rows — refunds are excluded from System Records entirely, see
+        // paymentQuery()). Figure out up front which domain the picked value belongs to, so
+        // each side of the union knows whether to filter on it or exclude itself entirely.
         $status = $request->string('status')->trim()->value() ?: null;
         $statusDomain = null;
         if ($status) {
             $statusDomain = in_array($status, array_column(TreatmentItemStatus::cases(), 'value'), true)
                 ? 'service'
-                : (in_array($status, ['paid', 'refund'], true) ? 'payment' : null);
+                : ($status === 'paid' ? 'payment' : null);
         }
 
         $advanced = [
@@ -312,6 +311,8 @@ class SystemRecordController extends Controller
             ->leftJoin('treatment_plans as pay_plan', 'inv.treatment_plan_id', '=', 'pay_plan.id')
             ->leftJoin('employees as pay_doc', 'pay.doctor_id', '=', 'pay_doc.id')
             ->leftJoin('employees as pay_plan_doc', 'pay_plan.doctor_id', '=', 'pay_plan_doc.id')
+            // Refunds (negative amount) aren't shown on System Records — only actual money collected.
+            ->where('pay.amount', '>', 0)
             ->when($branchId, fn ($q) => $q->where('inv.branch_id', $branchId))
             ->when($dateFrom, fn ($q) => $q->where('pay.payment_date', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->where('pay.payment_date', '<=', $dateTo))
@@ -339,8 +340,8 @@ class SystemRecordController extends Controller
             ->when($advanced['category_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['service_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
-            ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'payment'
-                ? $q->whereRaw("(CASE WHEN pay.amount < 0 THEN 'refund' ELSE 'paid' END) = ?", [$v])
+            ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'payment' && $v === 'paid'
+                ? $q
                 : $q->whereRaw('1 = 0'))
             ->select([
                 DB::raw("'payment' as record_type"),
@@ -357,7 +358,7 @@ class SystemRecordController extends Controller
                 DB::raw('CAST(NULL AS bigint) as unit_price'),
                 DB::raw('CAST(NULL AS bigint) as discount'),
                 'pay.amount as amount',
-                DB::raw("(CASE WHEN pay.amount < 0 THEN 'refund' ELSE 'paid' END) as status_raw"),
+                DB::raw("'paid' as status_raw"),
                 DB::raw('COALESCE(pay_doc.full_name, pay_plan_doc.full_name) as doctor_name'),
                 DB::raw('CAST(NULL AS varchar) as consultant_name'),
                 DB::raw('CAST(NULL AS varchar) as assistant_name'),
@@ -400,10 +401,10 @@ class SystemRecordController extends Controller
             'amount' => (int) $row->amount,
             'status_label' => $isService
                 ? (TreatmentItemStatus::tryFrom($row->status_raw)?->label() ?? $row->status_raw)
-                : ($row->status_raw === 'refund' ? 'Hoàn tiền' : 'Đã thu'),
+                : 'Đã thu',
             // Raw status value — 'status_domain' in buildUnionQuery() shows why comparing this
-            // directly against either a TreatmentItemStatus value or 'paid'/'refund' is safe:
-            // the two domains never share a value, so client-side filtering needs no extra check.
+            // directly against either a TreatmentItemStatus value or 'paid' is safe: the two
+            // domains never share a value, so client-side filtering needs no extra check.
             'status' => $row->status_raw,
             'doctor_name' => $row->doctor_name,
             'doctor_id' => $row->doctor_id,
