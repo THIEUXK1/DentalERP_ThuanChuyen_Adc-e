@@ -488,7 +488,7 @@ function matchesFilters(r) {
     if (form.category_id && String(r.category_id) !== String(form.category_id)) return false;
     if (form.service_id && String(r.service_id) !== String(form.service_id)) return false;
     if (form.source && r.source !== form.source) return false;
-    if (form.method && r.payment_method !== form.method) return false;
+    if (form.method && r.record_type === 'payment' && r.payment_method !== form.method) return false;
     if (form.status && r.status !== form.status) return false;
     return true;
 }

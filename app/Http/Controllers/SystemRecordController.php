@@ -267,9 +267,8 @@ class SystemRecordController extends Controller
             ->when($advanced['category_id'] ?? null, fn ($q, $v) => $q->where('svc.category_id', $v))
             ->when($advanced['service_id'] ?? null, fn ($q, $v) => $q->where('svc.id', $v))
             ->when($advanced['source'] ?? null, fn ($q, $v) => $q->where('p.source', $v))
-            // Payments carry a "phương thức" (cash/transfer/...); service rows have none, so
-            // picking a method filter excludes the whole service side of the union.
-            ->when($advanced['method'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
+            // Method filter only narrows down payment rows — service rows have no payment method
+            // and stay visible regardless of what's picked here.
             ->when($advanced['status'] ?? null, fn ($q, $v) => ($advanced['status_domain'] ?? null) === 'service'
                 ? $q->where('ti.status', $v)
                 : $q->whereRaw('1 = 0'))
