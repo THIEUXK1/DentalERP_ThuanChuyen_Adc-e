@@ -107,6 +107,32 @@ class SystemRecordController extends Controller
         return Excel::download(new SystemRecordExport($rows), $filename);
     }
 
+    /**
+     * All payments ever made against the given treatment plans, ignoring any date filter —
+     * backs the "Tiền thu đầy đủ theo KHDT" toggle in Index.vue: once switched on, the table
+     * needs to show payment rows for the visible KHDTs even when those payments landed outside
+     * the picked date window, not just fold their total into the summary bar.
+     */
+    public function planPayments(Request $request): \Illuminate\Http\JsonResponse
+    {
+        $planIds = collect($request->input('plan_ids', []))
+            ->map(fn ($v) => (int) $v)->filter()->unique()->values()->all();
+
+        if (empty($planIds)) {
+            return response()->json([]);
+        }
+
+        $branchId = $this->resolveBranchId($request, auth()->user());
+
+        $rows = $this->paymentQuery($branchId, null, null, null, null)
+            ->whereIn('pay_plan.id', $planIds)
+            ->orderByDesc('pay.payment_date')
+            ->limit(2000)
+            ->get();
+
+        return response()->json($rows->map(fn ($row) => $this->normalizeRow($row))->values());
+    }
+
     /** Non-admins are pinned to their own branch; admins/owners may pick one via the branch_id filter. */
     private function resolveBranchId(Request $request, $user): ?int
     {
@@ -273,6 +299,7 @@ class SystemRecordController extends Controller
                 'svc.category_id as category_id',
                 'svc.id as service_id',
                 'p.source as source',
+                'tp.id as plan_id',
             ]);
     }
 
@@ -345,6 +372,7 @@ class SystemRecordController extends Controller
                 DB::raw('CAST(NULL AS integer) as category_id'),
                 DB::raw('CAST(NULL AS integer) as service_id'),
                 'p.source as source',
+                'pay_plan.id as plan_id',
             ]);
     }
 
@@ -390,6 +418,7 @@ class SystemRecordController extends Controller
             'reference_code' => $row->reference_code,
             'reference_type' => $row->reference_type,
             'reference_id' => $row->reference_id,
+            'plan_id' => $row->plan_id,
         ];
     }
 }

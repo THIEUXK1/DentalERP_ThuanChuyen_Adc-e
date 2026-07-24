@@ -97,6 +97,9 @@ Route::get('/system-records', [SystemRecordController::class, 'index'])
 Route::get('/system-records/export', [SystemRecordController::class, 'exportExcel'])
     ->middleware(['auth', 'verified', 'can:reports.financial'])
     ->name('system-records.export');
+Route::get('/system-records/plan-payments', [SystemRecordController::class, 'planPayments'])
+    ->middleware(['auth', 'verified', 'can:reports.financial'])
+    ->name('system-records.plan-payments');
 
 // Reports
 Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function () {

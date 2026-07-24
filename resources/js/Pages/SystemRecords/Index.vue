@@ -173,8 +173,18 @@
                 <span class="text-gray-600">Đơn giá × SL: <strong class="text-gray-800 tabular-nums">{{ fmt(totals.gross) }}</strong></span>
                 <span class="text-gray-600">Khuyến mại: <strong class="text-orange-600 tabular-nums">{{ fmt(totals.discount) }}</strong></span>
                 <span class="text-gray-600">Thành tiền dịch vụ: <strong class="tabular-nums" :class="totals.service_amount < 0 ? 'text-red-600' : 'text-gray-800'">{{ fmt(totals.service_amount) }}</strong></span>
-                <span class="text-gray-600">Tiền thu: <strong class="text-emerald-700 tabular-nums">{{ fmt(totals.payment_collected) }}</strong></span>
-                <span class="text-gray-600">Tiền hoàn: <strong class="text-red-600 tabular-nums">{{ fmt(totals.payment_refunded) }}</strong></span>
+                <span class="text-gray-600">Tiền thu{{ showPlanTotals ? ' (theo KHDT)' : '' }}: <strong class="text-emerald-700 tabular-nums">{{ fmt(totals.payment_collected) }}</strong></span>
+                <span class="text-gray-600">Tiền hoàn{{ showPlanTotals ? ' (theo KHDT)' : '' }}: <strong class="text-red-600 tabular-nums">{{ fmt(totals.payment_refunded) }}</strong></span>
+                <label class="ml-auto flex items-center gap-2 cursor-pointer select-none" title="Khi bật: hiển thị thêm mọi khoản thanh toán của các KHDT đang có trong danh sách, kể cả những khoản thu nằm ngoài khoảng ngày đang lọc.">
+                    <span class="text-xs font-medium text-gray-500">
+                        Tiền thu đầy đủ theo KHDT
+                        <span v-if="loadingPlanPayments" class="text-gray-400">(đang tải...)</span>
+                    </span>
+                    <button type="button" role="switch" :aria-checked="showPlanTotals" @click="showPlanTotals = !showPlanTotals"
+                        :class="['relative inline-flex h-5 w-9 items-center rounded-full transition-colors', showPlanTotals ? 'bg-emerald-500' : 'bg-gray-300']">
+                        <span :class="['inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform', showPlanTotals ? 'translate-x-5' : 'translate-x-1']" />
+                    </button>
+                </label>
             </div>
 
             <!-- Table -->
@@ -206,8 +216,12 @@
                             <tr v-if="pagedRecords.length === 0">
                                 <td colspan="17" class="px-4 py-12 text-center text-gray-400">Không có dữ liệu</td>
                             </tr>
-                            <tr v-for="r in pagedRecords" :key="r.id" class="hover:bg-gray-50 transition-colors">
-                                <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ formatDate(r.record_date) }}</td>
+                            <tr v-for="r in pagedRecords" :key="r.id"
+                                :class="['hover:bg-gray-50 transition-colors', isOutsideDateFilter(r) ? 'bg-amber-50/60' : '']">
+                                <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">
+                                    {{ formatDate(r.record_date) }}
+                                    <span v-if="isOutsideDateFilter(r)" class="text-amber-500" title="Nằm ngoài khoảng ngày đang lọc — hiển thị do bật &quot;Tiền thu đầy đủ theo KHDT&quot;">●</span>
+                                </td>
                                 <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ r.record_time ?? '—' }}</td>
                                 <td class="px-3 py-2.5">
                                     <Link v-if="r.patient_id" :href="route('patients.show', r.patient_id)"
@@ -459,7 +473,47 @@ function matchesFilters(r) {
     return true;
 }
 
-const filteredRecords = computed(() => props.records.filter(matchesFilters));
+// When on, pulls in every payment ever made against the KHDTs currently in view — even payments
+// dated outside the picked date range — via a separate request, and merges them into the table.
+// Off: only the payment rows the server already loaded for the date window are shown, as before.
+const showPlanTotals = ref(false);
+const extraPaymentRows = ref([]);
+const loadingPlanPayments = ref(false);
+
+async function fetchExtraPayments() {
+    const planIds = [...new Set(props.records.map(r => r.plan_id).filter(Boolean))];
+    if (planIds.length === 0) { extraPaymentRows.value = []; return; }
+
+    loadingPlanPayments.value = true;
+    try {
+        const { data } = await axios.get(route('system-records.plan-payments'), {
+            params: { plan_ids: planIds, branch_id: form.branch_id || undefined },
+        });
+        extraPaymentRows.value = data;
+    } finally {
+        loadingPlanPayments.value = false;
+    }
+}
+
+watch(showPlanTotals, (on) => { if (on) fetchExtraPayments(); });
+watch(() => props.records, () => { if (showPlanTotals.value) fetchExtraPayments(); });
+
+// Merge in only rows not already present in the date-windowed payload, so a payment inside
+// the current filter isn't duplicated once the full-history fetch comes back.
+const baseRecords = computed(() => {
+    if (!showPlanTotals.value || extraPaymentRows.value.length === 0) return props.records;
+    const existingIds = new Set(props.records.map(r => r.id));
+    return [...props.records, ...extraPaymentRows.value.filter(r => !existingIds.has(r.id))];
+});
+
+function isOutsideDateFilter(r) {
+    if (!showPlanTotals.value) return false;
+    if (form.date_from && r.record_date < form.date_from) return true;
+    if (form.date_to && r.record_date > form.date_to) return true;
+    return false;
+}
+
+const filteredRecords = computed(() => baseRecords.value.filter(matchesFilters));
 
 const totals = computed(() => {
     const t = { quantity: 0, discount: 0, gross: 0, service_amount: 0, payment_collected: 0, payment_refunded: 0 };
