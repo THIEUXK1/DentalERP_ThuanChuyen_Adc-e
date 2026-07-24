@@ -185,7 +185,7 @@ class SystemRecordController extends Controller
             $serviceYears = DB::table('treatment_plan_items as ti')
                 ->join('treatment_plans as tp', 'ti.treatment_plan_id', '=', 'tp.id')
                 ->whereIn('tp.status', ['approved', 'in_progress', 'completed'])
-                ->selectRaw('DISTINCT EXTRACT(YEAR FROM COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at))::int as y')
+                ->selectRaw('DISTINCT EXTRACT(YEAR FROM COALESCE(tp.start_date, ti.completed_at, ti.started_at, tp.approved_at, tp.created_at))::int as y')
                 ->pluck('y');
 
             $paymentYears = DB::table('patient_payments')
@@ -211,13 +211,13 @@ class SystemRecordController extends Controller
             ->whereIn('tp.status', ['approved', 'in_progress', 'completed'])
             ->when($branchId, fn ($q) => $q->where('tp.branch_id', $branchId))
             ->when($dateFrom, fn ($q) => $q->whereRaw(
-                'COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at) >= ?', [$dateFrom]
+                'COALESCE(tp.start_date, ti.completed_at, ti.started_at, tp.approved_at, tp.created_at) >= ?', [$dateFrom]
             ))
             ->when($dateTo, fn ($q) => $q->whereRaw(
-                'COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at) <= ?', [$dateTo.' 23:59:59']
+                'COALESCE(tp.start_date, ti.completed_at, ti.started_at, tp.approved_at, tp.created_at) <= ?', [$dateTo.' 23:59:59']
             ))
             ->when($year, fn ($q) => $q->whereRaw(
-                'EXTRACT(YEAR FROM COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at)) = ?', [$year]
+                'EXTRACT(YEAR FROM COALESCE(tp.start_date, ti.completed_at, ti.started_at, tp.approved_at, tp.created_at)) = ?', [$year]
             ))
             ->when($search, fn ($q) => $q->where(function ($w) use ($search) {
                 $like = "%{$search}%";
@@ -246,8 +246,8 @@ class SystemRecordController extends Controller
             ->select([
                 DB::raw("'service' as record_type"),
                 'ti.id as row_id',
-                DB::raw('CAST(COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at) AS date) as record_date'),
-                DB::raw("TO_CHAR(COALESCE(ti.completed_at, ti.started_at, tp.approved_at, tp.created_at), 'HH24:MI') as record_time"),
+                DB::raw('CAST(COALESCE(tp.start_date, ti.completed_at, ti.started_at, tp.approved_at, tp.created_at) AS date) as record_date'),
+                DB::raw("TO_CHAR(COALESCE(tp.start_date, ti.completed_at, ti.started_at, tp.approved_at, tp.created_at), 'HH24:MI') as record_time"),
                 'p.id as patient_id',
                 'p.code as patient_code',
                 'p.full_name as patient_name',
@@ -282,7 +282,9 @@ class SystemRecordController extends Controller
             ->join('patient_invoices as inv', 'pay.invoice_id', '=', 'inv.id')
             ->join('patients as p', 'inv.patient_id', '=', 'p.id')
             ->leftJoin('branches as br', 'inv.branch_id', '=', 'br.id')
+            ->leftJoin('treatment_plans as pay_plan', 'inv.treatment_plan_id', '=', 'pay_plan.id')
             ->leftJoin('employees as pay_doc', 'pay.doctor_id', '=', 'pay_doc.id')
+            ->leftJoin('employees as pay_plan_doc', 'pay_plan.doctor_id', '=', 'pay_plan_doc.id')
             ->when($branchId, fn ($q) => $q->where('inv.branch_id', $branchId))
             ->when($dateFrom, fn ($q) => $q->where('pay.payment_date', '>=', $dateFrom))
             ->when($dateTo, fn ($q) => $q->where('pay.payment_date', '<=', $dateTo))
@@ -296,7 +298,9 @@ class SystemRecordController extends Controller
                     ->orWhere('pay.reference', 'ilike', $like);
             }))
             ->when($advanced['patient_name'] ?? null, fn ($q, $v) => $q->where('p.full_name', 'ilike', "%{$v}%"))
-            ->when($advanced['doctor_id'] ?? null, fn ($q, $v) => $q->where('pay.doctor_id', $v))
+            ->when($advanced['doctor_id'] ?? null, fn ($q, $v) => $q->whereRaw(
+                'COALESCE(pay.doctor_id, pay_plan.doctor_id) = ?', [$v]
+            ))
             // Payments have no consultant/assistant — filtering by either should exclude payment rows entirely.
             ->when($advanced['consultant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
             ->when($advanced['assistant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
@@ -327,7 +331,7 @@ class SystemRecordController extends Controller
                 DB::raw('CAST(NULL AS bigint) as discount'),
                 'pay.amount as amount',
                 DB::raw("(CASE WHEN pay.amount < 0 THEN 'refund' ELSE 'paid' END) as status_raw"),
-                'pay_doc.full_name as doctor_name',
+                DB::raw('COALESCE(pay_doc.full_name, pay_plan_doc.full_name) as doctor_name'),
                 DB::raw('CAST(NULL AS varchar) as consultant_name'),
                 DB::raw('CAST(NULL AS varchar) as assistant_name'),
                 'inv.branch_id as branch_id',
@@ -335,7 +339,7 @@ class SystemRecordController extends Controller
                 'inv.code as reference_code',
                 DB::raw("'invoice' as reference_type"),
                 'inv.id as reference_id',
-                'pay.doctor_id as doctor_id',
+                DB::raw('COALESCE(pay.doctor_id, pay_plan.doctor_id) as doctor_id'),
                 DB::raw('CAST(NULL AS integer) as consultant_id'),
                 DB::raw('CAST(NULL AS integer) as assistant_id'),
                 DB::raw('CAST(NULL AS integer) as category_id'),
