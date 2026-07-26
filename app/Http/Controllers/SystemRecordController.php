@@ -316,6 +316,22 @@ class SystemRecordController extends Controller
             ->leftJoin('treatment_plans as pay_plan', 'inv.treatment_plan_id', '=', 'pay_plan.id')
             ->leftJoin('employees as pay_doc', 'pay.doctor_id', '=', 'pay_doc.id')
             ->leftJoin('employees as pay_plan_doc', 'pay_plan.doctor_id', '=', 'pay_plan_doc.id')
+            // Last-resort fallback when neither the payment nor the plan itself has a doctor
+            // tagged: if every item on the plan that *does* name a doctor names the same one,
+            // it's unambiguous who treated the patient, so use that doctor rather than showing
+            // blank. Plans with items split across multiple doctors stay NULL — attributing a
+            // payment to the "wrong" one of several doctors would be worse than leaving it blank.
+            ->leftJoinSub(
+                DB::table('treatment_plan_items')
+                    ->select('treatment_plan_id')
+                    ->selectRaw('MAX(responsible_doctor_id) as sole_doctor_id')
+                    ->whereNotNull('responsible_doctor_id')
+                    ->groupBy('treatment_plan_id')
+                    ->havingRaw('COUNT(DISTINCT responsible_doctor_id) = 1'),
+                'plan_item_doc',
+                'plan_item_doc.treatment_plan_id', '=', 'pay_plan.id'
+            )
+            ->leftJoin('employees as plan_item_doc_emp', 'plan_item_doc.sole_doctor_id', '=', 'plan_item_doc_emp.id')
             // Refunds (negative amount) aren't shown on System Records — only actual money collected.
             ->where('pay.amount', '>', 0)
             ->when($branchId, fn ($q) => $q->where('inv.branch_id', $branchId))
@@ -332,7 +348,7 @@ class SystemRecordController extends Controller
             }))
             ->when($advanced['patient_name'] ?? null, fn ($q, $v) => $q->where('p.full_name', 'ilike', "%{$v}%"))
             ->when($advanced['doctor_id'] ?? null, fn ($q, $v) => $q->whereRaw(
-                'COALESCE(pay.doctor_id, pay_plan.doctor_id) = ?', [$v]
+                'COALESCE(pay.doctor_id, pay_plan.doctor_id, plan_item_doc.sole_doctor_id) = ?', [$v]
             ))
             // Payments have no consultant/assistant — filtering by either should exclude payment rows entirely.
             ->when($advanced['consultant_id'] ?? null, fn ($q) => $q->whereRaw('1 = 0'))
@@ -365,7 +381,7 @@ class SystemRecordController extends Controller
                 DB::raw('CAST(NULL AS bigint) as discount'),
                 'pay.amount as amount',
                 DB::raw("'paid' as status_raw"),
-                DB::raw('COALESCE(pay_doc.full_name, pay_plan_doc.full_name) as doctor_name'),
+                DB::raw('COALESCE(pay_doc.full_name, pay_plan_doc.full_name, plan_item_doc_emp.full_name) as doctor_name'),
                 DB::raw('CAST(NULL AS varchar) as consultant_name'),
                 DB::raw('CAST(NULL AS varchar) as assistant_name'),
                 'inv.branch_id as branch_id',
@@ -373,7 +389,7 @@ class SystemRecordController extends Controller
                 'inv.code as reference_code',
                 DB::raw("'invoice' as reference_type"),
                 'inv.id as reference_id',
-                DB::raw('COALESCE(pay.doctor_id, pay_plan.doctor_id) as doctor_id'),
+                DB::raw('COALESCE(pay.doctor_id, pay_plan.doctor_id, plan_item_doc.sole_doctor_id) as doctor_id'),
                 DB::raw('CAST(NULL AS integer) as consultant_id'),
                 DB::raw('CAST(NULL AS integer) as assistant_id'),
                 DB::raw('CAST(NULL AS integer) as category_id'),
