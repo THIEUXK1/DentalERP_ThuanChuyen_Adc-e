@@ -107,7 +107,8 @@ import {
     ArrowTrendingDownIcon,
     SparklesIcon,
     TagIcon,
-    ChevronDownIcon
+    ChevronDownIcon,
+    ServerIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -236,6 +237,7 @@ const iconMap = {
     'lab-payable': CreditCardIcon,
     'role': ShieldCheckIcon,
     'settings': Cog6ToothIcon,
+    'server-status': ServerIcon,
     'audit-log': ClockIcon
 };
 

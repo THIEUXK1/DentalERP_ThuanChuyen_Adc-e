@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\ClinicRecordController;
 use App\Http\Controllers\Admin\DataRestoreController;
 use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\ServerStatusController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Cashier\DebtController;
@@ -150,6 +151,8 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::post('data-restore/{activity}/restore', [DataRestoreController::class, 'restore'])->name('data-restore.restore')->middleware('can:admin.audit_log');
     Route::get('settings', [SettingController::class, 'index'])->name('settings.index')->middleware('can:settings.view');
     Route::post('settings', [SettingController::class, 'update'])->name('settings.update')->middleware('can:settings.manage');
+    Route::get('server-status', [ServerStatusController::class, 'index'])->name('server-status.index')->middleware('can:settings.view');
+    Route::get('server-status/data', [ServerStatusController::class, 'data'])->name('server-status.data')->middleware('can:settings.view');
     Route::get('clinic-records', [ClinicRecordController::class, 'index'])->name('clinic-records.index')->middleware('can:admin.audit_log');
     Route::get('clinic-records/template', [ClinicRecordController::class, 'downloadTemplate'])->name('clinic-records.template')->middleware('can:admin.audit_log');
     Route::post('clinic-records/preview', [ClinicRecordController::class, 'previewImport'])->name('clinic-records.preview')->middleware('can:admin.audit_log');
