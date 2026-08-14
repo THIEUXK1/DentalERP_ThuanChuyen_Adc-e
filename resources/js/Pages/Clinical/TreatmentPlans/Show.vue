@@ -249,18 +249,18 @@
                                         <span v-else class="text-gray-300">—</span>
                                     </td>
                                     <td class="px-4 py-3 text-right font-semibold text-gray-800 tabular-nums">{{ formatVnd(item.quantity * item.unit_price - (item.discount ?? 0)) }}</td>
-                                    <td class="px-4 py-3 text-center">
-                                        <!-- Inline status radio for in_progress plans -->
-                                        <div v-if="plan.status === 'in_progress' && item.status !== 'completed'" class="flex gap-1 justify-center flex-wrap">
-                                            <button v-for="st in itemStatuses" :key="st.value"
-                                                :class="['text-xs px-2 py-0.5 rounded-full border transition-colors',
-                                                    item.status === st.value
-                                                        ? st.activeClass
-                                                        : 'border-gray-200 text-gray-400 hover:border-gray-300']"
-                                                @click="changeItemStatus(item.id, st.value)">
-                                                {{ st.label }}
-                                            </button>
-                                        </div>
+                                    <td class="px-4 py-3 text-center" @click.stop>
+                                        <!-- Đổi nhanh trạng thái từng dịch vụ -->
+                                        <button v-if="can('treatment_plans.edit')"
+                                            :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-50',
+                                                itemStatusClass(item.status)]"
+                                            :disabled="itemStatusSaving[item.id]"
+                                            @click="openItemMenu(item, $event)">
+                                            {{ item.status_label }}
+                                            <svg class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                            </svg>
+                                        </button>
                                         <StatusBadge v-else :color="item.status_color">{{ item.status_label }}</StatusBadge>
                                     </td>
                                     <td class="px-4 py-3 text-right whitespace-nowrap">
@@ -546,9 +546,19 @@
                             <!-- Body -->
                             <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
 
-                                <!-- Status badge (readonly) -->
-                                <div class="flex items-center gap-2">
-                                    <StatusBadge :color="detailItem.status_color">{{ detailItem.status_label }}</StatusBadge>
+                                <!-- Status badge (đổi nhanh được, như ngoài bảng) -->
+                                <div class="flex items-center gap-2" @click.stop>
+                                    <button v-if="can('treatment_plans.edit')"
+                                        :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-50',
+                                            itemStatusClass(detailItem.status)]"
+                                        :disabled="itemStatusSaving[detailItem.id]"
+                                        @click="openItemMenu(detailItem, $event)">
+                                        {{ detailItem.status_label }}
+                                        <svg class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <StatusBadge v-else :color="detailItem.status_color">{{ detailItem.status_label }}</StatusBadge>
                                 </div>
 
                                 <!-- Row: SL + Đơn giá -->
@@ -813,11 +823,28 @@
                 </div>
             </div>
         </Teleport>
+
+        <!-- Menu đổi nhanh trạng thái dịch vụ (z cao hơn modal chi tiết) -->
+        <Teleport to="body">
+            <div v-if="itemMenu"
+                class="fixed z-[60] bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]"
+                :style="{ left: itemMenu.x + 'px', top: itemMenu.y + 'px' }"
+                @click.stop>
+                <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Chuyển sang</p>
+                <button v-for="st in ITEM_STATUSES" :key="st.value"
+                    @click="changeItemStatus(itemMenu.item.id, st.value)"
+                    :class="['w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 hover:bg-gray-50',
+                        st.value === itemMenu.item.status ? 'text-gray-400' : 'text-gray-700']">
+                    <span :class="['w-2 h-2 rounded-full flex-shrink-0', itemStatusDot(st.value)]"></span>
+                    {{ st.label }}
+                </button>
+            </div>
+        </Teleport>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick } from 'vue';
+import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { Link, useForm, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
@@ -1104,12 +1131,63 @@ async function saveStaff() {
     }
 }
 
-// Item status options for inline change
-const itemStatuses = [
-    { value: 'pending',     label: 'Chờ',       activeClass: 'bg-gray-100 border-gray-300 text-gray-600' },
-    { value: 'in_progress', label: 'Đang làm',  activeClass: 'bg-amber-100 border-amber-300 text-amber-700' },
-    { value: 'completed',   label: 'Xong',       activeClass: 'bg-emerald-100 border-emerald-400 text-emerald-700' },
+// ── Đổi nhanh trạng thái từng dịch vụ ───────────────────────────────────────
+// Giữ đúng thứ tự & nhãn của App\Enums\TreatmentItemStatus.
+const ITEM_STATUSES = [
+    { value: 'pending',     label: 'Chờ' },
+    { value: 'scheduled',   label: 'Đã lên lịch' },
+    { value: 'in_progress', label: 'Đang thực hiện' },
+    { value: 'completed',   label: 'Hoàn thành' },
+    { value: 'cancelled',   label: 'Đã hủy' },
+    { value: 'warranty',    label: 'Bảo hành' },
+    { value: 'redo',        label: 'Làm lại' },
 ];
+
+function itemStatusClass(status) {
+    const map = {
+        pending: 'bg-gray-100 text-gray-600', scheduled: 'bg-blue-100 text-blue-700',
+        in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700',
+        cancelled: 'bg-red-100 text-red-600', warranty: 'bg-purple-100 text-purple-700',
+        redo: 'bg-orange-100 text-orange-700',
+    };
+    return map[status] ?? 'bg-gray-100 text-gray-600';
+}
+function itemStatusDot(status) {
+    const map = {
+        pending: 'bg-gray-400', scheduled: 'bg-blue-500', in_progress: 'bg-amber-500',
+        completed: 'bg-emerald-500', cancelled: 'bg-red-500', warranty: 'bg-purple-500',
+        redo: 'bg-orange-500',
+    };
+    return map[status] ?? 'bg-gray-400';
+}
+
+// Menu được teleport ra body + position: fixed vì khung bảng có overflow-hidden/overflow-x-auto
+// sẽ cắt mất dropdown absolute.
+const itemMenu         = ref(null);
+const itemStatusSaving = reactive({});
+const MENU_WIDTH       = 170;
+
+function openItemMenu(item, event) {
+    if (itemMenu.value?.item.id === item.id) { closeItemMenu(); return; }
+    const rect = event.currentTarget.getBoundingClientRect();
+    itemMenu.value = {
+        item,
+        x: Math.max(8, Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8)),
+        y: rect.bottom + 4,
+    };
+}
+function closeItemMenu() { itemMenu.value = null; }
+
+onMounted(() => {
+    document.addEventListener('click', closeItemMenu);
+    window.addEventListener('scroll', closeItemMenu, true);
+    window.addEventListener('resize', closeItemMenu);
+});
+onUnmounted(() => {
+    document.removeEventListener('click', closeItemMenu);
+    window.removeEventListener('scroll', closeItemMenu, true);
+    window.removeEventListener('resize', closeItemMenu);
+});
 
 // Payment schedule
 const schedule         = ref(plan.payment_schedule ?? []);
@@ -1199,11 +1277,22 @@ async function completeItem(id) {
 }
 
 async function changeItemStatus(id, status) {
+    closeItemMenu();
+    if (itemStatusSaving[id]) return;
+
+    itemStatusSaving[id] = true;
     try {
         const { data } = await axios.patch(route('clinical.treatment-plan-items.update-status', id), { status });
         applyPayload(data);
+        // applyPayload thay mới cả mảng items, nên panel chi tiết đang mở phải trỏ lại
+        // vào object mới, không thì vẫn hiện trạng thái cũ.
+        if (detailItem.value?.id === id) {
+            detailItem.value = items.value.find(i => i.id === id) ?? null;
+        }
     } catch (err) {
         reportError(err, 'Không thể cập nhật trạng thái.');
+    } finally {
+        itemStatusSaving[id] = false;
     }
 }
 

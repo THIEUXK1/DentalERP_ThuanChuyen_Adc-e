@@ -206,10 +206,18 @@
                                     <span v-else class="text-gray-300">—</span>
                                 </td>
                                 <td class="px-4 py-2 text-right tabular-nums font-semibold text-gray-800">{{ fmt(item.unit_price * item.quantity - (item.discount ?? 0)) }}</td>
-                                <td class="px-4 py-2 text-center">
-                                    <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', itemStatusClass(item.status)]">
+                                <td class="px-4 py-2 text-center" @click.stop>
+                                    <button
+                                        :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-50',
+                                            itemStatusClass(item.status)]"
+                                        :disabled="itemStatusSaving[item.id]"
+                                        @click="openItemMenu(item, $event)">
                                         {{ item.status_label }}
-                                    </span>
+                                        <svg class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <p v-if="itemStatusErrors[item.id]" class="text-red-500 mt-1">{{ itemStatusErrors[item.id] }}</p>
                                 </td>
                             </tr>
                             <tr v-if="plan.items.length > 0" class="bg-gray-50 border-t border-gray-200">
@@ -224,6 +232,23 @@
             </div>
         </div>
     </div>
+
+    <!-- Item status quick-change menu (teleported: the table wrapper has overflow-x-auto và sẽ cắt mất dropdown) -->
+    <Teleport to="body">
+        <div v-if="itemMenu"
+            class="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]"
+            :style="{ left: itemMenu.x + 'px', top: itemMenu.y + 'px' }"
+            @click.stop>
+            <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Chuyển sang</p>
+            <button v-for="s in ITEM_STATUSES" :key="s.value"
+                @click="setItemStatus(itemMenu.item, s.value)"
+                :class="['w-full text-left px-3 py-2 text-xs font-medium flex items-center gap-2 hover:bg-gray-50',
+                    s.value === itemMenu.item.status ? 'text-gray-400' : 'text-gray-700']">
+                <span :class="['w-2 h-2 rounded-full flex-shrink-0', itemStatusDot(s.value)]"></span>
+                {{ s.label }}
+            </button>
+        </div>
+    </Teleport>
 
     <!-- Delete confirm modal -->
     <DeleteConfirmModal
@@ -254,16 +279,23 @@ let timer = null;
 onMounted(() => {
     timer = setInterval(() => { now.value = Date.now(); }, 1000);
     document.addEventListener('click', closeDropdown);
+    window.addEventListener('scroll', closeItemMenu, true);
+    window.addEventListener('resize', closeItemMenu);
 });
 onUnmounted(() => {
     clearInterval(timer);
     document.removeEventListener('click', closeDropdown);
+    window.removeEventListener('scroll', closeItemMenu, true);
+    window.removeEventListener('resize', closeItemMenu);
 });
 
 // Status transition dropdown
 const openDropdown = ref(null);
-function toggleDropdown(planId) { openDropdown.value = openDropdown.value === planId ? null : planId; }
-function closeDropdown() { openDropdown.value = null; }
+function toggleDropdown(planId) {
+    closeItemMenu();
+    openDropdown.value = openDropdown.value === planId ? null : planId;
+}
+function closeDropdown() { openDropdown.value = null; closeItemMenu(); }
 function doTransition(planId, status) {
     openDropdown.value = null;
     router.post(route('clinical.treatment-plans.transition', planId), { status }, { preserveScroll: true });
@@ -450,7 +482,72 @@ function stageDot(status) {
     return 'bg-gray-400';
 }
 function itemStatusClass(status) {
-    const map = { pending: 'bg-gray-100 text-gray-600', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600' };
+    const map = {
+        pending: 'bg-gray-100 text-gray-600', scheduled: 'bg-blue-100 text-blue-700',
+        in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700',
+        cancelled: 'bg-red-100 text-red-600', warranty: 'bg-purple-100 text-purple-700',
+        redo: 'bg-orange-100 text-orange-700',
+    };
     return map[status] ?? 'bg-gray-100 text-gray-600';
+}
+function itemStatusDot(status) {
+    const map = {
+        pending: 'bg-gray-400', scheduled: 'bg-blue-500', in_progress: 'bg-amber-500',
+        completed: 'bg-emerald-500', cancelled: 'bg-red-500', warranty: 'bg-purple-500',
+        redo: 'bg-orange-500',
+    };
+    return map[status] ?? 'bg-gray-400';
+}
+
+// ── Đổi nhanh trạng thái từng dịch vụ / thủ thuật ───────────────────────────
+// Giữ đúng thứ tự & nhãn của App\Enums\TreatmentItemStatus.
+const ITEM_STATUSES = [
+    { value: 'pending',     label: 'Chờ' },
+    { value: 'scheduled',   label: 'Đã lên lịch' },
+    { value: 'in_progress', label: 'Đang thực hiện' },
+    { value: 'completed',   label: 'Hoàn thành' },
+    { value: 'cancelled',   label: 'Đã hủy' },
+    { value: 'warranty',    label: 'Bảo hành' },
+    { value: 'redo',        label: 'Làm lại' },
+];
+
+const itemMenu = ref(null);
+const itemStatusSaving = reactive({});
+const itemStatusErrors = reactive({});
+
+const MENU_WIDTH = 170;
+function openItemMenu(item, event) {
+    if (itemMenu.value?.item.id === item.id) { closeItemMenu(); return; }
+    openDropdown.value = null;
+    const rect = event.currentTarget.getBoundingClientRect();
+    itemMenu.value = {
+        item,
+        x: Math.max(8, Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8)),
+        y: rect.bottom + 4,
+    };
+}
+function closeItemMenu() { itemMenu.value = null; }
+
+// Như saveDate: gọi axios để chỉ cập nhật state cục bộ, không re-render lại cả trang.
+async function setItemStatus(item, status) {
+    closeItemMenu();
+    if (item.status === status || itemStatusSaving[item.id]) return;
+
+    const prev = { status: item.status, label: item.status_label };
+    item.status = status;
+    item.status_label = ITEM_STATUSES.find(s => s.value === status)?.label ?? status;
+    itemStatusSaving[item.id] = true;
+    itemStatusErrors[item.id] = '';
+    try {
+        await axios.patch(route('clinical.treatment-plan-items.update-status', item.id), { status });
+    } catch (err) {
+        item.status = prev.status;
+        item.status_label = prev.label;
+        itemStatusErrors[item.id] = err.response?.data?.errors?.status?.[0]
+            ?? err.response?.data?.message
+            ?? 'Không đổi được trạng thái, vui lòng thử lại.';
+    } finally {
+        itemStatusSaving[item.id] = false;
+    }
 }
 </script>
