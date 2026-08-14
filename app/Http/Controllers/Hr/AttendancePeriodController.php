@@ -124,7 +124,13 @@ class AttendancePeriodController extends Controller
 
         $employees = Employee::with('department')
             ->where('is_active', true)->orderBy('full_name')->get()
-            ->map(fn ($e) => ['id' => $e->id, 'code' => $e->code, 'full_name' => $e->full_name, 'position' => $e->position ?? ''])
+            ->map(fn ($e) => [
+                'id' => $e->id,
+                'code' => $e->code,
+                'full_name' => $e->full_name,
+                'position' => $e->position ?? '',
+                'department' => $e->department?->name ?? '',
+            ])
             ->values()->all();
 
         $filename = "bang-cham-cong-{$attendance->code}.xlsx";

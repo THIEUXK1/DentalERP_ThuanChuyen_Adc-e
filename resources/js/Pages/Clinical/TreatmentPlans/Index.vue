@@ -9,12 +9,12 @@
                     <span class="ml-1.5 text-sm font-normal text-gray-400">({{ filtered.length }})</span>
                 </h2>
                 <div class="flex items-center gap-2">
-                    <button @click="exportCsv"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">
+                    <button @click="exportExcel" :disabled="exporting"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-emerald-200 bg-emerald-50 rounded-lg hover:bg-emerald-100 text-emerald-700 font-medium disabled:opacity-50">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        Xuất CSV
+                        {{ exporting ? 'Đang xuất…' : 'Xuất Excel' }}
                     </button>
                     <!-- View toggle -->
                     <div class="flex border border-gray-200 rounded-lg overflow-hidden">
@@ -371,6 +371,7 @@ import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
+import { exportTableToExcel } from '@/utils/exportExcel';
 
 const SortIcon = {
     props: ['field', 'current', 'dir'],
@@ -602,18 +603,57 @@ function clearFilters() {
 }
 
 // ── Export CSV ─────────────────────────────────────────────────────────────────
-function exportCsv() {
-    const headers = ['Mã KH','Khách hàng','Bác sĩ','Chi nhánh','Giá trị KH','Tổng lịch TT','Số đợt','Trạng thái','Ngày điều trị','Ngày tạo'];
-    const rows = sorted.value.map(p => [
-        p.code, p.patient, p.doctor, p.branch,
-        p.net_total, p.payment_schedule_total, p.payment_schedule_count,
-        p.status_label, p.start_date, p.created_at,
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a'); a.href = url;
-    a.download = `ke-hoach-${today}.csv`; a.click();
-    URL.revokeObjectURL(url);
+const exporting = ref(false);
+
+async function exportExcel() {
+    if (exporting.value) return;
+    exporting.value = true;
+
+    // Status chips reuse each row's own colour, so the sheet matches the badges on screen.
+    const colors = {};
+    for (const p of sorted.value) colors[p.status_label] = p.status_color || 'gray';
+
+    const rows = sorted.value.map(p => ({
+        ...p,
+        discount: (p.total_amount ?? 0) - (p.net_total ?? 0),
+        remaining: (p.net_total ?? 0) - (p.payment_schedule_total ?? 0),
+    }));
+
+    try {
+        await exportTableToExcel({
+            heading: 'DANH SÁCH KẾ HOẠCH ĐIỀU TRỊ',
+            subtitle: `${sorted.value.length} kế hoạch`,
+            meta: `Nháp: ${summary.value.draft}   •   Chưa bắt đầu: ${summary.value.notStarted}`
+                + `   •   Đang điều trị: ${summary.value.inProgress}   •   Hoàn thành: ${summary.value.completed}`,
+            filename: `ke-hoach-dieu-tri-${today}`,
+            sheetTitle: 'Kế hoạch điều trị',
+            accent: 'FF4338CA',
+            bands: [
+                { label: 'KẾ HOẠCH', first: 'A', last: 'B', color: 'FF4338CA' },
+                { label: 'KHÁCH HÀNG & PHỤ TRÁCH', first: 'C', last: 'E', color: 'FFB45309' },
+                { label: 'GIÁ TRỊ & LỊCH THANH TOÁN', first: 'F', last: 'K', color: 'FF15803D' },
+                { label: 'THỜI GIAN & TRẠNG THÁI', first: 'L', last: 'O', color: 'FF7E22CE' },
+            ],
+            columns: [
+                { key: 'code',                   label: 'Mã kế hoạch',     type: 'code',   width: 15 },
+                { key: 'patient',                label: 'Khách hàng',      type: 'text',   width: 26, bold: true },
+                { key: 'doctor',                 label: 'Bác sĩ phụ trách', type: 'text',  width: 22 },
+                { key: 'branch',                 label: 'Chi nhánh',       type: 'text',   width: 20 },
+                { key: 'total_amount',           label: 'Tổng giá gốc',    type: 'money',  width: 16, total: true },
+                { key: 'discount',               label: 'Khuyến mại',      type: 'money',  width: 14, total: true },
+                { key: 'net_total',              label: 'Giá trị kế hoạch', type: 'money', width: 16, total: true, bold: true },
+                { key: 'payment_schedule_total', label: 'Tổng lịch thanh toán', type: 'money', width: 17, total: true },
+                { key: 'remaining',              label: 'Chênh lệch',      type: 'money',  width: 14, total: true },
+                { key: 'payment_schedule_count', label: 'Số đợt',          type: 'number', width: 9 },
+                { key: 'start_date',             label: 'Ngày điều trị',   type: 'date',   width: 13 },
+                { key: 'created_at',             label: 'Ngày tạo',        type: 'date',   width: 13 },
+                { key: 'status_label',           label: 'Trạng thái',      type: 'status', width: 18, colors },
+                { key: 'notes',                  label: 'Ghi chú',         type: 'text',   width: 32 },
+            ],
+            rows,
+        });
+    } finally {
+        exporting.value = false;
+    }
 }
 </script>

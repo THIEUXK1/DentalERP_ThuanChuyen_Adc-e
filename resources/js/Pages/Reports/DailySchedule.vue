@@ -15,12 +15,16 @@
                     </p>
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button @click="exportCsv"
+                    <a :href="exportUrl"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white text-sm rounded-xl hover:bg-emerald-700 shadow-sm font-medium">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        Xuất CSV
+                        Xuất Excel
+                    </a>
+                    <button @click="exportCsv"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-xl hover:bg-gray-50 font-medium">
+                        CSV
                     </button>
                     <button @click="printPage"
                         class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 shadow-sm font-medium">
@@ -168,7 +172,8 @@
                                     </td>
                                     <td class="px-4 py-3">
                                         <div class="font-semibold text-gray-900">{{ row.patient }}</div>
-                                        <div class="text-xs text-gray-400 font-mono">{{ row.code }}</div>
+                                        <div class="text-xs text-gray-500">{{ patientMeta(row) || '—' }}</div>
+                                        <div class="text-xs text-gray-400 font-mono">{{ row.patient_code || row.code }}</div>
                                     </td>
                                     <td class="px-4 py-3 text-gray-600">{{ row.patient_phone || '—' }}</td>
                                     <td class="px-4 py-3 text-gray-700">{{ row.service }}</td>
@@ -241,7 +246,8 @@
                                         </td>
                                         <td class="px-4 py-2.5">
                                             <div class="font-semibold text-gray-900">{{ row.patient }}</div>
-                                            <div class="text-xs text-gray-400 font-mono">{{ row.code }}</div>
+                                            <div class="text-xs text-gray-500">{{ patientMeta(row) || '—' }}</div>
+                                            <div class="text-xs text-gray-400 font-mono">{{ row.patient_code || row.code }}</div>
                                         </td>
                                         <td class="px-4 py-2.5 text-gray-600">{{ row.patient_phone || '—' }}</td>
                                         <td class="px-4 py-2.5 text-gray-700">{{ row.service }}</td>
@@ -292,7 +298,7 @@
                             <tr v-for="(row, i) in group.rows" :key="row.id">
                                 <td class="c">{{ i+1 }}</td>
                                 <td class="c mono">{{ row.scheduled_at }}→{{ row.ends_at }}</td>
-                                <td><strong>{{ row.patient }}</strong><br><small class="gray">{{ row.code }}</small></td>
+                                <td><strong>{{ row.patient }}</strong><br><small class="gray">{{ patientMeta(row) }}</small></td>
                                 <td class="mono">{{ row.patient_phone || '—' }}</td>
                                 <td>{{ row.service }}</td>
                                 <td class="c">{{ row.chair }}</td>
@@ -318,7 +324,7 @@
                                 <tr v-for="(row, i) in group.rows" :key="row.id">
                                     <td class="c">{{ i+1 }}</td>
                                     <td class="c mono">{{ row.scheduled_at }}→{{ row.ends_at }}</td>
-                                    <td><strong>{{ row.patient }}</strong><br><small class="gray">{{ row.code }}</small></td>
+                                    <td><strong>{{ row.patient }}</strong><br><small class="gray">{{ patientMeta(row) }}</small></td>
                                     <td class="mono">{{ row.patient_phone || '—' }}</td>
                                     <td>{{ row.service }}</td>
                                     <td class="c">{{ row.chair }}</td>
@@ -471,16 +477,40 @@ const rangeLabel = computed(() => {
 });
 const printTime = computed(() => dayjs().format('HH:mm DD/MM/YYYY'));
 
+// "Nữ · 34 tuổi (1991)" — the compact patient identity line under the name.
+function patientMeta(r) {
+    return [r.patient_gender, r.patient_age != null ? `${r.patient_age} tuổi` : null,
+            r.patient_birth_year ? `(${r.patient_birth_year})` : null].filter(Boolean).join(' · ');
+}
+
+// Server-side Excel export: re-applies the exact filters shown on screen.
+const exportUrl = computed(() => {
+    const q = new URLSearchParams({
+        from: f.value.from,
+        to:   useRange.value ? f.value.to : f.value.from,
+    });
+    if (f.value.branch_id) q.set('branch_id', f.value.branch_id);
+    if (f.value.doctor_id) q.set('doctor_id', f.value.doctor_id);
+    if (f.value.status)    q.set('status', f.value.status);
+    if (f.value.search.trim()) q.set('search', f.value.search.trim());
+    return `${route('reports.daily-schedule.export')}?${q}`;
+});
+
 function printPage() { window.print(); }
 
 // ── CSV export ────────────────────────────────────────────────────
 function exportCsv() {
     const BOM = '﻿';
     const esc = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
-    const headers = ['Ngày','Bác sĩ','Mã lịch','Giờ BĐ','Giờ KT','TL(ph)','Bệnh nhân','SĐT','Dịch vụ','Ghế','Trạng thái','Ghi chú'];
+    const headers = ['Ngày','Thứ','Bác sĩ','Mã lịch','Giờ BĐ','Giờ KT','TL(ph)','Mã BN','Bệnh nhân','Giới tính',
+        'Ngày sinh','Năm sinh','Tuổi','SĐT','Email','Địa chỉ','Nguồn','Dị ứng','Tiền sử bệnh','Liên hệ khẩn cấp',
+        'Dịch vụ','Ghế','Chi nhánh','Trạng thái','Ghi chú'];
     const rows = filtered.value.map(r =>
-        [r.date_label, r.doctor, r.code, r.scheduled_at, r.ends_at, r.duration_minutes,
-         r.patient, r.patient_phone, r.service, r.chair, r.status_label, r.notes].map(esc).join(',')
+        [r.date_label, r.weekday, r.doctor, r.code, r.scheduled_at, r.ends_at, r.duration_minutes,
+         r.patient_code, r.patient, r.patient_gender, r.patient_dob, r.patient_birth_year, r.patient_age,
+         r.patient_phone, r.patient_email, r.patient_address, r.patient_source,
+         r.patient_allergies, r.patient_medical_history, r.patient_emergency_contact,
+         r.service, r.chair, r.branch, r.status_label, r.notes].map(esc).join(',')
     );
     const from = f.value.from, to = useRange.value ? f.value.to : f.value.from;
     const fname = from === to ? `lich-hen-${from}.csv` : `lich-hen-${from}-den-${to}.csv`;

@@ -59,6 +59,7 @@ use App\Http\Controllers\Crm\LeadController;
 use App\Http\Controllers\Crm\PatientController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\SystemRecordController;
+use App\Http\Controllers\TableExportController;
 use App\Http\Controllers\Crm\CareRuleController;
 use App\Http\Controllers\Crm\MessageController;
 use App\Http\Controllers\Hr\CommissionController;
@@ -92,6 +93,10 @@ Route::get('/dashboard/export/pdf', [DashboardController::class, 'exportPdf'])
 Route::get('/dashboard/export/excel', [DashboardController::class, 'exportExcel'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard.export.excel');
+// Styled Excel export for list screens that filter client-side (they post their visible rows).
+Route::post('/export/table', [TableExportController::class, 'table'])
+    ->middleware(['auth', 'verified'])
+    ->name('export.table');
 Route::get('/system-records', [SystemRecordController::class, 'index'])
     ->middleware(['auth', 'verified', 'can:reports.financial'])
     ->name('system-records.index');
@@ -107,6 +112,7 @@ Route::middleware(['auth'])->prefix('reports')->name('reports.')->group(function
     Route::get('revenue', [ReportController::class, 'revenue'])->name('revenue')->middleware('can:reports.financial');
     Route::get('appointments', [ReportController::class, 'appointments'])->name('appointments')->middleware('can:reports.view');
     Route::get('daily-schedule', [ReportController::class, 'dailySchedule'])->name('daily-schedule')->middleware('can:reports.view');
+    Route::get('daily-schedule/export', [ReportController::class, 'dailyScheduleExport'])->name('daily-schedule.export')->middleware('can:reports.view');
     Route::get('debt', [ReportController::class, 'debt'])->name('debt')->middleware('can:reports.financial');
     Route::get('crm', [ReportController::class, 'crm'])->name('crm')->middleware('can:reports.view');
     Route::get('profit-loss', [ReportController::class, 'profitLoss'])->name('profit-loss')->middleware('can:reports.financial');

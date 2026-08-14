@@ -10,12 +10,12 @@
                 </h2>
                 <div class="flex items-center gap-2">
                     <!-- Export CSV -->
-                    <button @click="exportCsv"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 font-medium">
+                    <button @click="exportExcel" :disabled="exporting"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs border border-emerald-200 bg-emerald-50 rounded-lg hover:bg-emerald-100 text-emerald-700 font-medium disabled:opacity-50">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                         </svg>
-                        Xuất CSV
+                        {{ exporting ? 'Đang xuất…' : 'Xuất Excel' }}
                     </button>
                     <!-- View toggle -->
                     <div class="flex border border-gray-200 rounded-lg overflow-hidden">
@@ -436,6 +436,7 @@ import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
 import { useCurrency } from '@/composables/useCurrency';
+import { exportTableToExcel } from '@/utils/exportExcel';
 
 // ── Inline sort icon component ──────────────────────────────────────────────
 const SortIcon = {
@@ -744,29 +745,57 @@ function clearFilters() {
     activePreset.value       = '';
 }
 
-// ── Export CSV ─────────────────────────────────────────────────────────────────
-function exportCsv() {
-    const headers = ['Mã HĐ','Khách hàng','SĐT','Kế hoạch','Đợt','Đến hạn','Tổng tiền','Đã TT','Còn nợ','Trạng thái','Chi nhánh'];
-    const rows = sorted.value.map(i => [
-        i.code,
-        i.patient,
-        i.patient_phone,
-        i.treatment_plan_code || '',
-        i.installment_index !== null && i.installment_index !== undefined ? `Đợt ${i.installment_index + 1}` : '',
-        i.due_date || '',
-        i.total,
-        i.amount_paid,
-        i.amount_due,
-        i.status_label,
-        i.branch,
-    ]);
-    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `hoa-don-${today}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+// ── Export Excel ───────────────────────────────────────────────────────────────
+const exporting = ref(false);
+
+async function exportExcel() {
+    if (exporting.value) return;
+    exporting.value = true;
+
+    // Status chips reuse each row's own colour, so the sheet matches the badges on screen.
+    const colors = {};
+    for (const i of sorted.value) colors[i.status_label] = i.status_color || 'gray';
+
+    const rows = sorted.value.map(i => ({
+        ...i,
+        installment: i.installment_index !== null && i.installment_index !== undefined
+            ? `Đợt ${i.installment_index + 1}` : '',
+    }));
+
+    try {
+        await exportTableToExcel({
+            heading: 'DANH SÁCH HÓA ĐƠN',
+            subtitle: summary.value.count + ' hóa đơn' + (filterBranch.value
+                ? ' — ' + (props.branches.find(b => String(b.id) === String(filterBranch.value))?.name ?? '') : ''),
+            meta: `Tổng tiền: ${summary.value.total.toLocaleString('vi-VN')} đ    |    Còn nợ: ${summary.value.due.toLocaleString('vi-VN')} đ`,
+            filename: `hoa-don-${today}`,
+            sheetTitle: 'Hóa đơn',
+            accent: 'FF0F766E',
+            bands: [
+                { label: 'CHỨNG TỪ', first: 'A', last: 'B', color: 'FF0F766E' },
+                { label: 'KHÁCH HÀNG', first: 'C', last: 'D', color: 'FFB45309' },
+                { label: 'KẾ HOẠCH & KỲ HẠN', first: 'E', last: 'H', color: 'FF4338CA' },
+                { label: 'GIÁ TRỊ', first: 'I', last: 'K', color: 'FF15803D' },
+                { label: 'TRẠNG THÁI', first: 'L', last: 'M', color: 'FF7E22CE' },
+            ],
+            columns: [
+                { key: 'code',                label: 'Mã hóa đơn',   type: 'code',   width: 15 },
+                { key: 'patient',             label: 'Khách hàng',   type: 'text',   width: 26, bold: true },
+                { key: 'patient_phone',       label: 'Số điện thoại', type: 'code',  width: 15 },
+                { key: 'treatment_plan_code', label: 'Mã KHĐT',      type: 'code',   width: 15 },
+                { key: 'installment',         label: 'Đợt thanh toán', type: 'text', width: 13 },
+                { key: 'created_at',          label: 'Ngày tạo',     type: 'date',   width: 12 },
+                { key: 'due_date',            label: 'Đến hạn',      type: 'date',   width: 12 },
+                { key: 'total',               label: 'Tổng tiền',    type: 'money',  width: 16, total: true },
+                { key: 'amount_paid',         label: 'Đã thanh toán', type: 'money', width: 16, total: true },
+                { key: 'amount_due',          label: 'Còn nợ',       type: 'money',  width: 16, total: true, bold: true },
+                { key: 'status_label',        label: 'Trạng thái',   type: 'status', width: 18, colors },
+                { key: 'branch',              label: 'Chi nhánh',    type: 'text',   width: 20 },
+            ],
+            rows,
+        });
+    } finally {
+        exporting.value = false;
+    }
 }
 </script>

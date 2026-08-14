@@ -104,7 +104,15 @@ class SystemRecordController extends Controller
 
         $filename = "du-lieu-he-thong_{$request->date_from}_{$request->date_to}.xlsx";
 
-        return Excel::download(new SystemRecordExport($rows), $filename);
+        $branchName = $request->branch_id ? Branch::find($request->branch_id)?->name : null;
+
+        $meta = [
+            'range' => 'Từ '.\Carbon\Carbon::parse($request->date_from)->format('d/m/Y')
+                .' đến '.\Carbon\Carbon::parse($request->date_to)->format('d/m/Y'),
+            'filters' => ($branchName ? 'Chi nhánh: '.$branchName.'  |  ' : '').'Xuất lúc '.now()->format('H:i d/m/Y'),
+        ];
+
+        return Excel::download(new SystemRecordExport($rows, $meta), $filename);
     }
 
     /**
