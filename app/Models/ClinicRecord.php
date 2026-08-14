@@ -20,6 +20,9 @@ class ClinicRecord extends Model
     ];
 
     protected $casts = [
-        'record_date' => 'date',
+        // 'date:Y-m-d' — không dùng 'date' vì khi serialize sang JSON, Carbon bị đổi
+        // sang UTC ("2025-04-09" → "2025-04-08T17:00:00Z"), làm bảng hiển thị lùi 1 ngày
+        // và sai thứ tự ngày/tháng so với các trang khác (d/m/Y).
+        'record_date' => 'date:Y-m-d',
     ];
 }

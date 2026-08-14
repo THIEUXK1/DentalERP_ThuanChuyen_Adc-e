@@ -153,7 +153,7 @@
                                         class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer" />
                                 </td>
                                 <td class="px-3 py-2.5 text-gray-400 text-xs">{{ r.id }}</td>
-                                <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ r.record_date }}</td>
+                                <td class="px-3 py-2.5 whitespace-nowrap text-gray-600">{{ fmtDate(r.record_date) }}</td>
                                 <td class="px-3 py-2.5 font-mono text-xs text-primary-700">{{ r.patient_code }}</td>
                                 <td class="px-3 py-2.5 font-medium text-gray-800">{{ r.patient_name }}</td>
                                 <td class="px-3 py-2.5">
@@ -491,6 +491,13 @@ function goToPage(url) {
 function fmt(val) {
     if (!val) return '—';
     return Number(val).toLocaleString('vi-VN');
+}
+
+// Backend trả 'YYYY-MM-DD' — hiển thị d/m/Y cho khớp trang hồ sơ bệnh nhân.
+function fmtDate(val) {
+    if (!val) return '—';
+    const [y, m, d] = String(val).split('T')[0].split('-');
+    return (y && m && d) ? `${d}/${m}/${y}` : val;
 }
 
 // ── Bulk select ───────────────────────────────────────────────
