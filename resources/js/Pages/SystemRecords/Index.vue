@@ -1,8 +1,8 @@
 <template>
-    <AppLayout title="Bảng kế hoạch báo cáo theo ngày">
-        <div class="space-y-4">
+    <AppLayout title="Bảng kế hoạch báo cáo theo ngày" full-height>
+        <div class="flex flex-col flex-1 min-h-0 gap-3">
             <!-- Header -->
-            <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center justify-between gap-3 flex-shrink-0">
                 <div>
                     <h1 class="text-xl font-bold text-gray-800">Bảng kế hoạch báo cáo theo ngày</h1>
                     <p class="text-xs text-gray-500 mt-0.5">Nhật ký giao dịch hợp nhất — dịch vụ đã thực hiện và thanh toán đã ghi nhận trong hệ thống</p>
@@ -20,11 +20,43 @@
             </div>
 
             <!-- Filters -->
-            <div class="bg-white rounded-xl border border-gray-200 p-4">
-                <div class="flex flex-wrap gap-3">
+            <div class="bg-white rounded-xl border border-gray-200 p-3 flex-shrink-0">
+                <!-- Thanh luôn hiển thị: tìm kiếm + các nút mở bộ lọc -->
+                <div class="flex flex-wrap items-center gap-2">
                     <input v-model="form.search" type="search" list="patient-suggestions"
                         placeholder="Tìm tên KH, mã KH, dịch vụ, SĐT, mã chứng từ..."
                         class="flex-1 min-w-[220px] rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500" />
+                    <button @click="showFilters = !showFilters"
+                        :class="['inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors font-medium',
+                            showFilters ? 'bg-gray-100 border-gray-300 text-gray-700' : 'border-gray-300 text-gray-600 hover:bg-gray-50']">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 10h12M10 16h4"/>
+                        </svg>
+                        Bộ lọc
+                        <span v-if="basicFilterCount" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-primary-600 text-white text-[10px] font-bold">
+                            {{ basicFilterCount }}
+                        </span>
+                        <svg :class="['w-3 h-3 transition-transform', showFilters ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <button @click="showAdvanced = !showAdvanced"
+                        :class="['inline-flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors font-medium',
+                            showAdvanced || hasAdvancedFilters
+                                ? 'border-primary-400 text-primary-700 bg-primary-50'
+                                : 'border-gray-300 text-gray-600 hover:bg-gray-50']">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                        </svg>
+                        Lọc nâng cao
+                        <span v-if="hasAdvancedFilters" class="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
+                    </button>
+                    <button v-if="hasFilters" @click="clearFilters"
+                        class="px-3 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Xóa lọc</button>
+                </div>
+
+                <!-- Bộ lọc cơ bản (thu gọn được) -->
+                <div v-show="showFilters" class="flex flex-wrap gap-2 mt-2.5">
                     <select v-model="form.record_type"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500">
                         <option value="">Tất cả loại</option>
@@ -58,19 +90,6 @@
                         <option value="500">500 / trang</option>
                         <option value="1000">1000 / trang</option>
                     </select>
-                    <button @click="showAdvanced = !showAdvanced"
-                        :class="['inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg border transition-colors font-medium',
-                            showAdvanced || hasAdvancedFilters
-                                ? 'border-primary-400 text-primary-700 bg-primary-50'
-                                : 'border-gray-300 text-gray-600 hover:bg-gray-50']">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
-                        </svg>
-                        Lọc nâng cao
-                        <span v-if="hasAdvancedFilters" class="w-1.5 h-1.5 rounded-full bg-primary-500"></span>
-                    </button>
-                    <button v-if="hasFilters" @click="clearFilters"
-                        class="px-4 py-2 border border-gray-300 text-gray-600 text-sm rounded-lg hover:bg-gray-50 transition-colors">Xóa lọc</button>
                 </div>
 
                 <!-- Advanced filter panel -->
@@ -170,12 +189,12 @@
             </div>
 
             <!-- Data-window cap warning -->
-            <div v-if="truncated" class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-amber-700">
+            <div v-if="truncated" class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-sm text-amber-700 flex-shrink-0">
                 Khoảng ngày đã chọn có quá nhiều bản ghi — chỉ tải {{ records.length.toLocaleString('vi-VN') }} dòng đầu tiên. Thu hẹp khoảng ngày để xem đầy đủ.
             </div>
 
             <!-- Totals for the currently filtered result set -->
-            <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm">
+            <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap items-center gap-x-6 gap-y-1.5 text-sm flex-shrink-0">
                 <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">Tổng theo bộ lọc</span>
                 <span class="text-gray-600">SL: <strong class="text-gray-800 tabular-nums">{{ fmt(totals.quantity) }}</strong></span>
                 <span class="text-gray-600">Đơn giá × SL: <strong class="text-gray-800 tabular-nums">{{ fmt(totals.gross) }}</strong></span>
@@ -205,11 +224,13 @@
             </div>
 
             <!-- Table -->
-            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div class="overflow-x-auto">
+            <div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
+                <!-- Vùng cuộn duy nhất của trang -->
+                <div class="flex-1 min-h-0 overflow-auto">
                     <table class="w-full text-sm">
-                        <thead>
-                            <tr class="bg-gray-50 border-b border-gray-200 text-xs text-gray-500 uppercase tracking-wide">
+                        <!-- Header dính khi cuộn trong khung bảng -->
+                        <thead class="sticky top-0 z-10 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_0_rgb(229,231,235)]">
+                            <tr class="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                                 <th class="px-3 py-3 text-left">Ngày</th>
                                 <th class="px-3 py-3 text-left">Giờ</th>
                                 <th class="px-3 py-3 text-left">Mã KH</th>
@@ -277,25 +298,12 @@
                     </table>
                 </div>
 
-                <!-- Pagination -->
-                <div v-if="totalPages > 1" class="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                    <span class="text-xs text-gray-500">
-                        Trang {{ currentPage }} / {{ totalPages }} — {{ filteredRecords.length.toLocaleString('vi-VN') }} bản ghi
-                    </span>
-                    <div class="flex gap-1">
-                        <button :disabled="currentPage <= 1" @click="goToPage(currentPage - 1)"
-                            :class="['px-3 py-1 rounded text-xs border transition-colors',
-                                currentPage > 1 ? 'border-gray-300 text-gray-600 hover:bg-gray-100' : 'border-gray-200 text-gray-300 cursor-not-allowed']">‹ Trước</button>
-                        <button v-for="p in pageNumbers" :key="p"
-                            @click="goToPage(p)"
-                            :class="['px-3 py-1 rounded text-xs border transition-colors',
-                                p === currentPage ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-300 text-gray-600 hover:bg-gray-100']">{{ p }}</button>
-                        <button :disabled="currentPage >= totalPages" @click="goToPage(currentPage + 1)"
-                            :class="['px-3 py-1 rounded text-xs border transition-colors',
-                                currentPage < totalPages ? 'border-gray-300 text-gray-600 hover:bg-gray-100' : 'border-gray-200 text-gray-300 cursor-not-allowed']">Sau ›</button>
-                    </div>
-                </div>
             </div>
+
+            <!-- Pagination -->
+            <PaginationBar v-if="filteredRecords.length" v-model:page="currentPage"
+                :total-pages="totalPages" :pages="pageNumbers"
+                :from="pageFrom" :to="pageTo" :total="filteredRecords.length" />
         </div>
 
         <!-- Export modal -->
@@ -385,6 +393,7 @@ import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
+import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 import { matchesQuery } from '@/utils/text';
 
 const props = defineProps({
@@ -457,6 +466,17 @@ const hasAdvancedFilters = computed(() =>
 
 const hasFilters = computed(() =>
     form.search || form.record_type || form.branch_id || form.year || form.date_from || form.date_to || hasAdvancedFilters.value
+);
+
+// Hàng bộ lọc cơ bản thu gọn được; mở sẵn nếu đang có điều kiện lọc từ URL.
+const showFilters = ref(
+    localStorage.getItem('sysrec_filters_open') !== '0'
+    || !!(form.branch_id || form.year || form.date_from || form.date_to)
+);
+watch(showFilters, v => localStorage.setItem('sysrec_filters_open', v ? '1' : '0'));
+
+const basicFilterCount = computed(() =>
+    [form.record_type, form.branch_id, form.year, form.date_from, form.date_to].filter(Boolean).length
 );
 
 // Gợi ý gõ-tìm cho ô "Tìm kiếm" / "Tên khách hàng" / "Mã chứng từ" — lấy từ toàn bộ dữ liệu
@@ -579,13 +599,15 @@ const pageNumbers = computed(() => {
     for (let p = start; p <= end; p++) pages.push(p);
     return pages;
 });
+const pageFrom = computed(() =>
+    filteredRecords.value.length === 0 ? 0 : (currentPage.value - 1) * Number(form.per_page) + 1
+);
+const pageTo = computed(() =>
+    Math.min(currentPage.value * Number(form.per_page), filteredRecords.value.length)
+);
 
 watch(filteredRecords, () => { currentPage.value = 1; });
 watch(() => form.per_page, () => { currentPage.value = 1; });
-
-function goToPage(page) {
-    currentPage.value = Math.min(Math.max(page, 1), totalPages.value);
-}
 
 // Only these bound the server-side data window — changing them needs a fresh page load.
 function reloadFromServer() {

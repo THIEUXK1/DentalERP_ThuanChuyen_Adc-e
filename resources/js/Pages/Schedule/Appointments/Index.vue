@@ -1,9 +1,9 @@
 <template>
-    <AppLayout title="Lịch hẹn">
-        <div class="space-y-3">
+    <AppLayout title="Lịch hẹn" full-height>
+        <div class="flex flex-col flex-1 min-h-0 gap-3">
 
             <!-- ── Header ─────────────────────────────────────────────────── -->
-            <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
                 <h2 class="text-lg font-semibold text-gray-800">
                     {{ pageTitle }}
                     <span class="ml-2 text-sm font-normal text-gray-400">({{ calendarTotal }})</span>
@@ -34,7 +34,9 @@
             </div>
 
             <!-- ── Filter bar ──────────────────────────────────────────────── -->
-            <div class="bg-white rounded-xl border border-gray-200 p-3 flex flex-wrap items-center gap-2.5">
+            <div class="bg-white rounded-xl border border-gray-200 p-3 space-y-2.5 flex-shrink-0">
+              <!-- Thanh luôn hiển thị: tìm kiếm + nút thu gọn bộ lọc -->
+              <div class="flex flex-wrap items-center gap-2.5">
                 <div class="relative flex-1 min-w-[180px]">
                     <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0"/>
@@ -45,6 +47,29 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
                 </div>
+                <button @click="showFilters = !showFilters"
+                    :class="['inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-colors',
+                        showFilters ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50']">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 10h12M10 16h4"/>
+                    </svg>
+                    Bộ lọc
+                    <span v-if="activeFilterCount" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                        {{ activeFilterCount }}
+                    </span>
+                    <svg :class="['w-3 h-3 transition-transform', showFilters ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+                <button v-if="hasActiveFilters" @click="clearFilters"
+                    class="px-3 py-2 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 flex items-center gap-1.5">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    Xóa lọc
+                </button>
+              </div>
+
+              <!-- Phần thu gọn được -->
+              <div v-show="showFilters" class="flex flex-wrap items-center gap-2.5">
                 <select v-model="branchId" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
                     <option value="">Tất cả chi nhánh</option>
                     <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
@@ -65,15 +90,11 @@
                     <option :value="100">100/trang</option>
                     <option value="all">Tất cả</option>
                 </select>
-                <button v-if="hasActiveFilters" @click="clearFilters"
-                    class="px-3 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50 flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    Xóa lọc
-                </button>
+              </div>
             </div>
 
             <!-- ── Date navigation (day / week / month) ────────────────────── -->
-            <div v-if="isCalendarView" class="bg-white rounded-xl border border-gray-200 px-4 py-2.5 flex items-center justify-between gap-3">
+            <div v-if="isCalendarView" class="bg-white rounded-xl border border-gray-200 px-4 py-2.5 flex items-center justify-between gap-3 flex-shrink-0">
                 <button @click="navPrev" class="p-2 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
@@ -87,7 +108,7 @@
             </div>
 
             <!-- ── Loading ────────────────────────────────────────────────── -->
-            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-gray-400">
                 <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -96,7 +117,7 @@
             </div>
 
             <!-- ── Error ──────────────────────────────────────────────────── -->
-            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-red-400">
                 <p class="text-sm font-medium">Không thể tải dữ liệu</p>
                 <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
             </div>
@@ -104,9 +125,9 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: NGÀY (Day Timeline)
             ══════════════════════════════════════════════════════════════ -->
-            <div v-else-if="viewMode === 'day'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="viewMode === 'day'" class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
                 <!-- Stats bar -->
-                <div class="flex items-center gap-4 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs text-gray-500">
+                <div class="flex items-center gap-4 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-xs text-gray-500 flex-shrink-0 overflow-x-auto">
                     <span>{{ dayLayoutItems.length }} lịch hẹn</span>
                     <span v-for="s in daySummary" :key="s.label"
                         :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-medium', s.badge]">
@@ -114,7 +135,7 @@
                     </span>
                 </div>
                 <!-- Timeline -->
-                <div class="overflow-y-auto" style="max-height: 72vh">
+                <div class="flex-1 min-h-0 overflow-auto">
                     <div class="relative" :style="{ height: DAY_TOTAL_H + 'px', minWidth: '500px' }">
                         <!-- Hour grid lines -->
                         <div v-for="hour in dayHours" :key="hour.val"
@@ -156,9 +177,9 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: TUẦN (Week View)
             ══════════════════════════════════════════════════════════════ -->
-            <div v-else-if="!loading && !loadError && viewMode === 'week'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="!loading && !loadError && viewMode === 'week'" class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
                 <!-- Day headers -->
-                <div class="grid border-b border-gray-200" style="grid-template-columns: 52px repeat(7, 1fr)">
+                <div class="grid border-b border-gray-200 flex-shrink-0" style="grid-template-columns: 52px repeat(7, 1fr)">
                     <div class="border-r border-gray-100 bg-gray-50"></div>
                     <div v-for="day in weekDays" :key="day.date"
                         :class="['p-2 text-center border-r border-gray-100 last:border-r-0',
@@ -172,7 +193,7 @@
                     </div>
                 </div>
                 <!-- Timeline + appointments -->
-                <div class="overflow-y-auto" style="max-height: 68vh">
+                <div class="flex-1 min-h-0 overflow-y-auto">
                     <div class="relative" :style="{ height: DAY_TOTAL_H + 'px' }">
                         <!-- Hour rows -->
                         <div v-for="hour in dayHours" :key="hour.val"
@@ -213,7 +234,7 @@
                     </div>
                 </div>
                 <!-- Week total footer -->
-                <div class="grid border-t border-gray-100 bg-gray-50/60" style="grid-template-columns: 52px repeat(7, 1fr)">
+                <div class="grid border-t border-gray-100 bg-gray-50/60 flex-shrink-0" style="grid-template-columns: 52px repeat(7, 1fr)">
                     <div></div>
                     <div v-for="day in weekDays" :key="day.date" class="py-1.5 text-center border-r border-gray-100 last:border-r-0">
                         <span v-if="day.appointments.length > 0"
@@ -228,16 +249,17 @@
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: THÁNG (Month Calendar)
             ══════════════════════════════════════════════════════════════ -->
-            <div v-else-if="!loading && !loadError && viewMode === 'month'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div v-else-if="!loading && !loadError && viewMode === 'month'" class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
                 <!-- Day of week headers -->
-                <div class="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
+                <div class="grid grid-cols-7 border-b border-gray-200 bg-gray-50 flex-shrink-0">
                     <div v-for="d in ['T.Hai','T.Ba','T.Tư','T.Năm','T.Sáu','T.Bảy','CN']" :key="d"
                         class="py-2 text-center text-xs font-semibold text-gray-500 border-r border-gray-100 last:border-r-0">
                         {{ d }}
                     </div>
                 </div>
-                <!-- Calendar grid -->
-                <div class="grid grid-cols-7">
+                <!-- Calendar grid: lấp đầy chiều cao còn lại, tự cuộn khi tháng có nhiều tuần -->
+                <div class="flex-1 min-h-0 overflow-y-auto">
+                  <div class="grid grid-cols-7 auto-rows-fr min-h-full">
                     <div v-for="cell in monthCalendar" :key="cell.date"
                         :class="['border-r border-b border-gray-100 last:border-r-0 p-1.5 min-h-24 flex flex-col',
                             !cell.currentMonth ? 'bg-gray-50/70' : '',
@@ -269,15 +291,16 @@
                             </div>
                         </div>
                     </div>
+                  </div>
                 </div>
             </div>
 
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: DANH SÁCH
             ══════════════════════════════════════════════════════════════ -->
-            <template v-else-if="!loading && !loadError && viewMode === 'list'">
+            <div v-else-if="!loading && !loadError && viewMode === 'list'" class="flex flex-col flex-1 min-h-0 gap-2">
                 <!-- Today toggle (chỉ list) -->
-                <div class="flex items-center gap-3 flex-wrap text-sm">
+                <div class="flex items-center gap-3 flex-wrap text-sm flex-shrink-0">
                     <label class="flex items-center gap-2 cursor-pointer select-none">
                         <div @click="toggleTodayOnly"
                             :class="['w-10 h-5 rounded-full relative transition-colors cursor-pointer',
@@ -298,18 +321,15 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                     </template>
-                    <span class="text-xs text-gray-400 ml-auto">
-                        {{ paginatedAppointments.length }} / {{ filteredAppointments.length }} lịch hẹn
-                    </span>
                 </div>
 
                 <div v-if="filteredAppointments.length === 0"
-                    class="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+                    class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex items-center justify-center text-center text-gray-400">
                     {{ hasActiveFilters || todayOnly ? 'Không tìm thấy lịch hẹn phù hợp' : 'Chưa có lịch hẹn nào' }}
                 </div>
                 <!-- Bulk action bar -->
                 <div v-if="selectedIds.size > 0"
-                    class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5">
+                    class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex-shrink-0">
                     <span class="text-sm font-medium text-indigo-700">Đã chọn {{ selectedIds.size }} lịch hẹn</span>
                     <button @click="selectedIds = new Set()" class="text-xs text-gray-500 hover:text-gray-700 underline">Bỏ chọn</button>
                     <div class="ml-auto flex items-center gap-2">
@@ -325,9 +345,10 @@
                     </div>
                 </div>
 
-                <div class="space-y-1.5">
-                    <div v-for="a in paginatedAppointments" :key="a.id"
-                        :class="['flex items-stretch bg-white rounded-xl border hover:shadow-sm transition-all overflow-hidden', statusBorder(a.status)]">
+                <!-- Vùng cuộn duy nhất của chế độ danh sách -->
+                <div v-if="filteredAppointments.length" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 pr-1">
+                    <div v-for="(a, idx) in paginatedAppointments" :key="a.id"
+                        :class="['flex items-stretch flex-wrap bg-white rounded-xl border hover:shadow-sm transition-all overflow-hidden', statusBorder(a.status)]">
                         <!-- Checkbox -->
                         <label class="flex items-center pl-3 cursor-pointer flex-shrink-0" @click.stop>
                             <input type="checkbox"
@@ -372,8 +393,10 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
+                            <!-- Mở lên trên ở các dòng cuối để không bị vùng cuộn cắt mất -->
                             <div v-if="statusDrop === a.id"
-                                class="absolute right-0 top-full mt-1 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]">
+                                :class="['absolute right-0 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]',
+                                    idx >= paginatedAppointments.length - 2 ? 'bottom-full mb-1' : 'top-full mt-1']">
                                 <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Đổi trạng thái</p>
                                 <button v-for="s in QUICK_STATUSES" :key="s.value"
                                     @click="doStatusTransition(a.id, s.value)"
@@ -403,32 +426,20 @@
                 </div>
 
                 <!-- Pagination -->
-                <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 py-2">
-                    <button @click="currentPage = 1" :disabled="currentPage === 1" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">«</button>
-                    <button @click="currentPage--" :disabled="currentPage === 1" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">‹</button>
-                    <template v-for="p in pageNumbers" :key="p">
-                        <span v-if="p === '...'" class="px-2 py-1.5 text-xs text-gray-400">…</span>
-                        <button v-else @click="currentPage = p"
-                            :class="['px-3 py-1.5 text-xs border rounded-lg',
-                                p === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 hover:bg-gray-50']">{{ p }}</button>
-                    </template>
-                    <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">›</button>
-                    <button @click="currentPage = totalPages" :disabled="currentPage === totalPages" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">»</button>
-                </div>
-            </template>
+                <PaginationBar v-if="filteredAppointments.length" v-model:page="currentPage"
+                    :total-pages="totalPages" :pages="pageNumbers"
+                    :from="pageFrom" :to="pageTo" :total="filteredAppointments.length" />
+            </div>
 
             <!-- ══════════════════════════════════════════════════════════════
                  CHẾ ĐỘ: LƯỚI
             ══════════════════════════════════════════════════════════════ -->
-            <template v-else-if="!loading && !loadError && viewMode === 'grid'">
-                <div class="flex justify-end text-xs text-gray-400 px-1">
-                    {{ paginatedAppointments.length }} / {{ filteredAppointments.length }} lịch hẹn
-                </div>
+            <div v-else-if="!loading && !loadError && viewMode === 'grid'" class="flex flex-col flex-1 min-h-0 gap-2">
                 <div v-if="filteredAppointments.length === 0"
-                    class="bg-white rounded-xl border border-gray-200 p-10 text-center text-gray-400">
+                    class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex items-center justify-center text-gray-400">
                     Không có lịch hẹn nào
                 </div>
-                <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                <div v-else class="flex-1 min-h-0 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 auto-rows-min content-start">
                     <div v-for="a in paginatedAppointments" :key="a.id"
                         :class="['rounded-xl border hover:shadow-md transition-all flex flex-col overflow-hidden', statusBorder(a.status)]">
                         <div :class="['h-1.5 flex-shrink-0', statusStripe(a.status)]"></div>
@@ -479,19 +490,10 @@
                     </div>
                 </div>
                 <!-- Pagination -->
-                <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 py-2">
-                    <button @click="currentPage = 1" :disabled="currentPage === 1" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">«</button>
-                    <button @click="currentPage--" :disabled="currentPage === 1" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">‹</button>
-                    <template v-for="p in pageNumbers" :key="p">
-                        <span v-if="p === '...'" class="px-2 py-1.5 text-xs text-gray-400">…</span>
-                        <button v-else @click="currentPage = p"
-                            :class="['px-3 py-1.5 text-xs border rounded-lg',
-                                p === currentPage ? 'bg-indigo-600 text-white border-indigo-600' : 'border-gray-300 hover:bg-gray-50']">{{ p }}</button>
-                    </template>
-                    <button @click="currentPage++" :disabled="currentPage === totalPages" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">›</button>
-                    <button @click="currentPage = totalPages" :disabled="currentPage === totalPages" class="px-2 py-1.5 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-40">»</button>
-                </div>
-            </template>
+                <PaginationBar v-if="filteredAppointments.length" v-model:page="currentPage"
+                    :total-pages="totalPages" :pages="pageNumbers"
+                    :from="pageFrom" :to="pageTo" :total="filteredAppointments.length" />
+            </div>
 
         </div>
 
@@ -649,6 +651,7 @@ import { router, Link, useForm } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
+import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 import { usePermission } from '@/composables/usePermission';
 
 const { hasPermission: can } = usePermission();
@@ -800,9 +803,23 @@ const pageNumbers = computed(() => {
     pages.push(total);
     return pages;
 });
-const hasActiveFilters = computed(() => !!search.value || !!branchId.value || !!doctorId.value || !!filterStatus.value);
+const pageFrom = computed(() => (filteredAppointments.value.length === 0 ? 0
+    : perPage.value === 'all' ? 1 : (currentPage.value - 1) * Number(perPage.value) + 1));
+const pageTo = computed(() => (perPage.value === 'all'
+    ? filteredAppointments.value.length
+    : Math.min(currentPage.value * Number(perPage.value), filteredAppointments.value.length)));
+// Bộ lọc mở/thu gọn — nhớ lựa chọn của người dùng
+const showFilters = ref(localStorage.getItem('apt_filters_open') !== '0');
+watch(showFilters, v => localStorage.setItem('apt_filters_open', v ? '1' : '0'));
 
-watch([search, branchId, doctorId, filterStatus, perPage], () => { currentPage.value = 1; });
+const activeFilterCount = computed(() =>
+    [search.value, branchId.value, doctorId.value, filterStatus.value].filter(Boolean).length
+);
+const hasActiveFilters = computed(() => activeFilterCount.value > 0);
+
+watch([search, branchId, doctorId, filterStatus, perPage, date, todayOnly, viewMode], () => { currentPage.value = 1; });
+// Bộ lọc có thể làm giảm số trang khi đang ở trang cuối
+watch(totalPages, t => { if (currentPage.value > t) currentPage.value = t; });
 
 // ── Vietnamese locale arrays ────────────────────────────────────
 const VI_DAYS   = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];

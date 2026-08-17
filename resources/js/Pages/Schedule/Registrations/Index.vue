@@ -1,9 +1,9 @@
 <template>
-    <AppLayout title="Đăng ký khám">
-        <div class="space-y-3">
+    <AppLayout title="Đăng ký khám" full-height>
+        <div class="flex flex-col flex-1 min-h-0 gap-3">
 
             <!-- Header -->
-            <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
                 <h2 class="text-lg font-semibold text-gray-800">
                     Đăng ký khám
                     <span class="ml-2 text-sm font-normal text-gray-400">({{ filtered.length }})</span>
@@ -34,7 +34,7 @@
             </div>
 
             <!-- Stats -->
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
                 <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
                     <div class="text-2xl font-bold text-gray-800">{{ filtered.length }}</div>
                     <div class="text-xs text-gray-500 mt-0.5">Tổng đăng ký</div>
@@ -54,22 +54,49 @@
             </div>
 
             <!-- Filter bar -->
-            <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap gap-2 shadow-sm">
-                <input v-model="search" type="text" placeholder="Tìm bệnh nhân, SĐT..."
-                    class="flex-1 min-w-40 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
-                <select v-model="filterStatus" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none">
-                    <option value="">Tất cả trạng thái</option>
-                    <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
-                </select>
-                <button v-if="search || filterStatus" @click="clearFilters"
-                    class="px-3 py-1.5 text-sm text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
-                    Xóa lọc
-                </button>
+            <div class="bg-white rounded-xl border border-gray-200 px-3 py-2.5 space-y-2.5 shadow-sm flex-shrink-0">
+                <!-- Thanh luôn hiển thị: tìm kiếm + nút thu gọn bộ lọc -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <input v-model="search" type="text" placeholder="Tìm bệnh nhân, SĐT..."
+                        class="flex-1 min-w-40 rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
+                    <button @click="showFilters = !showFilters"
+                        :class="['inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
+                            showFilters ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50']">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 10h12M10 16h4"/>
+                        </svg>
+                        Bộ lọc
+                        <span v-if="activeFilterCount" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                            {{ activeFilterCount }}
+                        </span>
+                        <svg :class="['w-3 h-3 transition-transform', showFilters ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <button v-if="activeFilterCount" @click="clearFilters"
+                        class="px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+                        Xóa lọc
+                    </button>
+                </div>
+
+                <!-- Phần thu gọn được -->
+                <div v-show="showFilters" class="flex flex-wrap items-center gap-2">
+                    <select v-model="filterStatus" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none">
+                        <option value="">Tất cả trạng thái</option>
+                        <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
+                    </select>
+                    <select v-model="perPage" class="rounded-lg border border-gray-200 px-3 py-1.5 text-sm focus:outline-none">
+                        <option :value="20">20/trang</option>
+                        <option :value="50">50/trang</option>
+                        <option :value="100">100/trang</option>
+                        <option value="all">Tất cả</option>
+                    </select>
+                </div>
             </div>
 
             <!-- Table -->
-            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                <div v-if="filtered.length === 0" class="py-16 text-center">
+            <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col flex-1 min-h-0">
+                <div v-if="filtered.length === 0" class="flex-1 min-h-0 flex flex-col justify-center text-center">
                     <svg class="mx-auto w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
@@ -79,8 +106,11 @@
                     </button>
                 </div>
 
-                <table v-else class="w-full text-sm">
-                    <thead class="bg-gray-50 border-b border-gray-100">
+                <!-- Vùng cuộn duy nhất của trang -->
+                <div v-else class="flex-1 min-h-0 overflow-auto">
+                <table class="w-full text-sm">
+                    <!-- Header dính khi cuộn trong khung bảng -->
+                    <thead class="bg-gray-50 sticky top-0 z-10 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_0_rgb(243,244,246)]">
                         <tr>
                             <th class="px-4 py-3 text-left font-medium text-gray-500 text-xs">Giờ</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500 text-xs">Bệnh nhân</th>
@@ -93,7 +123,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-50">
-                        <tr v-for="r in filtered" :key="r.id" class="hover:bg-gray-50/60 transition-colors">
+                        <tr v-for="r in paginated" :key="r.id" class="hover:bg-gray-50/60 transition-colors">
                             <td class="px-4 py-3 font-mono text-gray-800 font-medium">{{ r.visit_time ?? '—' }}</td>
                             <td class="px-4 py-3">
                                 <Link :href="route('patients.show', r.patient_id)"
@@ -138,7 +168,13 @@
                         </tr>
                     </tbody>
                 </table>
+                </div>
             </div>
+
+            <!-- Pagination -->
+            <PaginationBar v-if="filtered.length" v-model:page="page"
+                :total-pages="totalPages" :pages="pageNumbers"
+                :from="pageFrom" :to="pageTo" :total="filtered.length" />
         </div>
 
         <!-- Create modal -->
@@ -309,9 +345,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
+import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 
 const props = defineProps({
     all_registrations: Array,
@@ -355,6 +392,47 @@ const filtered = computed(() => {
 function countByStatus(status) {
     return filtered.value.filter(r => r.status === status).length;
 }
+
+// ── Bộ lọc thu gọn ───────────────────────────────────────────────────────
+const showFilters = ref(localStorage.getItem('reg_filters_open') !== '0');
+watch(showFilters, v => localStorage.setItem('reg_filters_open', v ? '1' : '0'));
+
+const activeFilterCount = computed(() => [search.value, filterStatus.value].filter(Boolean).length);
+
+// ── Phân trang ───────────────────────────────────────────────────────────
+const perPage = ref(localStorage.getItem('reg_per') === 'all' ? 'all' : Number(localStorage.getItem('reg_per') || 50));
+const page    = ref(1);
+
+watch(perPage, v => localStorage.setItem('reg_per', String(v)));
+watch([search, filterStatus, selectedDate, perPage], () => { page.value = 1; });
+
+const totalPages = computed(() =>
+    perPage.value === 'all' ? 1 : Math.max(1, Math.ceil(filtered.value.length / Number(perPage.value)))
+);
+const paginated = computed(() => {
+    if (perPage.value === 'all') return filtered.value;
+    const size = Number(perPage.value);
+    return filtered.value.slice((page.value - 1) * size, page.value * size);
+});
+const pageFrom = computed(() => (filtered.value.length === 0 ? 0
+    : perPage.value === 'all' ? 1 : (page.value - 1) * Number(perPage.value) + 1));
+const pageTo = computed(() => (perPage.value === 'all'
+    ? filtered.value.length
+    : Math.min(page.value * Number(perPage.value), filtered.value.length)));
+
+// Lọc có thể làm số trang giảm khi đang ở trang cuối
+watch(totalPages, t => { if (page.value > t) page.value = t; });
+
+const pageNumbers = computed(() => {
+    const total = totalPages.value, cur = page.value;
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const pages = [1];
+    if (cur > 3) pages.push('...');
+    for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) pages.push(i);
+    if (cur < total - 2) pages.push('...');
+    pages.push(total);
+    return pages;
+});
 
 function formatDateVn(dateStr) {
     if (!dateStr) return '';

@@ -1,9 +1,9 @@
 <template>
-    <AppLayout title="Khách hàng">
-        <div class="space-y-5">
+    <AppLayout title="Khách hàng" full-height>
+        <div class="flex flex-col flex-1 min-h-0 gap-3">
 
             <!-- ── Header ───────────────────────────────────────────────── -->
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between flex-shrink-0">
                 <div>
                     <h2 class="text-xl font-bold text-gray-900">Danh sách khách hàng</h2>
                     <p class="text-sm text-gray-500 mt-0.5">Quản lý toàn bộ hồ sơ bệnh nhân</p>
@@ -18,7 +18,7 @@
             </div>
 
             <!-- ── Stats bar ───────────────────────────────────────────── -->
-            <div class="bg-slate-800 rounded-xl px-5 py-3 flex flex-wrap items-center gap-4">
+            <div class="bg-slate-800 rounded-xl px-5 py-3 flex flex-wrap items-center gap-4 flex-shrink-0">
                 <div class="flex items-center gap-2">
                     <span class="text-slate-400 text-xs">Tổng KH</span>
                     <span class="font-bold text-white text-lg">{{ totalCount }}</span>
@@ -50,17 +50,41 @@
             </div>
 
             <!-- ── Filters ───────────────────────────────────────────────── -->
-            <div class="bg-white rounded-xl border border-gray-200 px-4 py-3 flex flex-wrap gap-3 items-end">
-                <div>
-                    <label class="text-xs text-gray-500 mb-1 block">Tìm kiếm</label>
-                    <div class="relative">
-                        <svg class="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div class="bg-white rounded-xl border border-gray-200 px-3 py-2.5 space-y-2.5 flex-shrink-0">
+                <!-- Thanh luôn hiển thị: tìm kiếm + nút thu gọn bộ lọc -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <div class="relative flex-1 min-w-[200px]">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                         </svg>
-                        <input v-model="search" placeholder="Tên, SĐT, mã KH..."
-                            class="border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm w-60 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        <input v-model="search" placeholder="Tìm tên, SĐT, mã KH..."
+                            class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                     </div>
+                    <button @click="showFilters = !showFilters"
+                        :class="['inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border transition-colors',
+                            showFilters ? 'bg-gray-100 border-gray-300 text-gray-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50']">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h18M6 10h12M10 16h4"/>
+                        </svg>
+                        Bộ lọc
+                        <span v-if="activeFilterCount" class="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full bg-indigo-600 text-white text-[10px] font-bold">
+                            {{ activeFilterCount }}
+                        </span>
+                        <svg :class="['w-3 h-3 transition-transform', showFilters ? 'rotate-180' : '']" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </button>
+                    <button v-if="hasActiveFilters" @click="clearFilters"
+                        class="px-3 py-2 text-xs text-indigo-600 rounded-lg border border-indigo-200 hover:bg-indigo-50 font-medium flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        Xóa bộ lọc
+                    </button>
                 </div>
+
+                <!-- Phần thu gọn được -->
+                <div v-show="showFilters" class="flex flex-wrap gap-3 items-end">
                 <div>
                     <label class="text-xs text-gray-500 mb-1 block">Chi nhánh</label>
                     <select v-model="branchId"
@@ -84,17 +108,11 @@
                         <option v-for="opt in perPageOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
                     </select>
                 </div>
-                <button v-if="hasActiveFilters" @click="clearFilters"
-                    class="px-3 py-2 text-indigo-600 text-sm rounded-lg border border-indigo-200 hover:bg-indigo-50 self-end font-medium flex items-center gap-1.5">
-                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                    </svg>
-                    Xóa bộ lọc
-                </button>
+                </div>
             </div>
 
             <!-- ── Loading ────────────────────────────────────────────────── -->
-            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-gray-400">
                 <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -103,22 +121,24 @@
             </div>
 
             <!-- ── Error ──────────────────────────────────────────────────── -->
-            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-red-400">
                 <p class="text-sm font-medium">Không thể tải dữ liệu</p>
                 <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
             </div>
 
             <!-- ── TABLE VIEW ──────────────────────────────────────────── -->
-            <div v-else-if="viewMode === 'table'" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div v-if="paginatedPatients.length === 0" class="flex flex-col items-center py-14 text-gray-400">
+            <div v-else-if="viewMode === 'table'" class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col flex-1 min-h-0">
+                <div v-if="paginatedPatients.length === 0" class="flex-1 min-h-0 flex flex-col items-center justify-center text-gray-400">
                     <svg class="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                     </svg>
                     <p class="text-sm font-medium">Không tìm thấy khách hàng</p>
                 </div>
-                <div v-else class="overflow-x-auto">
+                <!-- Vùng cuộn duy nhất của chế độ bảng -->
+                <div v-else class="flex-1 min-h-0 overflow-auto">
                     <table class="w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-500 text-xs border-b border-gray-100">
+                        <!-- Header dính khi cuộn trong khung bảng -->
+                        <thead class="bg-gray-50 text-gray-500 text-xs sticky top-0 z-10 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_0_rgb(243,244,246)]">
                             <tr>
                                 <th class="px-4 py-3 text-left font-medium">Khách hàng</th>
                                 <th class="px-4 py-3 text-left font-medium hidden sm:table-cell">SĐT</th>
@@ -196,7 +216,8 @@
             </div>
 
             <!-- ── CARD VIEW ───────────────────────────────────────────── -->
-            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div v-else
+                class="flex-1 min-h-0 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 auto-rows-min content-start">
                 <div v-if="paginatedPatients.length === 0" class="col-span-full text-center py-14 text-gray-400">
                     Không tìm thấy khách hàng
                 </div>
@@ -251,34 +272,9 @@
             </div>
 
             <!-- ── Pagination ──────────────────────────────────────────── -->
-            <div v-if="!loading && !loadError && (totalPages > 1 || filteredPatients.length > 0)" class="flex items-center justify-between flex-wrap gap-3">
-                <p class="text-sm text-gray-500">
-                    Hiển thị
-                    <span class="font-medium text-gray-700">{{ fromRecord }}–{{ toRecord }}</span>
-                    / <span class="font-medium text-gray-700">{{ filteredPatients.length }}</span> bản ghi
-                </p>
-
-                <div v-if="totalPages > 1" class="flex items-center gap-1">
-                    <button @click="currentPage--" :disabled="currentPage === 1"
-                        class="px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                        ‹
-                    </button>
-                    <template v-for="pg in pageNumbers" :key="pg">
-                        <span v-if="pg === '...'" class="px-1 text-gray-400 text-sm">…</span>
-                        <button v-else @click="currentPage = pg"
-                            :class="['px-2.5 py-1.5 text-sm rounded-lg border transition-colors',
-                                pg === currentPage
-                                    ? 'bg-indigo-600 border-indigo-600 text-white font-medium'
-                                    : 'border-gray-200 text-gray-600 hover:bg-gray-50']">
-                            {{ pg }}
-                        </button>
-                    </template>
-                    <button @click="currentPage++" :disabled="currentPage === totalPages"
-                        class="px-2.5 py-1.5 text-sm rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">
-                        ›
-                    </button>
-                </div>
-            </div>
+            <PaginationBar v-if="!loading && !loadError && filteredPatients.length" v-model:page="currentPage"
+                :total-pages="totalPages" :pages="pageNumbers"
+                :from="fromRecord" :to="toRecord" :total="filteredPatients.length" />
 
         </div>
 
@@ -293,9 +289,10 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
+import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 import { usePermission } from '@/composables/usePermission';
 import { usePatientFilters, PER_PAGE_OPTIONS, avatarColor, sourceClass } from '@/composables/usePatientFilters';
 import PatientCreateModal from './components/PatientCreateModal.vue';
@@ -313,6 +310,15 @@ const {
     filteredPatients, totalPages, fromRecord, toRecord, paginatedPatients, pageNumbers,
     hasActiveFilters, clearFilters,
 } = usePatientFilters();
+
+// ── Bộ lọc thu gọn ─────────────────────────────────────────────────────────
+const showFilters = ref(localStorage.getItem('patients_filters_open') !== '0');
+watch(showFilters, v => localStorage.setItem('patients_filters_open', v ? '1' : '0'));
+
+// Số dòng/trang không tính là "điều kiện lọc" trên badge
+const activeFilterCount = computed(() =>
+    [search.value, branchId.value !== '' ? branchId.value : '', source.value].filter(Boolean).length
+);
 
 function closeCreate() {
     showCreateModal.value = false;

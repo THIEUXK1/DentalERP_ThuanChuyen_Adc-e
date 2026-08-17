@@ -28,12 +28,18 @@ class DebtController extends Controller
                 $q->whereHas('patient', fn ($pq) => $pq->where('full_name', $op, "%{$v}%")->orWhere('phone', $op, "%{$v}%"));
             })
             ->when($request->branch_id, fn ($q, $v) => $q->whereHas('invoice', fn ($iq) => $iq->where('branch_id', $v)))
+            // "overdue" is derived from the due date, the other two are the stored status.
+            ->when($request->status === 'overdue', fn ($q) => $q->whereNotNull('due_date')->whereDate('due_date', '<', now()))
+            ->when(in_array($request->status, ['pending', 'partial'], true), fn ($q) => $q->where('status', $request->status))
             ->orderByDesc('remaining');
 
         $summary = PatientDebt::whereIn('status', ['pending', 'partial'])->sum('remaining');
 
+        $perPage = in_array((int) $request->per_page, [20, 50, 100], true) ? (int) $request->per_page : 20;
+
         return Inertia::render('Cashier/Debts/Index', [
-            'debts' => $query->paginate(20)->through(fn ($d) => [
+            // withQueryString keeps the active filters on the page links.
+            'debts' => $query->paginate($perPage)->withQueryString()->through(fn ($d) => [
                 'id' => $d->id,
                 'patient' => $d->patient->full_name,
                 'patient_id' => $d->patient_id,
@@ -51,10 +57,11 @@ class DebtController extends Controller
             ]),
             'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'summary' => [
+                // Cùng phạm vi với total_outstanding (toàn bộ công nợ chưa thu), không theo bộ lọc.
                 'total_outstanding' => $summary,
-                'count' => $query->count(),
+                'count' => PatientDebt::whereIn('status', ['pending', 'partial'])->count(),
             ],
-            'filters' => $request->only(['patient_search', 'branch_id']),
+            'filters' => $request->only(['patient_search', 'branch_id', 'status', 'per_page']),
         ]);
     }
 }

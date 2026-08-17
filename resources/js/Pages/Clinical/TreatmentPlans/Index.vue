@@ -1,9 +1,9 @@
 <template>
-    <AppLayout title="Kế hoạch điều trị">
-        <div class="space-y-4">
+    <AppLayout title="Kế hoạch điều trị" full-height>
+        <div class="flex flex-col flex-1 min-h-0 gap-3">
 
             <!-- ── Header ──────────────────────────────────────────────── -->
-            <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
                 <h2 class="text-lg font-semibold text-gray-800">
                     Kế hoạch điều trị
                     <span class="ml-1.5 text-sm font-normal text-gray-400">({{ filtered.length }})</span>
@@ -39,7 +39,7 @@
             </div>
 
             <!-- ── Summary stats ────────────────────────────────────────── -->
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 flex-shrink-0">
                 <!-- Nháp -->
                 <button @click="toggleStatusGroup('draft')"
                     :class="['text-left rounded-xl border px-4 py-3 transition-all',
@@ -83,7 +83,7 @@
             </div>
 
             <!-- ── Filters ──────────────────────────────────────────────── -->
-            <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+            <div class="bg-white rounded-xl border border-gray-200 p-4 space-y-3 flex-shrink-0">
                 <!-- Row 1: search + status + branch + doctor -->
                 <div class="flex flex-wrap gap-3">
                     <div class="relative flex-1 min-w-[200px]">
@@ -178,10 +178,11 @@
             </div>
 
             <!-- ── Controls ─────────────────────────────────────────────── -->
-            <div class="flex items-center justify-between text-xs text-gray-500">
-                <span>Hiển thị <strong class="text-gray-700">{{ paginated.length }}</strong> / {{ filtered.length }}
-                    <span v-if="filtered.length < allPlans.length" class="text-gray-400">(tổng {{ allPlans.length }})</span>
+            <div class="flex items-center justify-between text-xs text-gray-500 flex-shrink-0">
+                <span v-if="filtered.length < allPlans.length" class="text-gray-400">
+                    Đang lọc <strong class="text-gray-600">{{ filtered.length }}</strong> / tổng {{ allPlans.length }} kế hoạch
                 </span>
+                <span v-else></span>
                 <select v-model="perPage"
                     class="border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none">
                     <option :value="10">10/trang</option>
@@ -193,7 +194,7 @@
             </div>
 
             <!-- ── Loading ────────────────────────────────────────────────── -->
-            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 py-16 flex flex-col items-center gap-3 text-gray-400">
+            <div v-if="loading" class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-gray-400">
                 <svg class="w-8 h-8 animate-spin text-indigo-400" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
                     <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
@@ -202,21 +203,23 @@
             </div>
 
             <!-- ── Error ──────────────────────────────────────────────────── -->
-            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 py-12 flex flex-col items-center gap-3 text-red-400">
+            <div v-else-if="loadError" class="bg-white rounded-xl border border-red-200 flex-1 min-h-0 flex flex-col items-center justify-center gap-3 text-red-400">
                 <p class="text-sm font-medium">Không thể tải dữ liệu</p>
                 <button @click="loadData" class="text-xs px-4 py-2 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 text-red-600">Thử lại</button>
             </div>
 
             <!-- ── Empty ─────────────────────────────────────────────────── -->
             <div v-else-if="filtered.length === 0"
-                class="bg-white rounded-xl border border-gray-200 py-12 text-center text-gray-400">
+                class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex items-center justify-center text-center text-gray-400">
                 {{ hasFilters ? 'Không tìm thấy kế hoạch phù hợp' : 'Chưa có kế hoạch điều trị nào' }}
             </div>
 
             <!-- ── LIST VIEW ─────────────────────────────────────────────── -->
-            <div v-else-if="!loading && !loadError && viewMode === 'list'" class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+            <div v-else-if="!loading && !loadError && viewMode === 'list'"
+                class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 overflow-auto">
                 <table class="w-full">
-                    <thead class="bg-gray-50 border-b border-gray-200">
+                    <!-- Header dính khi cuộn trong khung bảng -->
+                    <thead class="bg-gray-50 border-b border-gray-200 sticky top-0 z-10 [&_th]:bg-gray-50 [&_th]:shadow-[inset_0_-1px_0_0_rgb(229,231,235)]">
                         <tr>
                             <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">
                                 <button @click="toggleSort('patient')" class="flex items-center gap-1 hover:text-gray-800">
@@ -302,7 +305,8 @@
             </div>
 
             <!-- ── GRID VIEW ─────────────────────────────────────────────── -->
-            <div v-else-if="!loading && !loadError" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+            <div v-else-if="!loading && !loadError"
+                class="flex-1 min-h-0 overflow-y-auto pr-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 auto-rows-min content-start">
                 <Link v-for="p in paginated" :key="p.id"
                     :href="route('clinical.treatment-plans.show', p.id)"
                     class="bg-white rounded-xl border border-gray-200 hover:border-primary-200 hover:shadow-md transition-all p-4 flex flex-col gap-2">
@@ -341,24 +345,9 @@
             </div>
 
             <!-- ── Pagination ────────────────────────────────────────────── -->
-            <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 py-2">
-                <button @click="page = 1" :disabled="page === 1"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">«</button>
-                <button @click="page--" :disabled="page === 1"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">‹</button>
-                <template v-for="n in pageNumbers" :key="n">
-                    <span v-if="n === '...'" class="px-2 py-1.5 text-xs text-gray-400">…</span>
-                    <button v-else @click="page = n"
-                        :class="['px-2.5 py-1.5 text-xs border rounded-lg transition-colors',
-                            n === page ? 'bg-primary-600 text-white border-primary-600' : 'border-gray-200 hover:bg-gray-50']">
-                        {{ n }}
-                    </button>
-                </template>
-                <button @click="page++" :disabled="page === totalPages"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">›</button>
-                <button @click="page = totalPages" :disabled="page === totalPages"
-                    class="px-2 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">»</button>
-            </div>
+            <PaginationBar v-if="!loading && !loadError && filtered.length" v-model:page="page"
+                :total-pages="totalPages" :pages="pageNumbers"
+                :from="pageFrom" :to="pageTo" :total="filtered.length" />
 
         </div>
     </AppLayout>
@@ -369,6 +358,7 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
+import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
 import { exportTableToExcel } from '@/utils/exportExcel';
@@ -560,6 +550,15 @@ const paginated = computed(() => {
 const totalPages = computed(() =>
     perPage.value === 'all' ? 1 : Math.max(1, Math.ceil(filtered.value.length / Number(perPage.value)))
 );
+
+const pageFrom = computed(() => (filtered.value.length === 0 ? 0
+    : perPage.value === 'all' ? 1 : (page.value - 1) * Number(perPage.value) + 1));
+const pageTo = computed(() => (perPage.value === 'all'
+    ? filtered.value.length
+    : Math.min(page.value * Number(perPage.value), filtered.value.length)));
+
+// Lọc/đổi số dòng mỗi trang có thể làm số trang giảm khi đang ở trang cuối
+watch(totalPages, t => { if (page.value > t) page.value = t; });
 
 const pageNumbers = computed(() => {
     const total = totalPages.value;
