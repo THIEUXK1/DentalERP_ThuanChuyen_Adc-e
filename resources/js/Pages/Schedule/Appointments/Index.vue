@@ -1098,7 +1098,9 @@ function doBulkTransition() {
 // ── Quick register (check-in) ───────────────────────────────────
 const QUICK_REGISTER_STATUSES = ['booked', 'confirmed'];
 const quickRegisteringId = ref(null);
-function canQuickRegister(a) { return QUICK_REGISTER_STATUSES.includes(a.status); }
+// Chỉ lịch hẹn của hôm nay mới đăng ký khám được — đăng ký khám là danh sách
+// bệnh nhân đã có mặt trong ngày, không phải chỗ đặt trước cho ngày khác.
+function canQuickRegister(a) { return a.is_today && QUICK_REGISTER_STATUSES.includes(a.status); }
 function quickRegister(a) {
     if (quickRegisteringId.value) return;
     quickRegisteringId.value = a.id;

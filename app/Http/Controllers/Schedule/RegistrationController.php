@@ -52,13 +52,12 @@ class RegistrationController extends Controller
         $this->authorize('appointments.create');
 
         $data = $request->validate([
-            'patient_id'        => 'required|exists:patients,id',
-            'registration_date' => 'required|date',
-            'visit_time'        => 'nullable|date_format:H:i',
-            'doctor_id'         => 'nullable|exists:employees,id',
-            'dental_chair_id'   => 'nullable|exists:dental_chairs,id',
-            'status'            => 'required|in:pending,in_treatment,completed,cancelled',
-            'notes'             => 'nullable|string|max:2000',
+            'patient_id'      => 'required|exists:patients,id',
+            'visit_time'      => 'nullable|date_format:H:i',
+            'doctor_id'       => 'nullable|exists:employees,id',
+            'dental_chair_id' => 'nullable|exists:dental_chairs,id',
+            'status'          => 'required|in:pending,in_treatment,completed,cancelled',
+            'notes'           => 'nullable|string|max:2000',
         ]);
 
         $patient = Patient::findOrFail($data['patient_id']);
@@ -66,9 +65,12 @@ class RegistrationController extends Controller
         try {
             ScheduleRegistration::create([
                 ...$data,
-                'code'       => ScheduleRegistration::generateCode(),
-                'branch_id'  => $patient->branch_id ?? auth()->user()->branch_id,
-                'created_by' => auth()->id(),
+                // Đăng ký khám luôn thuộc về ngày hôm nay: bệnh nhân đã có mặt tại phòng khám.
+                // Đặt trước cho ngày khác là việc của Lịch hẹn, không phải Đăng ký khám.
+                'registration_date' => today()->toDateString(),
+                'code'              => ScheduleRegistration::generateCode(),
+                'branch_id'         => $patient->branch_id ?? auth()->user()->branch_id,
+                'created_by'        => auth()->id(),
             ]);
         } catch (\Illuminate\Database\UniqueConstraintViolationException) {
             return back()->withErrors(['code' => 'Mã đăng ký bị trùng, vui lòng thử lại.'])->withInput();
@@ -81,14 +83,15 @@ class RegistrationController extends Controller
     {
         $this->authorize('appointments.create');
 
+        // Không có 'registration_date': ngày khám của một đăng ký là cố định,
+        // không cho phép dời sang ngày khác sau khi đã tạo.
         $data = $request->validate([
-            'patient_id'        => 'sometimes|exists:patients,id',
-            'registration_date' => 'sometimes|date',
-            'visit_time'        => 'nullable|date_format:H:i',
-            'doctor_id'         => 'nullable|exists:employees,id',
-            'dental_chair_id'   => 'nullable|exists:dental_chairs,id',
-            'status'            => 'sometimes|in:pending,in_treatment,completed,cancelled',
-            'notes'             => 'nullable|string|max:2000',
+            'patient_id'      => 'sometimes|exists:patients,id',
+            'visit_time'      => 'nullable|date_format:H:i',
+            'doctor_id'       => 'nullable|exists:employees,id',
+            'dental_chair_id' => 'nullable|exists:dental_chairs,id',
+            'status'          => 'sometimes|in:pending,in_treatment,completed,cancelled',
+            'notes'           => 'nullable|string|max:2000',
         ]);
 
         $registration->update($data);

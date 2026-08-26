@@ -372,6 +372,7 @@ class PatientController extends Controller
             'scheduled_at'     => $a->scheduled_at->format('d/m/Y H:i'),
             'scheduled_date'   => $a->scheduled_at->format('d/m/Y'),
             'scheduled_time'   => $a->scheduled_at->format('H:i'),
+            'is_today'         => $a->scheduled_at->isToday(),
             'duration_minutes' => $a->duration_minutes,
             'doctor'           => $a->doctor?->full_name ?? '—',
             'service'          => $a->service?->name ?? '—',

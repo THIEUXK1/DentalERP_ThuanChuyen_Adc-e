@@ -110,8 +110,11 @@ const { hasPermission: can } = usePermission();
 const QUICK_REGISTER_STATUSES = ['booked', 'confirmed'];
 const quickRegisteringId = ref(null);
 
+// Chỉ lịch hẹn của hôm nay mới đăng ký khám được — đăng ký khám là danh sách
+// bệnh nhân đã có mặt trong ngày, không phải chỗ đặt trước cho ngày khác.
 function canQuickRegister(appt) {
-    return can('appointments.manage') && QUICK_REGISTER_STATUSES.includes(appt.status) && !appt.has_registration;
+    return can('appointments.manage') && appt.is_today
+        && QUICK_REGISTER_STATUSES.includes(appt.status) && !appt.has_registration;
 }
 
 function quickRegister(appt) {

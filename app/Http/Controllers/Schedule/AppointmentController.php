@@ -183,6 +183,12 @@ class AppointmentController extends Controller
             return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');
         }
 
+        // Đăng ký khám = bệnh nhân đã có mặt tại phòng khám hôm nay. Lịch hẹn của ngày
+        // khác không được đẩy sang danh sách đăng ký, kể cả khi nhân viên bấm nhầm.
+        if (! $appointment->scheduled_at->isToday()) {
+            return back()->with('error', 'Chỉ đăng ký khám được cho lịch hẹn trong ngày hôm nay.');
+        }
+
         try {
             DB::transaction(function () use ($appointment) {
                 ScheduleRegistration::create([
@@ -192,18 +198,14 @@ class AppointmentController extends Controller
                     'branch_id' => $appointment->branch_id,
                     'doctor_id' => $appointment->doctor_id,
                     'dental_chair_id' => $appointment->dental_chair_id,
-                    'registration_date' => $appointment->scheduled_at->toDateString(),
+                    'registration_date' => today()->toDateString(),
                     'visit_time' => $appointment->scheduled_at->format('H:i'),
                     'status' => 'pending',
                     'notes' => $appointment->notes,
                     'created_by' => auth()->id(),
                 ]);
 
-                $arrivedStatus = now()->toDateString() < $appointment->scheduled_at->toDateString()
-                    ? AppointmentStatus::ArrivedEarly
-                    : AppointmentStatus::CheckedIn;
-
-                $this->svc->transition($appointment, $arrivedStatus);
+                $this->svc->transition($appointment, AppointmentStatus::CheckedIn);
             });
         } catch (\Illuminate\Database\UniqueConstraintViolationException) {
             return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');
@@ -306,6 +308,9 @@ class AppointmentController extends Controller
             'service' => $a->service?->name ?? '—',
             'branch' => $a->branch->name ?? '—',
             'scheduled_at' => $a->scheduled_at->format('Y-m-d H:i'),
+            // Chỉ lịch hẹn hôm nay mới được đăng ký khám; tính ở server để dùng
+            // đúng múi giờ phòng khám thay vì giờ máy của người dùng.
+            'is_today' => $a->scheduled_at->isToday(),
             'ends_at' => $a->ends_at->format('H:i'),
             'duration_minutes' => $a->duration_minutes,
             'status' => $a->status->value,

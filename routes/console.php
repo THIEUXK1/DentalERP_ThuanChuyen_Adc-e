@@ -19,3 +19,7 @@ Schedule::command('pending-deletions:execute')->everyMinute();
 
 // Daily check that invoice.amount_paid matches the sum of its patient_payments rows
 Schedule::command('invoices:audit-payments')->dailyAt('06:00')->timezone('Asia/Ho_Chi_Minh');
+
+// Chốt đăng ký khám của ngày hôm trước: hết ngày là coi như đã xong, không còn "đang chờ".
+// Chạy 00:05 thay vì cuối ngày để không cắt ngang ca khám kéo dài quá nửa đêm.
+Schedule::command('registrations:close-day')->dailyAt('00:05')->timezone('Asia/Ho_Chi_Minh');

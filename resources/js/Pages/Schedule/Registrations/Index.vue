@@ -142,11 +142,13 @@
                                     :class="['text-xs font-medium rounded-full px-2 py-0.5 border-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-300', statusClass(r.status_color)]">
                                     <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
                                 </select>
-                                <div v-if="r.status === 'pending' && r.pending_since"
+                                <div v-if="r.status === 'pending' && r.pending_since && r.registration_date === today"
                                     class="mt-0.5 text-xs font-mono text-yellow-600 flex items-center gap-0.5">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                     {{ elapsed(r.pending_since) }}
                                 </div>
+                                <div v-else-if="r.status === 'pending' && r.registration_date < today"
+                                    class="mt-0.5 text-xs text-red-500">Chưa chốt</div>
                             </td>
                             <td class="hidden xl:table-cell px-4 py-3 text-gray-500 max-w-xs truncate">{{ r.notes ?? '—' }}</td>
                             <td class="px-4 py-3 text-right">
@@ -212,8 +214,9 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Ngày khám</label>
-                            <input type="date" v-model="createForm.registration_date"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
+                            <div class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                                {{ formatDateVn(today) }} <span class="text-gray-400">(hôm nay)</span>
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Giờ vào</label>
@@ -221,6 +224,11 @@
                                 class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
                         </div>
                     </div>
+
+                    <p v-if="!isToday" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        Bạn đang xem ngày {{ formatDateVn(selectedDate) }}. Đăng ký khám luôn ghi vào ngày hôm nay —
+                        muốn đặt trước cho ngày khác thì tạo Lịch hẹn.
+                    </p>
 
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -278,8 +286,9 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Ngày khám</label>
-                            <input type="date" v-model="editForm.registration_date"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none" />
+                            <div class="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                                {{ formatDateVn(editForm.registration_date) }}
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 mb-1">Giờ vào</label>
@@ -358,21 +367,26 @@ const props = defineProps({
     chairs:            Array,
 });
 
-const today = new Date().toISOString().slice(0, 10);
+// toISOString() trả về ngày theo giờ UTC, lệch 1 ngày so với server (Asia/Ho_Chi_Minh)
+// khi mở trang trước 7h sáng. Luôn lấy ngày theo lịch của chính máy đang dùng.
+function toDateKey(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+const today = toDateKey(new Date());
 const selectedDate = ref(today);
 const search = ref('');
 const filterStatus = ref('');
 
 const isToday = computed(() => selectedDate.value === today);
 
-function prevDay() {
-    const d = new Date(selectedDate.value); d.setDate(d.getDate() - 1);
-    selectedDate.value = d.toISOString().slice(0, 10);
+function shiftDay(days) {
+    const [y, m, d] = selectedDate.value.split('-').map(Number);
+    const dt = new Date(y, m - 1, d + days);
+    selectedDate.value = toDateKey(dt);
 }
-function nextDay() {
-    const d = new Date(selectedDate.value); d.setDate(d.getDate() + 1);
-    selectedDate.value = d.toISOString().slice(0, 10);
-}
+function prevDay() { shiftDay(-1); }
+function nextDay() { shiftDay(1); }
 function goToday() { selectedDate.value = today; }
 function clearFilters() { search.value = ''; filterStatus.value = ''; }
 
@@ -474,8 +488,9 @@ function changeStatus(r, newStatus) {
 // ── Create modal ─────────────────────────────────────────────────────────
 const createModal = ref({ open: false });
 const patientSearch = ref('');
+// Không có registration_date: server luôn ghi đăng ký vào ngày hôm nay.
 const createForm = ref({
-    patient_id: null, registration_date: today, visit_time: '',
+    patient_id: null, visit_time: '',
     doctor_id: null, dental_chair_id: null, status: 'pending', notes: '',
 });
 
@@ -489,8 +504,8 @@ const patientSuggestions = computed(() => {
 
 function openCreate() {
     createForm.value = {
-        patient_id: null, registration_date: selectedDate.value,
-        visit_time: '', doctor_id: null, dental_chair_id: null,
+        patient_id: null, visit_time: '',
+        doctor_id: null, dental_chair_id: null,
         status: 'pending', notes: '',
     };
     patientSearch.value = '';
@@ -510,7 +525,11 @@ function clearPatient() {
 function submitCreate() {
     router.post(route('schedule.registrations.store'), createForm.value, {
         preserveScroll: true,
-        onSuccess: () => { createModal.value.open = false; },
+        onSuccess: () => {
+            createModal.value.open = false;
+            // Bản ghi vừa tạo luôn nằm ở hôm nay, kéo màn hình về đó để thấy ngay.
+            selectedDate.value = today;
+        },
     });
 }
 
@@ -535,7 +554,9 @@ function openEdit(r) {
 }
 
 function submitEdit() {
-    router.put(route('schedule.registrations.update', editForm.value.id), editForm.value, {
+    // registration_date chỉ để hiển thị, không gửi lên: ngày khám là cố định.
+    const { id, registration_date, ...payload } = editForm.value;
+    router.put(route('schedule.registrations.update', id), payload, {
         preserveScroll: true,
         onSuccess: () => { editModal.value.open = false; },
     });
