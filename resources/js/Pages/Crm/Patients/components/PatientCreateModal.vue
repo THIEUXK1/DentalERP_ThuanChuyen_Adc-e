@@ -254,6 +254,7 @@ async function handleSubmit() {
             },
             body: JSON.stringify({ full_name: form.full_name, phone: form.phone }),
         });
+        if (!resp.ok) throw Object.assign(new Error('check-duplicate HTTP ' + resp.status), { status: resp.status });
         const { warnings: w } = await resp.json();
         const hasWarning = w.phone_empty || w.name_duplicate || w.full_duplicate;
         if (hasWarning) {
@@ -262,8 +263,17 @@ async function handleSubmit() {
         } else {
             doSave();
         }
-    } catch {
-        alert('Không thể kiểm tra trùng lặp. Vui lòng thử lại.');
+    } catch (err) {
+        console.error('check-duplicate error:', err);
+        if (err?.status === 419) {
+            alert('Phiên đăng nhập đã hết hạn. Trang sẽ được tải lại, bạn đăng nhập rồi nhập lại hồ sơ giúp mình nhé.');
+            window.location.reload();
+        } else if (err?.status === 403) {
+            alert('Tài khoản của bạn không có quyền tạo hồ sơ bệnh nhân. Vui lòng liên hệ quản trị viên.');
+        } else if (confirm('Không kiểm tra được trùng lặp (lỗi ' + (err?.status ?? 'kết nối') + '). Bạn có muốn lưu hồ sơ mà không kiểm tra trùng không?')) {
+            form.force_save = true;
+            doSave();
+        }
     } finally {
         checking.value = false;
     }

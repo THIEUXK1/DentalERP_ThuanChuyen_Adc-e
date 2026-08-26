@@ -3,8 +3,8 @@
         <div class="space-y-4">
 
             <!-- ── Header ───────────────────────────────────────────────────── -->
-            <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
-                <div class="flex items-start justify-between gap-4">
+            <div class="bg-white rounded-xl border border-gray-200 px-4 sm:px-5 py-4">
+                <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                     <div class="min-w-0">
                         <div class="flex items-center gap-2 flex-wrap mb-1">
                             <Link :href="route('clinical.treatment-plans.index')" class="text-gray-400 hover:text-gray-600 text-sm">← Kế hoạch</Link>
@@ -13,27 +13,27 @@
                             <StatusBadge :color="plan.status_color">{{ plan.status_label }}</StatusBadge>
                         </div>
                         <Link :href="route('patients.show', plan.patient_id)"
-                            class="text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors">
+                            class="block text-lg sm:text-xl font-bold text-gray-900 hover:text-indigo-600 transition-colors break-words">
                             {{ plan.patient }}
                         </Link>
-                        <p class="text-sm text-gray-500 mt-0.5">
+                        <p class="text-sm text-gray-500 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                             <span v-if="plan.doctor">🦷 {{ plan.doctor }}</span>
-                            <span v-if="plan.consultant" class="ml-3">💬 {{ plan.consultant }}</span>
-                            <span class="ml-3 text-gray-400">{{ plan.created_at }}</span>
+                            <span v-if="plan.consultant">💬 {{ plan.consultant }}</span>
+                            <span class="text-gray-400">{{ plan.created_at }}</span>
                         </p>
                     </div>
                     <div class="flex gap-2 flex-shrink-0">
                         <Link :href="plan.primary_invoice_id
                                 ? route('cashier.invoices.show', plan.primary_invoice_id)
                                 : route('cashier.invoices.index', { plan_id: plan.id })"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-indigo-700 font-medium">
+                            class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 text-indigo-700 font-medium">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/>
                             </svg>
                             Hóa đơn
                         </Link>
                         <a :href="route('clinical.treatment-plans.pdf', plan.id)" target="_blank"
-                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+                            class="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                             </svg>
@@ -43,23 +43,23 @@
                 </div>
 
                 <!-- Financial summary bar -->
-                <div class="mt-3 flex flex-wrap gap-4 text-sm bg-slate-800 rounded-xl px-4 py-3">
-                    <div class="flex items-center gap-2">
+                <div class="mt-3 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2 sm:gap-4 text-sm bg-slate-800 rounded-xl px-4 py-3">
+                    <div class="flex items-center justify-between sm:justify-start gap-2">
                         <span class="text-slate-400 text-xs">Tổng dịch vụ</span>
                         <span class="font-bold text-white tabular-nums">{{ formatVnd(plan.total_amount) }}</span>
                     </div>
                     <div class="h-4 w-px bg-slate-600 hidden sm:block self-center"></div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center justify-between sm:justify-start gap-2">
                         <span class="text-slate-400 text-xs">Giảm giá</span>
                         <span class="font-bold text-rose-400 tabular-nums">-{{ formatVnd(plan.discount_amount) }}</span>
                     </div>
                     <div class="h-4 w-px bg-slate-600 hidden sm:block self-center"></div>
-                    <div class="flex items-center gap-2">
+                    <div class="flex items-center justify-between sm:justify-start gap-2 border-t border-slate-700 pt-2 sm:border-0 sm:pt-0">
                         <span class="text-slate-400 text-xs">Thực thu</span>
                         <span class="font-bold text-emerald-400 tabular-nums text-base">{{ formatVnd(plan.net_total) }}</span>
                     </div>
                     <span v-if="plan.approved_at"
-                        class="ml-auto text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2.5 py-1 rounded-full font-medium self-center">
+                        class="sm:ml-auto text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 px-2.5 py-1 rounded-full font-medium self-start sm:self-center">
                         ✓ Đã duyệt {{ plan.approved_at }}
                     </span>
                 </div>
@@ -78,7 +78,12 @@
                             </svg>
                             Sơ đồ răng — chọn vị trí điều trị
                         </h3>
-                        <ToothChart v-model="selectedTeeth" :treated-teeth="treatedTeethList" @select="onTeethSelect" />
+                        <!-- Sơ đồ 32 răng có bề ngang cố định — cho cuộn ngang thay vì bóp méo trên màn nhỏ -->
+                        <div class="-mx-4 px-4 overflow-x-auto">
+                            <div class="min-w-[560px]">
+                                <ToothChart v-model="selectedTeeth" :treated-teeth="treatedTeethList" @select="onTeethSelect" />
+                            </div>
+                        </div>
                         <p v-if="selectedTeeth.length" class="mt-2 text-xs text-indigo-600 font-medium">
                             Đã chọn: Răng {{ selectedTeeth.join(', ') }}
                         </p>
@@ -196,7 +201,7 @@
                     </div>
 
                     <!-- Items table -->
-                    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden overflow-x-auto">
+                    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
                         <div class="px-4 py-3 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
                             <h3 class="text-sm font-semibold text-gray-700">Danh sách dịch vụ điều trị</h3>
                             <span class="text-xs text-gray-400">{{ items.length }} dịch vụ</span>
@@ -207,7 +212,73 @@
                             </svg>
                             <p class="text-sm">Chưa có dịch vụ nào</p>
                         </div>
-                        <table v-else class="w-full text-sm">
+
+                        <!-- Mobile: mỗi dịch vụ là một thẻ, tránh phải cuộn ngang cả bảng 9 cột -->
+                        <div v-else class="md:hidden divide-y divide-gray-100">
+                            <div v-for="(item, idx) in items" :key="item.id" class="px-4 py-3">
+                                <div class="flex items-start justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="font-medium text-gray-900 text-sm">
+                                            <span class="text-gray-400 text-xs mr-1">{{ idx + 1 }}.</span>{{ item.service_name }}
+                                        </p>
+                                        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                                            <span v-if="item.tooth_number"
+                                                class="inline-flex items-center px-2 py-0.5 rounded bg-blue-50 text-blue-700 font-mono text-xs">
+                                                R{{ item.tooth_number }}
+                                            </span>
+                                            <span class="text-xs text-gray-500 tabular-nums">
+                                                {{ item.quantity }} × {{ formatVnd(item.unit_price) }}
+                                            </span>
+                                            <span v-if="item.discount" class="text-xs text-rose-500 tabular-nums">
+                                                -{{ formatVnd(item.discount) }}
+                                            </span>
+                                        </div>
+                                        <p v-if="item.stage_name" class="text-xs text-indigo-500 mt-0.5">📋 {{ item.stage_name }}</p>
+                                        <p v-if="item.diagnosis" class="text-xs text-amber-600 mt-0.5">🔍 {{ item.diagnosis }}</p>
+                                        <p v-if="item.doctor_name" class="text-xs text-indigo-500 mt-0.5">
+                                            🦷 {{ item.doctor_name }}
+                                            <span v-if="item.assistant_name" class="text-gray-400"> · Trợ: {{ item.assistant_name }}</span>
+                                        </p>
+                                    </div>
+                                    <div class="text-right flex-shrink-0">
+                                        <p class="font-semibold text-gray-900 tabular-nums text-sm">
+                                            {{ formatVnd(item.quantity * item.unit_price - (item.discount ?? 0)) }}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center justify-between gap-2 mt-2" @click.stop>
+                                    <button v-if="can('treatment_plans.edit')"
+                                        :class="['inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-80 disabled:opacity-50',
+                                            itemStatusClass(item.status)]"
+                                        :disabled="itemStatusSaving[item.id]"
+                                        @click="openItemMenu(item, $event)">
+                                        {{ item.status_label }}
+                                        <svg class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                    <StatusBadge v-else :color="item.status_color">{{ item.status_label }}</StatusBadge>
+                                    <div class="flex items-center gap-3 flex-shrink-0">
+                                        <button @click="openDetail(item)"
+                                            class="text-indigo-500 hover:text-indigo-700 text-xs font-medium">Chi tiết</button>
+                                        <button v-if="item.status !== 'completed' && plan.status === 'in_progress'"
+                                            @click="completeItem(item.id)"
+                                            class="text-emerald-600 hover:text-emerald-800 text-xs font-medium">✓ Xong</button>
+                                        <button v-if="plan.items_editable"
+                                            @click="removeItem(item.id)"
+                                            class="text-red-400 hover:text-red-600 text-xs">Xóa</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                                <span class="text-xs font-medium text-gray-500">Tổng</span>
+                                <span class="font-bold text-gray-900 tabular-nums">{{ formatVnd(tableTotal) }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Desktop: bảng đầy đủ -->
+                        <div v-if="items.length" class="hidden md:block overflow-x-auto">
+                        <table class="w-full text-sm">
                             <thead class="bg-gray-50/60 text-gray-500 text-xs border-b border-gray-100">
                                 <tr>
                                     <th class="px-4 py-2.5 text-left font-medium w-6">#</th>
@@ -282,11 +353,13 @@
                                 </tr>
                             </tbody>
                         </table>
+                        </div>
                     </div>
                 </div>
 
                 <!-- RIGHT: Summary + Status transitions + Payment schedule -->
-                <div class="space-y-4">
+                <!-- Tablet (md): xếp 2 cột cho đỡ dài; desktop (lg) trở lại 1 cột dọc bên phải -->
+                <div class="space-y-4 md:space-y-0 md:grid md:grid-cols-2 md:gap-4 md:items-start lg:block lg:space-y-4">
 
                     <!-- 4-stage stepper -->
                     <div class="bg-white rounded-xl border border-gray-200 p-4">
@@ -544,7 +617,7 @@
                             </div>
 
                             <!-- Body -->
-                            <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+                            <div class="flex-1 overflow-y-auto px-4 sm:px-5 py-4 space-y-4">
 
                                 <!-- Status badge (đổi nhanh được, như ngoài bảng) -->
                                 <div class="flex items-center gap-2" @click.stop>
@@ -670,9 +743,9 @@
                             </div>
 
                             <!-- Footer actions -->
-                            <div class="px-5 py-4 border-t border-gray-100 bg-gray-50 flex items-center gap-2">
+                            <div class="px-4 sm:px-5 py-4 border-t border-gray-100 bg-gray-50 flex flex-wrap items-center gap-2">
                                 <button v-if="canEditItems" @click="saveDetail" :disabled="detailForm.processing"
-                                    class="flex-1 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
+                                    class="flex-1 min-w-[120px] py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 font-medium">
                                     Lưu thay đổi
                                 </button>
                                 <button v-if="detailItem.status !== 'completed' && plan.status === 'in_progress'"
@@ -827,7 +900,7 @@
         <!-- Menu đổi nhanh trạng thái dịch vụ (z cao hơn modal chi tiết) -->
         <Teleport to="body">
             <div v-if="itemMenu"
-                class="fixed z-[60] bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]"
+                class="fixed z-[60] bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px] max-h-[70vh] overflow-y-auto"
                 :style="{ left: itemMenu.x + 'px', top: itemMenu.y + 'px' }"
                 @click.stop>
                 <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Chuyển sang</p>
@@ -1166,14 +1239,18 @@ function itemStatusDot(status) {
 const itemMenu         = ref(null);
 const itemStatusSaving = reactive({});
 const MENU_WIDTH       = 170;
+const MENU_HEIGHT      = 280; // 7 trạng thái + tiêu đề
 
 function openItemMenu(item, event) {
     if (itemMenu.value?.item.id === item.id) { closeItemMenu(); return; }
     const rect = event.currentTarget.getBoundingClientRect();
+    // Trên màn hình thấp (mobile) menu mở xuống dưới sẽ lọt ra ngoài viewport → lật lên trên.
+    const openUpward = rect.bottom + MENU_HEIGHT + 8 > window.innerHeight
+        && rect.top - MENU_HEIGHT - 8 > 0;
     itemMenu.value = {
         item,
         x: Math.max(8, Math.min(rect.left, window.innerWidth - MENU_WIDTH - 8)),
-        y: rect.bottom + 4,
+        y: openUpward ? rect.top - MENU_HEIGHT - 4 : rect.bottom + 4,
     };
 }
 function closeItemMenu() { itemMenu.value = null; }

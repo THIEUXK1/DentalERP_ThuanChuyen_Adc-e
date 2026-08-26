@@ -4,35 +4,35 @@
 
             <!-- Header -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Tổng quan</h1>
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Tổng quan</h1>
                     <p class="text-sm text-gray-500 mt-0.5">{{ dateLabel }}</p>
                 </div>
-                <div class="flex items-center gap-2 flex-wrap">
-                    <!-- Date nav -->
-                    <div class="flex items-center gap-1">
-                        <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500">
+                <div class="flex flex-wrap items-center gap-2">
+                    <!-- Date nav: chiếm trọn hàng trên mobile để ô ngày không bị bóp -->
+                    <div class="flex items-center gap-1 w-full sm:w-auto">
+                        <button @click="changeDate(-1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500 shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         </button>
                         <input v-model="dateSel" @change="changeToDate" type="date"
-                            class="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white" />
-                        <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500">
+                            class="flex-1 sm:flex-none min-w-0 border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white" />
+                        <button @click="changeDate(1)" class="p-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500 shrink-0">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                         <button v-if="!isToday" @click="goToday"
-                            class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors">
+                            class="px-3 py-1.5 text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg hover:bg-indigo-50 transition-colors shrink-0 whitespace-nowrap">
                             Hôm nay
                         </button>
                     </div>
-                    <div v-if="branches.length > 0" class="flex items-center gap-2">
-                        <span class="text-sm text-gray-500">Chi nhánh:</span>
+                    <div v-if="branches.length > 0" class="flex items-center gap-2 flex-1 sm:flex-none min-w-0">
+                        <span class="text-sm text-gray-500 shrink-0">Chi nhánh:</span>
                         <select v-model="branchSel" @change="changeBranch"
-                            class="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
+                            class="flex-1 sm:flex-none min-w-0 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
                             <option :value="null">Tất cả</option>
                             <option v-for="b in branches" :key="b.id" :value="b.id">{{ b.name }}</option>
                         </select>
                     </div>
-                    <div class="flex items-center gap-1.5 border-l border-gray-200 pl-2.5 ml-0.5">
+                    <div class="flex items-center gap-1.5 sm:border-l sm:border-gray-200 sm:pl-2.5 sm:ml-0.5">
                         <a :href="exportUrl('pdf')"
                             class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H8a2 2 0 01-2-2V5a2 2 0 012-2h6l6 6v11a2 2 0 01-2 2z"/></svg>
@@ -48,61 +48,61 @@
             </div>
 
             <!-- KPI Cards -->
-            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-4">
-                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-sm">
+            <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
+                <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
                     <div class="flex items-start justify-between mb-3">
                         <svg class="w-5 h-5 text-blue-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                         </svg>
                         <DeltaBadge :delta="kpis.todayApptsDelta" />
                     </div>
-                    <p class="text-3xl font-bold">{{ kpis.todayAppts }}</p>
+                    <p class="text-2xl sm:text-3xl font-bold">{{ kpis.todayAppts }}</p>
                     <p class="text-blue-100 text-xs mt-1">{{ isToday ? 'Lịch hẹn hôm nay' : `Lịch hẹn ngày ${shortDateLabel}` }}</p>
                 </div>
 
-                <div v-if="canFinancial" class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-5 text-white shadow-sm">
+                <div v-if="canFinancial" class="bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
                     <div class="flex items-start justify-between mb-3">
                         <svg class="w-5 h-5 text-emerald-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
                         <DeltaBadge :delta="kpis.todayRevenueDelta" />
                     </div>
-                    <p class="text-2xl font-bold truncate">{{ formatVndShort(kpis.todayRevenue) }}</p>
+                    <p class="text-xl sm:text-2xl font-bold truncate">{{ formatVndShort(kpis.todayRevenue) }}</p>
                     <p class="text-emerald-100 text-xs mt-1">{{ isToday ? 'Doanh thu hôm nay' : `Doanh thu ngày ${shortDateLabel}` }}</p>
                 </div>
 
-                <div v-if="canFinancial" class="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl p-5 text-white shadow-sm">
+                <div v-if="canFinancial" class="bg-gradient-to-br from-rose-500 to-pink-600 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
                     <svg class="w-5 h-5 text-rose-200 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                     </svg>
-                    <p class="text-2xl font-bold truncate">{{ formatVndShort(kpis.totalOutstanding) }}</p>
+                    <p class="text-xl sm:text-2xl font-bold truncate">{{ formatVndShort(kpis.totalOutstanding) }}</p>
                     <p class="text-rose-100 text-xs mt-1">Tổng công nợ</p>
                 </div>
 
-                <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl p-5 text-white shadow-sm">
+                <div class="bg-gradient-to-br from-amber-400 to-orange-500 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
                     <div class="flex items-start justify-between mb-3">
                         <svg class="w-5 h-5 text-amber-200" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
                         <DeltaBadge :delta="kpis.newLeadsDelta" />
                     </div>
-                    <p class="text-3xl font-bold">{{ kpis.newLeads }}</p>
+                    <p class="text-2xl sm:text-3xl font-bold">{{ kpis.newLeads }}</p>
                     <p class="text-amber-100 text-xs mt-1">Lead mới (7 ngày)</p>
                 </div>
 
-                <div class="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-5 text-white shadow-sm">
+                <div class="bg-gradient-to-br from-teal-500 to-cyan-600 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
                     <svg class="w-5 h-5 text-teal-200 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
                     </svg>
-                    <p class="text-3xl font-bold">{{ kpis.activePatients }}</p>
+                    <p class="text-2xl sm:text-3xl font-bold">{{ kpis.activePatients }}</p>
                     <p class="text-teal-100 text-xs mt-1">Khách hàng</p>
                 </div>
 
-                <div class="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-5 text-white shadow-sm">
+                <div class="bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl p-4 sm:p-5 text-white shadow-sm">
                     <svg class="w-5 h-5 text-violet-200 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                     </svg>
-                    <p class="text-3xl font-bold">{{ pendingTasksCount }}</p>
+                    <p class="text-2xl sm:text-3xl font-bold">{{ pendingTasksCount }}</p>
                     <p class="text-violet-100 text-xs mt-1">Công việc Follow-up</p>
                 </div>
             </div>
@@ -147,7 +147,7 @@
 
                 <!-- Today's schedule -->
                 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-2">
                         <h3 class="text-sm font-semibold text-gray-800">
                             {{ isToday ? 'Lịch hẹn hôm nay' : `Lịch hẹn ngày ${shortDateLabel}` }}
                             <span v-if="todaySchedule.length" class="ml-2 text-xs bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full font-medium">
@@ -168,7 +168,7 @@
                     </div>
                     <ul v-else class="divide-y divide-gray-50">
                         <li v-for="a in todaySchedule" :key="a.id"
-                            class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                            class="flex items-center gap-3 px-4 sm:px-5 py-3 hover:bg-gray-50 transition-colors">
                             <span class="text-sm font-mono font-bold text-indigo-600 w-11 shrink-0">{{ a.time }}</span>
                             <div class="flex-1 min-w-0">
                                 <p class="text-sm font-medium text-gray-900 truncate">{{ a.patient }}</p>
@@ -193,7 +193,7 @@
 
             <!-- Lịch sử thanh toán — đối chiếu trực tiếp với "Doanh thu hôm nay" -->
             <div v-if="canFinancial" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
+                <div class="px-4 sm:px-5 py-4 border-b border-gray-100 flex items-center justify-between flex-wrap gap-2">
                     <h3 class="text-sm font-semibold text-gray-800">
                         {{ isToday ? 'Lịch sử thanh toán hôm nay' : `Lịch sử thanh toán ngày ${shortDateLabel}` }}
                         <span v-if="todayPayments.length" class="ml-2 text-xs bg-emerald-100 text-emerald-600 px-2 py-0.5 rounded-full font-medium">
@@ -208,7 +208,32 @@
                     </svg>
                     <p class="text-sm">{{ isToday ? 'Chưa có thanh toán nào hôm nay' : 'Không có thanh toán nào ngày này' }}</p>
                 </div>
-                <div v-else class="overflow-x-auto">
+                <!-- Mobile: dạng thẻ, khỏi cuộn ngang cả bảng -->
+                <div v-else class="sm:hidden divide-y divide-gray-50">
+                    <div v-for="p in todayPayments" :key="p.id" class="px-4 py-3 flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <Link v-if="p.patient_id" :href="route('patients.show', p.patient_id)"
+                                class="block text-sm font-medium text-gray-800 hover:text-indigo-600 truncate">{{ p.patient }}</Link>
+                            <span v-else class="block text-sm font-medium text-gray-800 truncate">{{ p.patient }}</span>
+                            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                                <span class="font-mono text-xs text-gray-400">{{ p.time }}</span>
+                                <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', apptBadgeClass(p.method_color)]">
+                                    {{ p.method_label }}
+                                </span>
+                                <Link v-if="p.invoice_id" :href="route('cashier.invoices.show', p.invoice_id)"
+                                    class="font-mono text-xs text-indigo-600 hover:underline">{{ p.invoice_code }}</Link>
+                            </div>
+                            <p v-if="p.creator" class="text-xs text-gray-400 mt-0.5">{{ p.creator }}</p>
+                        </div>
+                        <span class="text-sm font-semibold tabular-nums whitespace-nowrap flex-shrink-0"
+                            :class="p.amount < 0 ? 'text-red-600' : 'text-emerald-700'">
+                            {{ p.amount < 0 ? '−' : '' }}{{ formatVnd(Math.abs(p.amount)) }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Desktop: bảng đầy đủ -->
+                <div v-if="todayPayments.length" class="hidden sm:block overflow-x-auto">
                     <table class="w-full text-sm">
                         <thead class="bg-gray-50/60 text-gray-500 text-xs border-b border-gray-100">
                             <tr>
