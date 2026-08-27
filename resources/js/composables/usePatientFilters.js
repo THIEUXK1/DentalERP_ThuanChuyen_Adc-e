@@ -89,7 +89,8 @@ export function usePatientFilters() {
             if (q && !matchesQuery(p.full_name, q)
                   && !matchesQuery(p.phone, q)
                   && !(p.extra_phones ?? []).some(ph => matchesQuery(ph, q))
-                  && !matchesQuery(p.code, q)) return false;
+                  && !matchesQuery(p.code, q)
+                  && !matchesQuery(p.address, q)) return false;
             if (branchId.value !== '' && p.branch_id !== branchId.value) return false;
             if (source.value && p.source !== source.value) return false;
             return true;
