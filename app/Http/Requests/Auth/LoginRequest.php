@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,9 +29,38 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'email' => ['required', 'string', 'email'],
+            'login' => ['required', 'string'],
             'password' => ['required', 'string'],
         ];
+    }
+
+    /**
+     * Đổi thứ người dùng gõ vào thành đúng email đang lưu trong CSDL.
+     *
+     * Chấp nhận cả ba kiểu: email đầy đủ, chỉ tên tài khoản (phần trước @),
+     * và gõ hoa thường tuỳ ý. Cần bước này vì Postgres phân biệt hoa thường,
+     * nên Auth::attempt() so khớp email bằng dấu bằng sẽ trượt nếu chỉ khác cỡ chữ.
+     */
+    protected function resolveEmail(): string
+    {
+        $login = trim((string) $this->input('login'));
+
+        if ($login === '') {
+            return $login;
+        }
+
+        // Vô hiệu hoá ký tự đại diện của LIKE để "a%b" không khớp bừa.
+        // Dùng "!" làm ký tự thoát cho gọn, tránh rắc rối trích dẫn dấu gạch chéo ngược.
+        $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $login);
+
+        // Có "@" thì coi là email đầy đủ; không có thì ghép thêm phần đuôi bất kỳ.
+        $pattern = str_contains($login, '@') ? $escaped : $escaped.'@%';
+
+        // LOWER() ở cả hai vế nên chạy đúng trên cả Postgres lẫn SQLite (dùng khi chạy test).
+        return User::query()
+            ->whereRaw("LOWER(email) LIKE LOWER(?) ESCAPE '!'", [$pattern])
+            ->orderBy('id')
+            ->value('email') ?? $login;
     }
 
     /**
@@ -42,11 +72,17 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $credentials = [
+            'email' => $this->resolveEmail(),
+            'password' => (string) $this->input('password'),
+        ];
+
+        // luôn ghi nhớ đăng nhập: đăng nhập một lần dùng lâu dài, không cần đăng nhập lại
+        if (! Auth::attempt($credentials, true)) {
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'login' => trans('auth.failed'),
             ]);
         }
 
@@ -69,7 +105,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'login' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),
@@ -81,6 +117,6 @@ class LoginRequest extends FormRequest
      */
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->string('email')).'|'.$this->ip());
+        return Str::transliterate(Str::lower($this->string('login')).'|'.$this->ip());
     }
 }
