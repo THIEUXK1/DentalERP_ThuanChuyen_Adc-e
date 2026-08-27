@@ -36,5 +36,6 @@ createInertiaApp({
             .mount(el);
     },
 
-    progress: { color: '#4B5563' },
+    // delay thấp để thao tác 200–400ms vẫn thấy thanh tiến trình, không bị cảm giác "khựng"
+    progress: { color: '#4B5563', delay: 80 },
 });

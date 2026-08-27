@@ -4,6 +4,8 @@
         <Link
             v-if="!item.children"
             :href="safeRoute"
+            prefetch="hover"
+            cache-for="30s"
             :class="[
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-150',
                 isActive
@@ -44,6 +46,8 @@
                     v-for="child in filteredChildren"
                     :key="child.route"
                     :href="getSafeRoute(child.route)"
+                    prefetch="hover"
+                    cache-for="30s"
                     :class="[
                         'block py-1.5 px-3 rounded-md text-[12px] transition-all duration-150 truncate',
                         isRouteActive(child.route)

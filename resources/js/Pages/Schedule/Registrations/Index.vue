@@ -2,54 +2,51 @@
     <AppLayout title="Đăng ký khám" full-height>
         <div class="flex flex-col flex-1 min-h-0 gap-3">
 
-            <!-- Header -->
+            <!-- Header — không lặp lại tên màn hình (đã có ở TopBar + TabBar),
+                 thay bằng ngày đang xem để người dùng luôn biết mình đứng ở đâu -->
             <div class="flex items-center justify-between gap-3 flex-wrap flex-shrink-0">
-                <h2 class="text-lg font-semibold text-gray-800">
-                    Đăng ký khám
-                    <span class="ml-2 text-sm font-normal text-gray-400">({{ filtered.length }})</span>
-                </h2>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 min-w-0">
                     <!-- Date navigation -->
-                    <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-                        <button @click="prevDay" class="px-2 py-2 text-gray-500 hover:bg-gray-50 transition-colors">
+                    <div class="flex items-center bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                        <button @click="prevDay" title="Ngày trước"
+                            class="px-2 py-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                         </button>
                         <input type="date" v-model="selectedDate"
-                            class="border-0 text-sm text-gray-700 font-medium px-1 py-2 focus:outline-none focus:ring-0 bg-transparent cursor-pointer" />
-                        <button @click="nextDay" class="px-2 py-2 text-gray-500 hover:bg-gray-50 transition-colors">
+                            class="border-0 text-sm text-gray-800 font-semibold px-1 py-2 focus:outline-none focus:ring-0 bg-transparent cursor-pointer" />
+                        <button @click="nextDay" title="Ngày sau"
+                            class="px-2 py-2 text-gray-400 hover:text-gray-700 hover:bg-gray-50 transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                     </div>
-                    <button @click="goToday"
-                        :class="['px-3 py-2 text-sm rounded-xl border shadow-sm font-medium transition-colors',
-                            isToday ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50']">
-                        Hôm nay
-                    </button>
-                    <button @click="openCreate"
-                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 shadow-sm font-medium">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Đăng ký mới
+
+                    <span v-if="isToday"
+                        class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold">
+                        <span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>
+                        {{ weekdayLabel }} · hôm nay
+                    </span>
+                    <button v-else @click="goToday"
+                        class="px-3 py-1.5 text-xs font-medium rounded-full border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors">
+                        {{ weekdayLabel }} · về hôm nay
                     </button>
                 </div>
+
+                <button @click="openCreate"
+                    class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded-xl hover:bg-indigo-700 shadow-sm font-medium transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Đăng ký mới
+                </button>
             </div>
 
             <!-- Stats -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-shrink-0">
-                <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <div class="text-2xl font-bold text-gray-800">{{ filtered.length }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">Tổng đăng ký</div>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <div class="text-2xl font-bold text-yellow-600">{{ countByStatus('pending') }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">Đang chờ</div>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <div class="text-2xl font-bold text-teal-600">{{ countByStatus('in_treatment') }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">Đang làm</div>
-                </div>
-                <div class="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
-                    <div class="text-2xl font-bold text-green-600">{{ countByStatus('completed') }}</div>
-                    <div class="text-xs text-gray-500 mt-0.5">Đã xong</div>
+                <div v-for="card in statCards" :key="card.label"
+                    :class="['bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3 border-l-4', card.accent]">
+                    <div class="flex items-baseline gap-2">
+                        <span :class="['text-2xl font-bold leading-none', card.text]">{{ card.value }}</span>
+                        <span v-if="card.percent !== null" class="text-xs text-gray-400">{{ card.percent }}%</span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">{{ card.label }}</div>
                 </div>
             </div>
 
@@ -100,10 +97,15 @@
                     <svg class="mx-auto w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
-                    <p class="text-gray-400 text-sm">Không có đăng ký khám nào ngày {{ formatDateVn(selectedDate) }}</p>
-                    <button @click="openCreate" class="mt-3 inline-flex items-center gap-1.5 text-sm text-indigo-600 hover:underline">
-                        Đăng ký mới
-                    </button>
+                    <p class="text-gray-500 text-sm font-medium">Chưa có đăng ký khám nào</p>
+                    <p class="text-gray-400 text-xs mt-1">{{ weekdayLabel }}, {{ formatDateVn(selectedDate) }}</p>
+                    <div>
+                        <button @click="openCreate"
+                            class="mt-4 inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Tạo đăng ký đầu tiên
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Vùng cuộn duy nhất của trang -->
@@ -406,6 +408,29 @@ const filtered = computed(() => {
 function countByStatus(status) {
     return filtered.value.filter(r => r.status === status).length;
 }
+
+const WEEKDAYS = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+const weekdayLabel = computed(() => {
+    const [y, m, d] = selectedDate.value.split('-').map(Number);
+    return WEEKDAYS[new Date(y, m - 1, d).getDay()];
+});
+
+// Tỷ lệ tính trên tổng của đúng ngày đang xem, không tính khi chưa có đăng ký nào
+function percentOf(count) {
+    const total = filtered.value.length;
+    return total ? Math.round((count / total) * 100) : null;
+}
+
+const statCards = computed(() => [
+    { label: 'Tổng đăng ký', value: filtered.value.length, percent: null,
+      accent: 'border-l-gray-300',   text: 'text-gray-800' },
+    { label: 'Đang chờ', value: countByStatus('pending'), percent: percentOf(countByStatus('pending')),
+      accent: 'border-l-yellow-400', text: 'text-yellow-600' },
+    { label: 'Đang làm', value: countByStatus('in_treatment'), percent: percentOf(countByStatus('in_treatment')),
+      accent: 'border-l-teal-400',   text: 'text-teal-600' },
+    { label: 'Đã xong', value: countByStatus('completed'), percent: percentOf(countByStatus('completed')),
+      accent: 'border-l-green-400',  text: 'text-green-600' },
+]);
 
 // ── Bộ lọc thu gọn ───────────────────────────────────────────────────────
 const showFilters = ref(localStorage.getItem('reg_filters_open') !== '0');
