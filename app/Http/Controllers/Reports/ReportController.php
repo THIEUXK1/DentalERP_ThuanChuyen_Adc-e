@@ -256,10 +256,10 @@ class ReportController extends Controller
         $period   = $request->period ?? now()->format('Y-m');
         $branchId = $request->branch_id;
 
-        $rows = $this->svc->employeePerformance($period, $branchId);
+        $data = $this->svc->employeePerformance($period, $branchId);
 
         return Inertia::render('Reports/Performance', [
-            'rows'     => $rows,
+            ...$data,
             'period'   => $period,
             'branches' => Branch::where('is_active', true)->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'filters'  => compact('period', 'branchId'),

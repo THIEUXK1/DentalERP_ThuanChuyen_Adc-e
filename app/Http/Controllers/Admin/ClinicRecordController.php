@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClinicRecord;
+use App\Support\LegacyExcelValue;
 use App\Support\RowRangeReadFilter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -11,8 +12,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
+use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
 use PhpOffice\PhpSpreadsheet\IOFactory;
-use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Style\Alignment;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -58,10 +59,10 @@ class ClinicRecordController extends Controller
             ->when($request->search, function ($q, $v) {
                 $q->where(function ($q2) use ($v) {
                     $q2->where('patient_name', 'like', "%{$v}%")
-                       ->orWhere('patient_code', 'like', "%{$v}%")
-                       ->orWhere('service_name', 'like', "%{$v}%")
-                       ->orWhere('doctor_name', 'like', "%{$v}%")
-                       ->orWhere('phone', 'like', "%{$v}%");
+                        ->orWhere('patient_code', 'like', "%{$v}%")
+                        ->orWhere('service_name', 'like', "%{$v}%")
+                        ->orWhere('doctor_name', 'like', "%{$v}%")
+                        ->orWhere('phone', 'like', "%{$v}%");
                 });
             })
             ->when($request->record_type, fn ($q, $v) => $q->where('record_type', $v))
@@ -82,17 +83,17 @@ class ClinicRecordController extends Controller
             : (in_array((int) $request->per_page, [20, 50, 100]) ? (int) $request->per_page : 50);
 
         return Inertia::render('Admin/ClinicRecords/Index', [
-            'records'      => $query->paginate(max($perPage, 1))->withQueryString(),
-            'filters'      => $request->only(['search', 'record_type', 'year', 'date_from', 'date_to', 'per_page']),
+            'records' => $query->paginate(max($perPage, 1))->withQueryString(),
+            'filters' => $request->only(['search', 'record_type', 'year', 'date_from', 'date_to', 'per_page']),
             'record_types' => ClinicRecord::distinct()->pluck('record_type')->filter()->values(),
-            'years'        => ClinicRecord::whereNotNull('record_date')
+            'years' => ClinicRecord::whereNotNull('record_date')
                 ->selectRaw('DISTINCT EXTRACT(YEAR FROM record_date) as y')
                 ->orderByDesc('y')
                 ->pluck('y')
                 ->map(fn ($y) => (int) $y)
                 ->values(),
             'unknown_year_count' => ClinicRecord::whereDate('record_date', '>', now()->toDateString())->count(),
-            'total_all'    => ClinicRecord::count(),
+            'total_all' => ClinicRecord::count(),
         ]);
     }
 
@@ -104,10 +105,10 @@ class ClinicRecordController extends Controller
                 ->when($request->search, function ($q, $v) {
                     $q->where(function ($q2) use ($v) {
                         $q2->where('patient_name', 'like', "%{$v}%")
-                           ->orWhere('patient_code', 'like', "%{$v}%")
-                           ->orWhere('service_name', 'like', "%{$v}%")
-                           ->orWhere('doctor_name', 'like', "%{$v}%")
-                           ->orWhere('phone', 'like', "%{$v}%");
+                            ->orWhere('patient_code', 'like', "%{$v}%")
+                            ->orWhere('service_name', 'like', "%{$v}%")
+                            ->orWhere('doctor_name', 'like', "%{$v}%")
+                            ->orWhere('phone', 'like', "%{$v}%");
                     });
                 })
                 ->when($request->record_type, fn ($q, $v) => $q->where('record_type', $v))
@@ -129,18 +130,18 @@ class ClinicRecordController extends Controller
 
         // Xóa theo danh sách IDs
         $ids = $request->validate([
-            'ids'   => 'required|array|min:1',
+            'ids' => 'required|array|min:1',
             'ids.*' => 'integer|exists:clinic_records,id',
         ])['ids'];
 
         ClinicRecord::whereIn('id', $ids)->delete();
 
-        return back()->with('success', 'Đã xóa ' . count($ids) . ' bản ghi.');
+        return back()->with('success', 'Đã xóa '.count($ids).' bản ghi.');
     }
 
     public function downloadTemplate(): BinaryFileResponse
     {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
         $sheet->setTitle('Dữ liệu');
 
@@ -151,7 +152,7 @@ class ClinicRecordController extends Controller
             $col++;
         }
 
-        $lastCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex(count(self::COLUMNS));
+        $lastCol = Coordinate::stringFromColumnIndex(count(self::COLUMNS));
         $sheet->getStyle("A1:{$lastCol}1")->applyFromArray([
             'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
             'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '1D4ED8']],
@@ -171,9 +172,11 @@ class ClinicRecordController extends Controller
         }
 
         $tmpDir = storage_path('app/import_tmp');
-        if (! is_dir($tmpDir)) mkdir($tmpDir, 0755, true);
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0755, true);
+        }
 
-        $path = $tmpDir . '/template_' . time() . '.xlsx';
+        $path = $tmpDir.'/template_'.time().'.xlsx';
         (new Xlsx($spreadsheet))->save($path);
 
         return response()->download($path, 'mau_bang_ghi_phong_kham.xlsx')->deleteFileAfterSend(true);
@@ -186,36 +189,40 @@ class ClinicRecordController extends Controller
         ]);
 
         $tmpDir = storage_path('app/import_tmp');
-        if (! is_dir($tmpDir)) mkdir($tmpDir, 0755, true);
+        if (! is_dir($tmpDir)) {
+            mkdir($tmpDir, 0755, true);
+        }
 
         @ini_set('memory_limit', '1024M');
 
-        $tempId  = Str::uuid()->toString();
-        $ext     = strtolower($request->file('file')->getClientOriginalExtension());
+        $tempId = Str::uuid()->toString();
+        $ext = strtolower($request->file('file')->getClientOriginalExtension());
         $xlsPath = "{$tmpDir}/{$tempId}.{$ext}";
         $request->file('file')->move($tmpDir, "{$tempId}.{$ext}");
 
         // Chỉ đọc thông tin kích thước sheet (nhẹ, không load hết dữ liệu ô)
         // để chia nhỏ việc đọc theo từng khối dòng, tránh tràn bộ nhớ với file lớn.
         try {
-            $reader    = IOFactory::createReaderForFile($xlsPath);
+            $reader = IOFactory::createReaderForFile($xlsPath);
             $reader->setReadDataOnly(true);
             $sheetInfo = $reader->listWorksheetInfo($xlsPath)[0] ?? null;
             $totalRows = (int) ($sheetInfo['totalRows'] ?? 0);
         } catch (\Throwable $e) {
             @unlink($xlsPath);
-            return response()->json(['error' => 'Không đọc được file: ' . $e->getMessage()], 422);
+
+            return response()->json(['error' => 'Không đọc được file: '.$e->getMessage()], 422);
         }
 
         if ($totalRows < 2) {
             @unlink($xlsPath);
+
             return response()->json(['error' => 'File rỗng.'], 422);
         }
 
-        $headers       = [];
+        $headers = [];
         $numericFields = ['unit_price', 'quantity', 'discount', 'amount', 'total_collected', 'remaining_debt', 'collected_this_period'];
         $processedRows = [];
-        $previewRaw    = [];  // raw values cho preview table (giữ nguyên định dạng gốc)
+        $previewRaw = [];  // raw values cho preview table (giữ nguyên định dạng gốc)
 
         $chunkSize = 3000;
 
@@ -227,7 +234,7 @@ class ClinicRecordController extends Controller
                 $reader->setReadDataOnly(true);
                 $reader->setReadFilter(new RowRangeReadFilter($start, $end));
                 $spreadsheet = $reader->load($xlsPath);
-                $chunkArr    = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
+                $chunkArr = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
                 $spreadsheet->disconnectWorksheets();
                 unset($spreadsheet);
 
@@ -237,14 +244,21 @@ class ClinicRecordController extends Controller
 
                 for ($r = $start; $r <= $end; $r++) {
                     $row = $chunkArr[$r - 1] ?? null;
-                    if ($row === null) continue;
+                    if ($row === null) {
+                        continue;
+                    }
 
                     // Bỏ qua dòng hoàn toàn trống
                     $hasContent = false;
                     foreach ($row as $cell) {
-                        if ($cell !== null && $cell !== '') { $hasContent = true; break; }
+                        if ($cell !== null && $cell !== '') {
+                            $hasContent = true;
+                            break;
+                        }
                     }
-                    if (! $hasContent) continue;
+                    if (! $hasContent) {
+                        continue;
+                    }
 
                     $data = [];
                     foreach (self::COLUMNS as $idx => $def) {
@@ -253,7 +267,9 @@ class ClinicRecordController extends Controller
                     }
 
                     // Bỏ qua dòng thiếu cả tên lẫn ngày
-                    if (! $data['patient_name'] && ! $data['record_date']) continue;
+                    if (! $data['patient_name'] && ! $data['record_date']) {
+                        continue;
+                    }
 
                     // Parse date — Excel serial hoặc chuỗi (d/m/Y, Y-m-d, …)
                     if ($data['record_date'] !== null) {
@@ -283,7 +299,8 @@ class ClinicRecordController extends Controller
             }
         } catch (\Throwable $e) {
             @unlink($xlsPath);
-            return response()->json(['error' => 'Không đọc được file: ' . $e->getMessage()], 422);
+
+            return response()->json(['error' => 'Không đọc được file: '.$e->getMessage()], 422);
         }
 
         @unlink($xlsPath); // Excel không cần nữa sau khi đọc xong
@@ -298,7 +315,7 @@ class ClinicRecordController extends Controller
 
         return response()->json([
             'temp_id' => $tempId,
-            'total'   => count($processedRows),
+            'total' => count($processedRows),
             'headers' => $headers,
             'preview' => $previewRaw,
         ]);
@@ -310,7 +327,7 @@ class ClinicRecordController extends Controller
             'temp_id' => ['required', 'string', 'regex:/^[a-f0-9\-]+\.(xlsx|xls)$/i'],
         ]);
 
-        $path = storage_path('app/import_tmp/' . $request->temp_id);
+        $path = storage_path('app/import_tmp/'.$request->temp_id);
 
         if (! file_exists($path)) {
             return back()->with('error', 'File import đã hết hạn. Vui lòng tải lại file và thử lại.');
@@ -321,11 +338,13 @@ class ClinicRecordController extends Controller
             $rows = $spreadsheet->getActiveSheet()->toArray(null, true, true, false);
         } catch (\Throwable $e) {
             @unlink($path);
-            return back()->with('error', 'Không đọc được file: ' . $e->getMessage());
+
+            return back()->with('error', 'Không đọc được file: '.$e->getMessage());
         }
 
         if (empty($rows)) {
             @unlink($path);
+
             return back()->with('error', 'File rỗng.');
         }
 
@@ -333,7 +352,7 @@ class ClinicRecordController extends Controller
 
         $numericFields = ['unit_price', 'quantity', 'discount', 'amount', 'total_collected', 'remaining_debt', 'collected_this_period'];
         $inserted = 0;
-        $skipped  = 0;
+        $skipped = 0;
 
         foreach ($rows as $row) {
             $data = [];
@@ -345,6 +364,7 @@ class ClinicRecordController extends Controller
             // Skip completely empty rows
             if (! $data['patient_name'] && ! $data['record_date']) {
                 $skipped++;
+
                 continue;
             }
 
@@ -366,91 +386,38 @@ class ClinicRecordController extends Controller
         @unlink($path);
 
         $msg = "Đã import {$inserted} bản ghi thành công.";
-        if ($skipped > 0) $msg .= " Bỏ qua {$skipped} dòng trống/lỗi.";
+        if ($skipped > 0) {
+            $msg .= " Bỏ qua {$skipped} dòng trống/lỗi.";
+        }
 
         return back()->with('success', $msg);
     }
 
+    // Quy tắc parse dùng chung với lệnh clinic-records:import-missing — xem App\Support\LegacyExcelValue.
     private static function parseBirthYear(mixed $value): ?int
     {
-        if ($value === null || $value === '' || ! is_numeric($value)) return null;
-
-        $year = (int) $value;
-
-        // smallint tối đa 32767 — chặn giá trị lỗi kiểu năm bị nối đôi (vd "19781978")
-        // hoặc ngoài khoảng năm sinh hợp lý.
-        if ($year < 1900 || $year > (int) date('Y')) return null;
-
-        return $year;
+        return LegacyExcelValue::birthYear($value);
     }
 
     private static function parseTime(mixed $value): ?string
     {
-        if ($value === null || $value === '') return null;
-
-        // Excel time fraction: 0.0–1.0 (phần thập phân của ngày).
-        // Một số file lỗi chứa cả phần ngày (số nguyên) lẫn giờ trong cùng ô —
-        // chỉ lấy phần thập phân để tránh giá trị giờ vượt quá 24h.
-        if (is_numeric($value)) {
-            $frac = fmod((float) $value, 1);
-            if ($frac < 0) $frac += 1;
-            $totalSeconds = (int) round($frac * 86400);
-            if ($totalSeconds >= 86400) $totalSeconds = 0;
-            $h = intdiv($totalSeconds, 3600);
-            $m = intdiv($totalSeconds % 3600, 60);
-            $s = $totalSeconds % 60;
-            return sprintf('%02d:%02d:%02d', $h, $m, $s);
-        }
-
-        $str = trim((string) $value);
-        // Chấp nhận H:MM hoặc HH:MM hoặc HH:MM:SS
-        if (preg_match('/^\d{1,2}:\d{2}(:\d{2})?$/', $str)) {
-            return $str;
-        }
-
-        return null;
+        return LegacyExcelValue::time($value);
     }
 
     private static function parseDate(mixed $value): ?string
     {
-        if ($value === null || $value === '') return null;
-
-        // Excel serial number
-        if (is_numeric($value)) {
-            try {
-                return ExcelDate::excelToDateTimeObject((float) $value)->format('Y-m-d');
-            } catch (\Throwable) {}
-        }
-
-        $str = trim((string) $value);
-        if ($str === '') return null;
-
-        // Try Vietnamese/common formats explicitly (Carbon::parse mis-interprets d/m/Y as m/d/Y)
-        foreach (['d/m/Y', 'd-m-Y', 'd/m/y', 'd-m-y', 'Y-m-d', 'Y/m/d'] as $fmt) {
-            $dt = \DateTime::createFromFormat($fmt, $str);
-            $errs = \DateTime::getLastErrors();
-            if ($dt !== false && ($errs === false || $errs['error_count'] === 0)) {
-                return $dt->format('Y-m-d');
-            }
-        }
-
-        // Fallback: Carbon generic parse
-        try {
-            return \Carbon\Carbon::parse($str)->format('Y-m-d');
-        } catch (\Throwable) {
-            return null;
-        }
+        return LegacyExcelValue::date($value);
     }
 
     public function importChunk(Request $request): JsonResponse
     {
         $v = $request->validate([
             'temp_id' => ['required', 'string', 'regex:/^[a-f0-9\-]+$/i'],
-            'offset'  => 'required|integer|min:0',
-            'limit'   => 'required|integer|min:1|max:2000',
+            'offset' => 'required|integer|min:0',
+            'limit' => 'required|integer|min:1|max:2000',
         ]);
 
-        $jsonPath = storage_path('app/import_tmp/' . $v['temp_id'] . '.json');
+        $jsonPath = storage_path('app/import_tmp/'.$v['temp_id'].'.json');
 
         if (! file_exists($jsonPath)) {
             return response()->json(['error' => 'Phiên import đã hết hạn. Vui lòng tải lại file.'], 422);
@@ -459,15 +426,16 @@ class ClinicRecordController extends Controller
         $allRows = json_decode(file_get_contents($jsonPath), true);
         if (! is_array($allRows)) {
             @unlink($jsonPath);
+
             return response()->json(['error' => 'Dữ liệu import bị lỗi. Vui lòng tải lại file.'], 422);
         }
 
-        $total  = count($allRows);
-        $chunk  = array_slice($allRows, $v['offset'], $v['limit']);
+        $total = count($allRows);
+        $chunk = array_slice($allRows, $v['offset'], $v['limit']);
         $isDone = ($v['offset'] + $v['limit']) >= $total;
 
         if (! empty($chunk)) {
-            $now   = now()->toDateTimeString();
+            $now = now()->toDateTimeString();
             $batch = array_map(fn ($r) => $r + ['created_at' => $now, 'updated_at' => $now], $chunk);
             ClinicRecord::insert($batch);
         }
@@ -479,10 +447,10 @@ class ClinicRecordController extends Controller
         $processed = min($v['offset'] + count($chunk), $total);
 
         return response()->json([
-            'inserted'  => count($chunk),
+            'inserted' => count($chunk),
             'processed' => $processed,
-            'total'     => $total,
-            'done'      => $isDone,
+            'total' => $total,
+            'done' => $isDone,
         ]);
     }
 }

@@ -365,27 +365,30 @@ class ReportService
         })->values()->toArray();
     }
 
+    /**
+     * Bảng tổng hợp hiệu suất + KPI của toàn bộ nhân viên trong một kỳ.
+     *
+     * Doanh thu lấy theo bác sĩ đứng tên khoản thu (fallback về bác sĩ chính của KHĐT),
+     * còn KPI lấy từ bảng phân bổ `kpi_allocations` — hai nguồn khác nhau nên một nhân
+     * viên có thể có KPI mà không có doanh thu (phụ tá, người thực hiện bước) và ngược lại.
+     */
     public function employeePerformance(string $period, ?int $branchId = null): array
     {
-        [$year, $month] = explode('-', $period);
-        $from = "{$period}-01";
-        $to   = date('Y-m-t', mktime(0, 0, 0, (int)$month, 1, (int)$year));
+        [$from, $to] = $this->periodBounds($period);
 
         $revenueRows = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
             ->join('treatment_plans', 'patient_invoices.treatment_plan_id', '=', 'treatment_plans.id')
             ->join('employees', DB::raw('COALESCE(patient_payments.doctor_id, treatment_plans.doctor_id)'), '=', 'employees.id')
             ->select(
                 'employees.id',
-                'employees.full_name',
-                'employees.code',
-                'employees.role_type',
                 DB::raw('SUM(CASE WHEN patient_payments.amount > 0 THEN patient_payments.amount ELSE 0 END) as revenue'),
-                DB::raw('COUNT(DISTINCT patient_invoices.treatment_plan_id) as case_count')
+                DB::raw('COUNT(DISTINCT patient_invoices.treatment_plan_id) as case_count'),
+                DB::raw('COUNT(DISTINCT patient_invoices.patient_id) as patient_count')
             )
             ->whereBetween('patient_payments.payment_date', [$from, $to])
             ->where('patient_payments.amount', '>', 0)
             ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
-            ->groupBy('employees.id', 'employees.full_name', 'employees.code', 'employees.role_type')
+            ->groupBy('employees.id')
             ->get()->keyBy('id');
 
         $commissionByEmployee = CommissionTransaction::where('period', $period)
@@ -393,21 +396,194 @@ class ReportService
             ->groupBy('employee_id')
             ->get()->keyBy('employee_id');
 
-        return Employee::where('is_active', true)
+        $allocations = KpiAllocation::where('period', $period)
+            ->when($branchId, fn ($q) => $q->whereHas('employee', fn ($eq) => $eq->where('branch_id', $branchId)))
+            ->get([
+                'employee_id', 'role', 'status', 'service_id',
+                'eligible_revenue', 'direct_cost', 'kpi_pool_amount', 'kpi_amount',
+                'quality_factor', 'collection_factor', 'final_kpi_amount',
+            ]);
+
+        $allocByEmployee = $allocations->groupBy('employee_id');
+
+        $rows = Employee::where('is_active', true)
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->orderBy('full_name')->get()
-            ->map(function ($emp) use ($revenueRows, $commissionByEmployee) {
-                $row = $revenueRows->get($emp->id);
+            ->map(function ($emp) use ($revenueRows, $commissionByEmployee, $allocByEmployee) {
+                $rev    = $revenueRows->get($emp->id);
+                $allocs = $allocByEmployee->get($emp->id) ?? collect();
+
+                $sumBy = fn (array $statuses) => (int) $allocs
+                    ->filter(fn ($a) => in_array($a->status->value, $statuses, true))
+                    ->sum('final_kpi_amount');
+
+                $live      = $allocs->filter(fn ($a) => $a->status->value !== 'reversed');
+                $kpiTotal  = (int) $live->sum('final_kpi_amount');
+                $kpiAmount = (int) $live->sum('kpi_amount');
+
+                // Hệ số hiển thị là trung bình có trọng số theo KPI gộp — trung bình cộng
+                // sẽ khiến một ca lẻ giá trị nhỏ kéo lệch chỉ số của cả kỳ.
+                $weighted = function (string $field) use ($live, $kpiAmount) {
+                    if ($kpiAmount <= 0) {
+                        return $live->count() ? round((float) $live->avg($field), 2) : 1.0;
+                    }
+
+                    return round($live->sum(fn ($a) => $a->{$field} * $a->kpi_amount) / $kpiAmount, 2);
+                };
+
+                $revenue    = (int) ($rev?->revenue ?? 0);
+                $caseCount  = (int) ($rev?->case_count ?? 0);
+                $commission = (int) ($commissionByEmployee->get($emp->id)?->commission ?? 0);
+
                 return [
-                    'employee_id'   => $emp->id,
-                    'employee'      => $emp->full_name,
-                    'code'          => $emp->code,
-                    'role_type'     => $emp->role_type,
-                    'revenue'       => (int) ($row?->revenue ?? 0),
-                    'case_count'    => (int) ($row?->case_count ?? 0),
-                    'commission'    => (int) ($commissionByEmployee->get($emp->id)?->commission ?? 0),
+                    'employee_id'       => $emp->id,
+                    'employee'          => $emp->full_name,
+                    'code'              => $emp->code,
+                    'role_type'         => $emp->role_type?->value,
+                    'role_label'        => $emp->role_type?->label() ?? '—',
+                    'revenue'           => $revenue,
+                    'case_count'        => $caseCount,
+                    'patient_count'     => (int) ($rev?->patient_count ?? 0),
+                    'avg_per_case'      => $caseCount > 0 ? intdiv($revenue, $caseCount) : 0,
+                    'commission'        => $commission,
+                    'kpi_total'         => $kpiTotal,
+                    'kpi_accrued'       => $sumBy(['accrued']),
+                    'kpi_pending'       => $sumBy(['pending_approval']),
+                    'kpi_approved'      => $sumBy(['approved']),
+                    'kpi_paid'          => $sumBy(['paid']),
+                    'kpi_held'          => $sumBy(['held']),
+                    'kpi_reversed'      => $sumBy(['reversed']),
+                    'alloc_count'       => $live->count(),
+                    'eligible_revenue'  => (int) $live->sum('eligible_revenue'),
+                    'direct_cost'       => (int) $live->sum('direct_cost'),
+                    'kpi_pool'          => (int) $live->sum('kpi_pool_amount'),
+                    'quality_factor'    => $weighted('quality_factor'),
+                    'collection_factor' => $weighted('collection_factor'),
+                    'total_earning'     => $commission + $kpiTotal,
                 ];
-            })->toArray();
+            })->values()->toArray();
+
+        return [
+            'rows'         => $rows,
+            'totals'       => $this->performanceTotals($rows),
+            'by_role'      => $this->kpiByAllocationRole($allocations),
+            'top_services' => $this->kpiTopServices($period, $branchId),
+            'trend'        => $this->performanceTrend($period, $branchId),
+        ];
+    }
+
+    /** Cộng dồn các cột số của bảng hiệu suất để dựng thẻ tổng quan. */
+    private function performanceTotals(array $rows): array
+    {
+        $sum = fn (string $key) => (int) array_sum(array_column($rows, $key));
+
+        $revenue = $sum('revenue');
+        $active  = array_values(array_filter($rows, fn ($r) => $r['revenue'] > 0 || $r['kpi_total'] > 0));
+        $kpi     = $sum('kpi_total');
+
+        return [
+            'revenue'        => $revenue,
+            'commission'     => $sum('commission'),
+            'kpi_total'      => $kpi,
+            'kpi_paid'       => $sum('kpi_paid'),
+            'kpi_approved'   => $sum('kpi_approved'),
+            'kpi_pending'    => $sum('kpi_pending'),
+            'kpi_accrued'    => $sum('kpi_accrued'),
+            'kpi_held'       => $sum('kpi_held'),
+            'kpi_reversed'   => $sum('kpi_reversed'),
+            'case_count'     => $sum('case_count'),
+            'alloc_count'    => $sum('alloc_count'),
+            'total_earning'  => $sum('total_earning'),
+            'headcount'      => count($rows),
+            'contributors'   => count($active),
+            'avg_per_person' => count($active) > 0 ? intdiv($kpi, count($active)) : 0,
+            'kpi_ratio'      => $revenue > 0 ? round($kpi / $revenue * 100, 1) : 0.0,
+        ];
+    }
+
+    /** KPI chia theo vai trò trong phân bổ (bác sĩ chính / người thực hiện / phụ tá). */
+    private function kpiByAllocationRole($allocations): array
+    {
+        $labels = [
+            'main_doctor'    => 'Bác sĩ chính',
+            'step_performer' => 'Người thực hiện',
+            'assistant'      => 'Phụ tá',
+        ];
+
+        return $allocations
+            ->filter(fn ($a) => $a->status->value !== 'reversed')
+            ->groupBy(fn ($a) => $a->role ?? 'other')
+            ->map(fn ($group, $role) => [
+                'role'  => $role,
+                'label' => $labels[$role] ?? 'Khác',
+                'kpi'   => (int) $group->sum('final_kpi_amount'),
+                'count' => $group->count(),
+            ])
+            ->sortByDesc('kpi')->values()->toArray();
+    }
+
+    /** Nhóm dịch vụ sinh ra nhiều KPI nhất trong kỳ. */
+    private function kpiTopServices(string $period, ?int $branchId = null): array
+    {
+        return KpiAllocation::join('dental_services', 'kpi_allocations.service_id', '=', 'dental_services.id')
+            ->where('kpi_allocations.period', $period)
+            ->where('kpi_allocations.status', '!=', 'reversed')
+            ->when($branchId, fn ($q) => $q->whereIn(
+                'kpi_allocations.employee_id',
+                Employee::where('branch_id', $branchId)->select('id')
+            ))
+            ->select(
+                'dental_services.name',
+                DB::raw('SUM(kpi_allocations.final_kpi_amount) as kpi'),
+                DB::raw('SUM(kpi_allocations.eligible_revenue) as revenue'),
+                DB::raw('COUNT(*) as alloc_count')
+            )
+            ->groupBy('dental_services.name')
+            ->orderByDesc('kpi')
+            ->limit(8)
+            ->get()
+            ->map(fn ($r) => [
+                'name'        => $r->name,
+                'kpi'         => (int) $r->kpi,
+                'revenue'     => (int) $r->revenue,
+                'alloc_count' => (int) $r->alloc_count,
+            ])->toArray();
+    }
+
+    /** Doanh thu và KPI của 6 kỳ gần nhất để vẽ đường xu hướng. */
+    private function performanceTrend(string $period, ?int $branchId = null): array
+    {
+        $periods = collect(range(5, 0))
+            ->map(fn ($back) => date('Y-m', strtotime("{$period}-01 -{$back} month")))
+            ->values();
+
+        $kpiByPeriod = KpiAllocation::whereIn('period', $periods)
+            ->where('status', '!=', 'reversed')
+            ->when($branchId, fn ($q) => $q->whereIn(
+                'employee_id',
+                Employee::where('branch_id', $branchId)->select('id')
+            ))
+            ->select('period', DB::raw('SUM(final_kpi_amount) as kpi'))
+            ->groupBy('period')
+            ->pluck('kpi', 'period');
+
+        $revenueByPeriod = PatientPayment::join('patient_invoices', 'patient_payments.invoice_id', '=', 'patient_invoices.id')
+            ->whereBetween('patient_payments.payment_date', [$periods->first().'-01', date('Y-m-t', strtotime($period.'-01'))])
+            ->where('patient_payments.amount', '>', 0)
+            ->when($branchId, fn ($q) => $q->where('patient_invoices.branch_id', $branchId))
+            ->select(
+                DB::raw("TO_CHAR(patient_payments.payment_date, 'YYYY-MM') as p"),
+                DB::raw('SUM(patient_payments.amount) as revenue')
+            )
+            ->groupBy('p')
+            ->pluck('revenue', 'p');
+
+        return $periods->map(fn ($p) => [
+            'period'  => $p,
+            'label'   => date('m/Y', strtotime($p.'-01')),
+            'kpi'     => (int) ($kpiByPeriod[$p] ?? 0),
+            'revenue' => (int) ($revenueByPeriod[$p] ?? 0),
+        ])->toArray();
     }
 
     public function debtAging(?int $branchId = null): array
