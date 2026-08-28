@@ -8,7 +8,6 @@ use App\Enums\InvoiceStatus;
 use App\Enums\LeadSource;
 use App\Enums\RelationshipType;
 use App\Enums\ToothConditionType;
-use App\Enums\TreatmentPlanStatus;
 use App\Http\Controllers\Clinical\ClinicalNoteController;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
@@ -22,10 +21,16 @@ use App\Models\PatientPayment;
 use App\Models\PendingDeletion;
 use App\Models\ScheduleRegistration;
 use App\Models\TreatmentPlan;
+use App\Services\PatientMergeService;
+use Carbon\Carbon;
+use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -56,7 +61,7 @@ class PatientController extends Controller
         // the `database` store's Postgres round-trip (TOAST compression) takes 800ms-1.5s
         // per read/write, while `file` takes ~20ms — the cache was making this endpoint
         // slower than just recomputing on every request.
-        $json = \Illuminate\Support\Facades\Cache::store('file')->remember('patients.data.list', 20, function () {
+        $json = Cache::store('file')->remember('patients.data.list', 20, function () {
             // Plain query-builder select instead of Eloquent + with()/withMin(): at 20k+ patients,
             // per-row model hydration and Carbon parsing dominate the cost (see
             // PatientInvoiceController::data() for the same fix applied to a bigger table).
@@ -104,23 +109,23 @@ class PatientController extends Controller
                 $next = $nextAppointments[$p->id] ?? null;
 
                 return [
-                    'id'                      => $p->id,
-                    'code'                    => $p->code,
-                    'full_name'               => $p->full_name,
-                    'phone'                   => $p->phone ?? '',
-                    'extra_phones'            => isset($extraPhones[$p->id]) ? explode(',', $extraPhones[$p->id]) : [],
-                    'gender'                  => $p->gender,
-                    'source'                  => $p->source,
-                    'dob_raw'                 => $p->dob,
-                    'branch'                  => $p->branch_name,
-                    'branch_id'               => $p->branch_id,
-                    'is_active'               => $p->is_active,
-                    'address'                 => $p->address,
-                    'created_at'              => $p->created_at,
-                    'created_at_raw'          => $p->created_at_raw,
-                    'next_appointment_at'     => $next,
-                    'next_appointment_display'=> $next ? \Carbon\Carbon::parse($next)->format('d/m H:i') : null,
-                    'has_registration'        => isset($registeredPatientIds[$p->id]),
+                    'id' => $p->id,
+                    'code' => $p->code,
+                    'full_name' => $p->full_name,
+                    'phone' => $p->phone ?? '',
+                    'extra_phones' => isset($extraPhones[$p->id]) ? explode(',', $extraPhones[$p->id]) : [],
+                    'gender' => $p->gender,
+                    'source' => $p->source,
+                    'dob_raw' => $p->dob,
+                    'branch' => $p->branch_name,
+                    'branch_id' => $p->branch_id,
+                    'is_active' => $p->is_active,
+                    'address' => $p->address,
+                    'created_at' => $p->created_at,
+                    'created_at_raw' => $p->created_at_raw,
+                    'next_appointment_at' => $next,
+                    'next_appointment_display' => $next ? Carbon::parse($next)->format('d/m H:i') : null,
+                    'has_registration' => isset($registeredPatientIds[$p->id]),
                 ];
             })->values()->toJson();
         });
@@ -138,15 +143,15 @@ class PatientController extends Controller
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($r) => [
-                'id'           => $r->id,
-                'code'         => $r->code,
-                'scheduled_at' => $r->registration_date->format('d/m/Y') . ($r->visit_time ? ' ' . substr($r->visit_time, 0, 5) : ''),
-                'doctor'       => $r->doctor?->full_name ?? '—',
-                'chair'        => $r->chair?->name ?? '—',
-                'status'       => $r->status,
+                'id' => $r->id,
+                'code' => $r->code,
+                'scheduled_at' => $r->registration_date->format('d/m/Y').($r->visit_time ? ' '.substr($r->visit_time, 0, 5) : ''),
+                'doctor' => $r->doctor?->full_name ?? '—',
+                'chair' => $r->chair?->name ?? '—',
+                'status' => $r->status,
                 'status_label' => $r->statusLabel(),
                 'status_color' => $r->statusColor(),
-                'notes'        => $r->notes,
+                'notes' => $r->notes,
                 'duration_minutes' => null,
             ]);
 
@@ -159,16 +164,16 @@ class PatientController extends Controller
 
         return Inertia::render('Crm/Patients/AppointmentRegister', [
             'patient' => [
-                'id'        => $patient->id,
-                'code'      => $patient->code,
+                'id' => $patient->id,
+                'code' => $patient->code,
                 'full_name' => $patient->full_name,
-                'phone'     => $patient->phone,
+                'phone' => $patient->phone,
                 'branch_id' => $patient->branch_id,
             ],
             'appointments' => $registrations,
-            'doctors'  => Employee::doctors()->where('is_active', true)->get()
+            'doctors' => Employee::doctors()->where('is_active', true)->get()
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name, 'branch_id' => $e->branch_id]),
-            'chairs'   => DentalChair::where('is_active', true)->get()
+            'chairs' => DentalChair::where('is_active', true)->get()
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
             'statuses' => $quickStatuses,
         ]);
@@ -179,28 +184,28 @@ class PatientController extends Controller
         $this->authorize('appointments.create');
 
         $data = $request->validate([
-            'scheduled_time'  => 'required|date_format:H:i',
-            'doctor_id'       => 'nullable|exists:employees,id',
+            'scheduled_time' => 'required|date_format:H:i',
+            'doctor_id' => 'nullable|exists:employees,id',
             'dental_chair_id' => 'nullable|exists:dental_chairs,id',
-            'notes'           => 'nullable|string|max:2000',
-            'status'          => 'required|in:pending,in_treatment,completed,cancelled',
-            'redirect_after'  => 'nullable|string',
+            'notes' => 'nullable|string|max:2000',
+            'status' => 'required|in:pending,in_treatment,completed,cancelled',
+            'redirect_after' => 'nullable|string',
         ]);
 
         try {
             ScheduleRegistration::create([
-                'code'              => ScheduleRegistration::generateCode(),
-                'patient_id'        => $patient->id,
-                'branch_id'         => $patient->branch_id ?? auth()->user()->branch_id ?? null,
-                'doctor_id'         => $data['doctor_id'] ?? null,
-                'dental_chair_id'   => $data['dental_chair_id'] ?? null,
+                'code' => ScheduleRegistration::generateCode(),
+                'patient_id' => $patient->id,
+                'branch_id' => $patient->branch_id ?? auth()->user()->branch_id ?? null,
+                'doctor_id' => $data['doctor_id'] ?? null,
+                'dental_chair_id' => $data['dental_chair_id'] ?? null,
                 'registration_date' => today()->format('Y-m-d'),
-                'visit_time'        => $data['scheduled_time'],
-                'status'            => $data['status'],
-                'notes'             => $data['notes'] ?? null,
-                'created_by'        => auth()->id(),
+                'visit_time' => $data['scheduled_time'],
+                'status' => $data['status'],
+                'notes' => $data['notes'] ?? null,
+                'created_by' => auth()->id(),
             ]);
-        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException) {
             return back()->withErrors(['scheduled_time' => 'Mã đăng ký bị trùng, vui lòng thử lại.'])->withInput();
         }
 
@@ -215,15 +220,15 @@ class PatientController extends Controller
         return $this->form();
     }
 
-    public function checkDuplicate(Request $request): \Illuminate\Http\JsonResponse
+    public function checkDuplicate(Request $request): JsonResponse
     {
         $this->authorize('patients.create');
 
-        $name  = trim($request->input('full_name', ''));
+        $name = trim($request->input('full_name', ''));
         $phone = trim($request->input('phone', ''));
 
         $warnings = [
-            'phone_empty'    => $phone === '',
+            'phone_empty' => $phone === '',
             'name_duplicate' => null,
             'full_duplicate' => null,
         ];
@@ -266,8 +271,8 @@ class PatientController extends Controller
 
         $patient = Patient::createWithCode($data);
         $this->syncExtraPhones($patient, $extraPhones);
-        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
-        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');
+        Cache::store('file')->forget('patients.data.list');
+        Cache::store('file')->forget('patients.lite-list');
 
         return redirect()->route('patients.index')->with('success', 'Đã tạo bệnh nhân.');
     }
@@ -283,18 +288,18 @@ class PatientController extends Controller
         ]);
     }
 
-    public function showData(Patient $patient): \Illuminate\Http\JsonResponse
+    public function showData(Patient $patient): JsonResponse
     {
         $this->authorize('patients.view');
 
         $activities = $patient->contactActivities()->with('creator')->take(20)->get()
             ->map(fn ($a) => [
-                'id'         => $a->id,
-                'type'       => $a->type->value,
+                'id' => $a->id,
+                'type' => $a->type->value,
                 'type_label' => $a->type->label(),
                 'type_color' => $a->type->color(),
-                'content'    => $a->content,
-                'creator'    => $a->creator->name,
+                'content' => $a->content,
+                'creator' => $a->creator->name,
                 'created_at' => $a->created_at->format('d/m/Y H:i'),
             ]);
 
@@ -303,14 +308,14 @@ class PatientController extends Controller
 
         $toothConditions = $patient->toothConditions()->get()
             ->map(fn ($tc) => [
-                'id'              => $tc->id,
-                'tooth_number'    => $tc->tooth_number,
-                'condition'       => $tc->condition->value,
+                'id' => $tc->id,
+                'tooth_number' => $tc->tooth_number,
+                'condition' => $tc->condition->value,
                 'condition_label' => $tc->condition->label(),
                 'condition_color' => $tc->condition->color(),
-                'svg_fill'        => $tc->condition->svgFill(),
-                'svg_stroke'      => $tc->condition->svgStroke(),
-                'note'            => $tc->note,
+                'svg_fill' => $tc->condition->svgFill(),
+                'svg_stroke' => $tc->condition->svgStroke(),
+                'note' => $tc->note,
             ]);
 
         $doctors = Employee::doctors()->where('is_active', true)->orderBy('full_name')->get()
@@ -334,28 +339,29 @@ class PatientController extends Controller
 
         $billableInvoices = $allInvoices->where('status', '!=', InvoiceStatus::Cancelled->value);
         $totalAmount = $billableInvoices->sum('total');
-        $amountPaid  = $billableInvoices->sum('amount_paid');
-        $amountDue   = max(0, $totalAmount - $amountPaid);
+        $amountPaid = $billableInvoices->sum('amount_paid');
+        $amountDue = max(0, $totalAmount - $amountPaid);
 
         $patientInvoices = $allInvoices->map(function ($inv) {
             $lastPayment = $inv->payments->first();
+
             return [
-                'id'                => $inv->id,
-                'code'              => $inv->code,
-                'status'            => $inv->status->value,
-                'status_label'      => $inv->status->label(),
-                'status_color'      => $inv->status->color(),
-                'total'             => $inv->total,
-                'amount_paid'       => $inv->amount_paid,
-                'amount_due'        => $inv->amountDue(),
-                'due_date'          => $inv->due_date?->format('d/m/Y'),
-                'due_date_raw'      => $inv->due_date?->toDateString(),
+                'id' => $inv->id,
+                'code' => $inv->code,
+                'status' => $inv->status->value,
+                'status_label' => $inv->status->label(),
+                'status_color' => $inv->status->color(),
+                'total' => $inv->total,
+                'amount_paid' => $inv->amount_paid,
+                'amount_due' => $inv->amountDue(),
+                'due_date' => $inv->due_date?->format('d/m/Y'),
+                'due_date_raw' => $inv->due_date?->toDateString(),
                 'installment_index' => $inv->installment_index,
-                'plan_id'           => $inv->treatment_plan_id,
-                'plan_code'         => $inv->treatmentPlan?->code,
-                'created_at'        => $inv->created_at->format('d/m/Y'),
+                'plan_id' => $inv->treatment_plan_id,
+                'plan_code' => $inv->treatmentPlan?->code,
+                'created_at' => $inv->created_at->format('d/m/Y'),
                 'last_payment_date' => $lastPayment?->payment_date?->format('d/m/Y'),
-                'payment_count'     => $inv->payments->count(),
+                'payment_count' => $inv->payments->count(),
             ];
         });
 
@@ -367,20 +373,23 @@ class PatientController extends Controller
             ->get();
 
         $appointments = $appointmentsRaw->map(fn ($a) => [
-            'id'               => $a->id,
-            'code'             => $a->code,
-            'scheduled_at'     => $a->scheduled_at->format('d/m/Y H:i'),
-            'scheduled_date'   => $a->scheduled_at->format('d/m/Y'),
-            'scheduled_time'   => $a->scheduled_at->format('H:i'),
-            'is_today'         => $a->scheduled_at->isToday(),
+            'id' => $a->id,
+            'code' => $a->code,
+            'scheduled_at' => $a->scheduled_at->format('d/m/Y H:i'),
+            'scheduled_date' => $a->scheduled_at->format('d/m/Y'),
+            'scheduled_time' => $a->scheduled_at->format('H:i'),
+            'is_today' => $a->scheduled_at->isToday(),
             'duration_minutes' => $a->duration_minutes,
-            'doctor'           => $a->doctor?->full_name ?? '—',
-            'service'          => $a->service?->name ?? '—',
-            'status'           => $a->status->value,
-            'status_label'     => $a->status->label(),
-            'status_color'     => $a->status->color(),
-            'notes'            => $a->notes,
+            'doctor' => $a->doctor?->full_name ?? '—',
+            'service' => $a->service?->name ?? '—',
+            'status' => $a->status->value,
+            'status_label' => $a->status->label(),
+            'status_color' => $a->status->color(),
+            'notes' => $a->notes,
             'has_registration' => (bool) $a->registration_exists,
+            // Gợi ý sớm/đúng/muộn để UI đánh dấu sẵn lựa chọn mặc định khi đăng ký khám.
+            'arrival_suggestion' => $a->suggestedArrivalStatus()->value,
+            'is_past_day' => $a->scheduled_at->lt(today()),
         ]);
 
         // ── Treatment history (plans + items) ───────────────────────────────
@@ -403,43 +412,44 @@ class PatientController extends Controller
 
         $treatmentPlans = $treatmentPlansRaw->map(function ($plan) {
             $paid = $plan->invoices->sum('amount_paid');
-            $due  = max(0, ($plan->total_amount - $plan->discount_amount) - $paid);
+            $due = max(0, ($plan->total_amount - $plan->discount_amount) - $paid);
+
             return [
-                'id'                 => $plan->id,
-                'code'               => $plan->code,
-                'status'             => $plan->status->value,
-                'status_label'       => $plan->status->label(),
-                'doctor'             => $plan->doctor?->full_name,
-                'total_amount'       => $plan->total_amount,
-                'discount_amount'    => $plan->discount_amount,
-                'net_total'          => $plan->total_amount - $plan->discount_amount,
-                'amount_paid'        => $paid,
-                'amount_due'         => $due,
-                'created_at'         => $plan->created_at->format('d/m/Y H:i'),
-                'diagnosis'          => $plan->diagnosis,
-                'chief_complaint'    => $plan->chief_complaint,
-                'treatment_goal'     => $plan->treatment_goal,
-                'priority'           => $plan->priority,
-                'start_date'         => $plan->start_date?->format('d/m/Y H:i'),
-                'start_date_raw'     => $plan->start_date?->format('Y-m-d\TH:i'),
-                'expected_end_date'  => $plan->expected_end_date?->format('d/m/Y'),
+                'id' => $plan->id,
+                'code' => $plan->code,
+                'status' => $plan->status->value,
+                'status_label' => $plan->status->label(),
+                'doctor' => $plan->doctor?->full_name,
+                'total_amount' => $plan->total_amount,
+                'discount_amount' => $plan->discount_amount,
+                'net_total' => $plan->total_amount - $plan->discount_amount,
+                'amount_paid' => $paid,
+                'amount_due' => $due,
+                'created_at' => $plan->created_at->format('d/m/Y H:i'),
+                'diagnosis' => $plan->diagnosis,
+                'chief_complaint' => $plan->chief_complaint,
+                'treatment_goal' => $plan->treatment_goal,
+                'priority' => $plan->priority,
+                'start_date' => $plan->start_date?->format('d/m/Y H:i'),
+                'start_date_raw' => $plan->start_date?->format('Y-m-d\TH:i'),
+                'expected_end_date' => $plan->expected_end_date?->format('d/m/Y'),
                 'estimated_sessions' => $plan->estimated_sessions,
-                'frequency'          => $plan->frequency,
-                'notes'              => $plan->notes,
-                'transitions'        => collect($plan->status->allowedTransitions())->map(fn ($s) => [
+                'frequency' => $plan->frequency,
+                'notes' => $plan->notes,
+                'transitions' => collect($plan->status->allowedTransitions())->map(fn ($s) => [
                     'value' => $s->value,
                 ])->values()->all(),
-                'items'              => $plan->items->map(fn ($item) => [
-                    'id'           => $item->id,
-                    'name'         => $item->name,
+                'items' => $plan->items->map(fn ($item) => [
+                    'id' => $item->id,
+                    'name' => $item->name,
                     'tooth_number' => $item->tooth_number,
-                    'unit_price'   => $item->unit_price,
-                    'quantity'     => $item->quantity,
-                    'discount'     => $item->discount,
-                    'subtotal'     => $item->subtotal,
-                    'status'       => $item->status->value,
+                    'unit_price' => $item->unit_price,
+                    'quantity' => $item->quantity,
+                    'discount' => $item->discount,
+                    'subtotal' => $item->subtotal,
+                    'status' => $item->status->value,
                     'status_label' => $item->status->label(),
-                    'notes'  => $item->notes,
+                    'notes' => $item->notes,
                     'doctor_name' => $item->responsibleDoctor?->full_name ?? $plan->doctor?->full_name,
                 ])->values()->all(),
             ];
@@ -447,43 +457,43 @@ class PatientController extends Controller
 
         // ── Phase M: Attachments ─────────────────────────────────────────────
         $attachments = $patient->attachments()->get()->map(fn ($a) => [
-            'id'         => $a->id,
-            'type'       => $a->type->value,
+            'id' => $a->id,
+            'type' => $a->type->value,
             'type_label' => $a->type->label(),
             'type_color' => $a->type->color(),
-            'title'      => $a->title,
-            'file_path'  => $a->file_path,
-            'file_url'   => asset('storage/'.$a->file_path),
-            'file_size'  => $a->file_size,
-            'mime_type'  => $a->mime_type,
+            'title' => $a->title,
+            'file_path' => $a->file_path,
+            'file_url' => asset('storage/'.$a->file_path),
+            'file_size' => $a->file_size,
+            'mime_type' => $a->mime_type,
             'created_at' => $a->created_at->format('d/m/Y H:i'),
         ]);
 
         // ── Phase M: Consent Forms ───────────────────────────────────────────
         $consentForms = $patient->consentForms()->get()->map(fn ($c) => [
-            'id'               => $c->id,
-            'title'            => $c->title,
-            'content'          => $c->content,
-            'status'           => $c->status->value,
-            'status_label'     => $c->status->label(),
-            'status_color'     => $c->status->color(),
-            'signed_at'        => $c->signed_at?->format('d/m/Y H:i'),
-            'signed_by_name'   => $c->signed_by_name,
-            'treatment_plan_id'=> $c->treatment_plan_id,
-            'notes'            => $c->notes,
-            'created_at'       => $c->created_at->format('d/m/Y'),
+            'id' => $c->id,
+            'title' => $c->title,
+            'content' => $c->content,
+            'status' => $c->status->value,
+            'status_label' => $c->status->label(),
+            'status_color' => $c->status->color(),
+            'signed_at' => $c->signed_at?->format('d/m/Y H:i'),
+            'signed_by_name' => $c->signed_by_name,
+            'treatment_plan_id' => $c->treatment_plan_id,
+            'notes' => $c->notes,
+            'created_at' => $c->created_at->format('d/m/Y'),
         ]);
 
         // ── Phase M: Relationships ───────────────────────────────────────────
         $relationships = $patient->relationships()->with('relatedPatient')->get()->map(fn ($r) => [
-            'id'                  => $r->id,
-            'related_patient_id'  => $r->related_patient_id,
-            'related_patient_name'=> $r->relatedPatient->full_name,
-            'related_patient_code'=> $r->relatedPatient->code,
-            'relationship_type'   => $r->relationship_type->value,
-            'relationship_label'  => $r->relationship_type->label(),
-            'referral_rate'       => $r->referral_rate,
-            'notes'               => $r->notes,
+            'id' => $r->id,
+            'related_patient_id' => $r->related_patient_id,
+            'related_patient_name' => $r->relatedPatient->full_name,
+            'related_patient_code' => $r->relatedPatient->code,
+            'relationship_type' => $r->relationship_type->value,
+            'relationship_label' => $r->relationship_type->label(),
+            'referral_rate' => $r->referral_rate,
+            'notes' => $r->notes,
         ]);
 
         // ── Phase M: Treatment Timeline (reuses $appointmentsRaw / $clinicalNotesRaw above) ──
@@ -510,51 +520,51 @@ class PatientController extends Controller
 
         return response()->json([
             'patient' => [
-                'id'                => $patient->id,
-                'code'              => $patient->code,
-                'full_name'         => $patient->full_name,
-                'phone'             => $patient->phone,
-                'extra_phones'      => $patient->phones()->get(['id', 'phone']),
-                'email'             => $patient->email,
-                'dob'               => $patient->dob?->format('d/m/Y'),
-                'dob_raw'           => $patient->dob?->format('Y-m-d'),
-                'gender'            => $patient->gender,
-                'address'           => $patient->address,
-                'source'            => $patient->source,
-                'allergies'         => $patient->allergies,
-                'medical_history'   => $patient->medical_history,
-                'medical_flags'     => $patient->medical_flags ?? [],
+                'id' => $patient->id,
+                'code' => $patient->code,
+                'full_name' => $patient->full_name,
+                'phone' => $patient->phone,
+                'extra_phones' => $patient->phones()->get(['id', 'phone']),
+                'email' => $patient->email,
+                'dob' => $patient->dob?->format('d/m/Y'),
+                'dob_raw' => $patient->dob?->format('Y-m-d'),
+                'gender' => $patient->gender,
+                'address' => $patient->address,
+                'source' => $patient->source,
+                'allergies' => $patient->allergies,
+                'medical_history' => $patient->medical_history,
+                'medical_flags' => $patient->medical_flags ?? [],
                 'emergency_contact' => $patient->emergency_contact,
-                'notes'             => $patient->notes,
-                'is_active'         => $patient->is_active,
-                'branch_id'         => $patient->branch_id,
-                'photo_url'         => $patient->photo_path ? asset('storage/'.$patient->photo_path) : null,
+                'notes' => $patient->notes,
+                'is_active' => $patient->is_active,
+                'branch_id' => $patient->branch_id,
+                'photo_url' => $patient->photo_path ? asset('storage/'.$patient->photo_path) : null,
             ],
             'financial' => [
                 'total_amount' => $totalAmount,
-                'amount_paid'  => $amountPaid,
-                'amount_due'   => $amountDue,
+                'amount_paid' => $amountPaid,
+                'amount_due' => $amountDue,
             ],
-            'invoices'          => $patientInvoices->values(),
-            'treatmentPlans'    => $treatmentPlans->values(),
-            'appointments'      => $appointments->values(),
-            'pendingDeletions'  => $this->pendingDeletionsMap($appointmentsRaw->pluck('id'), $treatmentPlansRaw->pluck('id')),
-            'activities'        => $activities,
-            'clinicalNotes'     => $clinicalNotes,
-            'toothConditions'   => $toothConditions,
-            'attachments'       => $attachments,
-            'consentForms'      => $consentForms,
-            'relationships'     => $relationships,
-            'timeline'          => $timeline,
-            'doctors'           => $doctors,
-            'chairs'            => $chairs,
-            'services'          => $services,
-            'conditionTypes'    => $conditionTypes,
-            'contactTypes'      => collect(ContactType::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
-            'attachmentTypes'   => collect(AttachmentType::cases())->map(fn ($t) => ['value' => $t->value, 'label' => $t->label()]),
+            'invoices' => $patientInvoices->values(),
+            'treatmentPlans' => $treatmentPlans->values(),
+            'appointments' => $appointments->values(),
+            'pendingDeletions' => $this->pendingDeletionsMap($appointmentsRaw->pluck('id'), $treatmentPlansRaw->pluck('id')),
+            'activities' => $activities,
+            'clinicalNotes' => $clinicalNotes,
+            'toothConditions' => $toothConditions,
+            'attachments' => $attachments,
+            'consentForms' => $consentForms,
+            'relationships' => $relationships,
+            'timeline' => $timeline,
+            'doctors' => $doctors,
+            'chairs' => $chairs,
+            'services' => $services,
+            'conditionTypes' => $conditionTypes,
+            'contactTypes' => collect(ContactType::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
+            'attachmentTypes' => collect(AttachmentType::cases())->map(fn ($t) => ['value' => $t->value, 'label' => $t->label()]),
             'relationshipTypes' => collect(RelationshipType::cases())->map(fn ($r) => ['value' => $r->value, 'label' => $r->label()]),
-            'branches'          => Branch::where('is_active', true)->orderBy('name')->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
-            'sources'           => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            'branches' => Branch::where('is_active', true)->orderBy('name')->get()->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
+            'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
         ]);
     }
 
@@ -574,7 +584,7 @@ class PatientController extends Controller
     {
         $this->authorize('patients.view');
 
-        $json = \Illuminate\Support\Facades\Cache::store('file')->remember('patients.lite-list', 60, function () {
+        $json = Cache::store('file')->remember('patients.lite-list', 60, function () {
             return DB::table('patients')
                 ->whereNull('deleted_at')
                 ->orderBy('full_name')
@@ -604,14 +614,15 @@ class PatientController extends Controller
 
         $map = [];
         foreach ($rows as $row) {
-            $key = $row->deletable_type . ':' . $row->deletable_id;
+            $key = $row->deletable_type.':'.$row->deletable_id;
             $map[$key] = [
-                'id'         => $row->id,
-                'reason'     => $row->reason,
+                'id' => $row->id,
+                'reason' => $row->reason,
                 'execute_at' => $row->execute_at->toIso8601String(),
-                'user_id'    => $row->user_id,
+                'user_id' => $row->user_id,
             ];
         }
+
         return $map;
     }
 
@@ -623,36 +634,36 @@ class PatientController extends Controller
     }
 
     /** Same fields as edit(), but plain JSON — lets the list page open the edit form inline instead of navigating away. */
-    public function editJson(Patient $patient): \Illuminate\Http\JsonResponse
+    public function editJson(Patient $patient): JsonResponse
     {
         $this->authorize('patients.edit');
 
         return response()->json([
-            'id'                => $patient->id,
-            'full_name'         => $patient->full_name,
-            'phone'             => $patient->phone,
-            'extra_phones'      => $patient->phones()->pluck('phone'),
-            'email'             => $patient->email,
-            'dob_raw'           => $patient->dob?->format('Y-m-d'),
-            'gender'            => $patient->gender,
-            'address'           => $patient->address,
-            'source'            => $patient->source,
-            'allergies'         => $patient->allergies,
-            'medical_history'   => $patient->medical_history,
-            'medical_flags'     => $patient->medical_flags ?? [],
+            'id' => $patient->id,
+            'full_name' => $patient->full_name,
+            'phone' => $patient->phone,
+            'extra_phones' => $patient->phones()->pluck('phone'),
+            'email' => $patient->email,
+            'dob_raw' => $patient->dob?->format('Y-m-d'),
+            'gender' => $patient->gender,
+            'address' => $patient->address,
+            'source' => $patient->source,
+            'allergies' => $patient->allergies,
+            'medical_history' => $patient->medical_history,
+            'medical_flags' => $patient->medical_flags ?? [],
             'emergency_contact' => $patient->emergency_contact,
-            'branch_id'         => $patient->branch_id,
-            'notes'             => $patient->notes,
-            'is_active'         => $patient->is_active,
+            'branch_id' => $patient->branch_id,
+            'notes' => $patient->notes,
+            'is_active' => $patient->is_active,
         ]);
     }
 
-    public function mergePreview(Request $request, Patient $patient): \Illuminate\Http\JsonResponse
+    public function mergePreview(Request $request, Patient $patient): JsonResponse
     {
         $this->authorize('patients.delete');
 
         $data = $request->validate([
-            'loser_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('patients', 'id')->whereNull('deleted_at')],
+            'loser_id' => ['required', 'integer', Rule::exists('patients', 'id')->whereNull('deleted_at')],
         ]);
 
         if ((int) $data['loser_id'] === $patient->id) {
@@ -662,7 +673,7 @@ class PatientController extends Controller
         $loser = Patient::findOrFail($data['loser_id']);
 
         try {
-            return response()->json(app(\App\Services\PatientMergeService::class)->preview($patient, $loser));
+            return response()->json(app(PatientMergeService::class)->preview($patient, $loser));
         } catch (\RuntimeException $e) {
             return response()->json(['error' => $e->getMessage()], 422);
         }
@@ -673,7 +684,7 @@ class PatientController extends Controller
         $this->authorize('patients.delete');
 
         $data = $request->validate([
-            'loser_id' => ['required', 'integer', \Illuminate\Validation\Rule::exists('patients', 'id')->whereNull('deleted_at')],
+            'loser_id' => ['required', 'integer', Rule::exists('patients', 'id')->whereNull('deleted_at')],
         ]);
 
         if ((int) $data['loser_id'] === $patient->id) {
@@ -681,7 +692,7 @@ class PatientController extends Controller
         }
 
         try {
-            app(\App\Services\PatientMergeService::class)->merge($patient->id, (int) $data['loser_id']);
+            app(PatientMergeService::class)->merge($patient->id, (int) $data['loser_id']);
         } catch (\RuntimeException $e) {
             return back()->withErrors(['loser_id' => $e->getMessage()]);
         }
@@ -705,8 +716,8 @@ class PatientController extends Controller
         if ($hasExtraPhones) {
             $this->syncExtraPhones($patient, $extraPhones);
         }
-        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
-        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');
+        Cache::store('file')->forget('patients.data.list');
+        Cache::store('file')->forget('patients.lite-list');
 
         if ($request->boolean('stay')) {
             return back()->with('success', 'Đã cập nhật bệnh nhân.');
@@ -719,8 +730,8 @@ class PatientController extends Controller
     {
         $this->authorize('patients.delete');
         $patient->delete();
-        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.data.list');
-        \Illuminate\Support\Facades\Cache::store('file')->forget('patients.lite-list');
+        Cache::store('file')->forget('patients.data.list');
+        Cache::store('file')->forget('patients.lite-list');
 
         return redirect()->route('patients.index')->with('success', 'Đã xóa bệnh nhân.');
     }
@@ -729,21 +740,21 @@ class PatientController extends Controller
     {
         return Inertia::render('Crm/Patients/Form', [
             'patient' => $patient ? [
-                'id'                => $patient->id,
-                'full_name'         => $patient->full_name,
-                'phone'             => $patient->phone,
-                'email'             => $patient->email,
-                'dob'               => $patient->dob?->format('Y-m-d'),
-                'gender'            => $patient->gender,
-                'address'           => $patient->address,
-                'source'            => $patient->source,
-                'allergies'         => $patient->allergies,
-                'medical_history'   => $patient->medical_history,
-                'medical_flags'     => $patient->medical_flags ?? [],
+                'id' => $patient->id,
+                'full_name' => $patient->full_name,
+                'phone' => $patient->phone,
+                'email' => $patient->email,
+                'dob' => $patient->dob?->format('Y-m-d'),
+                'gender' => $patient->gender,
+                'address' => $patient->address,
+                'source' => $patient->source,
+                'allergies' => $patient->allergies,
+                'medical_history' => $patient->medical_history,
+                'medical_flags' => $patient->medical_flags ?? [],
                 'emergency_contact' => $patient->emergency_contact,
-                'branch_id'         => $patient->branch_id,
-                'notes'             => $patient->notes,
-                'is_active'         => $patient->is_active,
+                'branch_id' => $patient->branch_id,
+                'notes' => $patient->notes,
+                'is_active' => $patient->is_active,
             ] : null,
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
@@ -769,28 +780,28 @@ class PatientController extends Controller
     private function validated(Request $request, ?int $ignore = null, bool $forceSave = false): array
     {
         return $request->validate([
-            'full_name'         => 'required|string|max:255',
+            'full_name' => 'required|string|max:255',
             // Same format rule on create and edit: a Vietnamese phone starts with 0.
             // Without this, editing could strip the leading 0 and silently break search/lookup by phone.
-            'phone'             => [
+            'phone' => [
                 $forceSave ? 'nullable' : 'required', 'string', 'max:20',
                 'regex:/^0\d{8,10}$/',
             ],
-            'email'             => 'nullable|email|max:255',
-            'dob'               => 'nullable|date',
-            'gender'            => 'nullable|in:male,female,other',
-            'address'           => 'nullable|string|max:500',
-            'source'            => 'nullable|string',
-            'allergies'         => 'nullable|string',
-            'medical_history'   => 'nullable|string',
-            'medical_flags'     => 'nullable|array',
-            'medical_flags.*'   => 'string',
+            'email' => 'nullable|email|max:255',
+            'dob' => 'nullable|date',
+            'gender' => 'nullable|in:male,female,other',
+            'address' => 'nullable|string|max:500',
+            'source' => 'nullable|string',
+            'allergies' => 'nullable|string',
+            'medical_history' => 'nullable|string',
+            'medical_flags' => 'nullable|array',
+            'medical_flags.*' => 'string',
             'emergency_contact' => 'nullable|string|max:255',
-            'branch_id'         => 'nullable|exists:branches,id',
-            'notes'             => 'nullable|string',
-            'is_active'         => 'boolean',
-            'extra_phones'      => 'nullable|array',
-            'extra_phones.*'    => ['string', 'max:20', 'regex:/^0\d{8,10}$/'],
+            'branch_id' => 'nullable|exists:branches,id',
+            'notes' => 'nullable|string',
+            'is_active' => 'boolean',
+            'extra_phones' => 'nullable|array',
+            'extra_phones.*' => ['string', 'max:20', 'regex:/^0\d{8,10}$/'],
         ]);
     }
 

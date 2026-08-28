@@ -12,7 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Appointment extends Model
 {
-    use LogsActivity, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity;
 
     protected $fillable = [
         'code', 'patient_id', 'branch_id', 'doctor_id', 'dental_chair_id',
@@ -44,6 +44,21 @@ class Appointment extends Model
     public function getEndsAtAttribute(): Carbon
     {
         return $this->scheduled_at->addMinutes($this->duration_minutes);
+    }
+
+    /**
+     * Bệnh nhân đến sớm/đúng/muộn so với giờ hẹn, tính theo cửa sổ 15 phút quanh giờ hẹn.
+     * Chỉ là gợi ý mặc định khi đăng ký khám — lễ tân vẫn được chọn tay.
+     */
+    public function suggestedArrivalStatus(): AppointmentStatus
+    {
+        $diff = $this->scheduled_at->diffInMinutes(now(), false);
+
+        return match (true) {
+            $diff < -15 => AppointmentStatus::ArrivedEarly,
+            $diff > 15 => AppointmentStatus::ArrivedLate,
+            default => AppointmentStatus::CheckedIn,
+        };
     }
 
     public function patient()

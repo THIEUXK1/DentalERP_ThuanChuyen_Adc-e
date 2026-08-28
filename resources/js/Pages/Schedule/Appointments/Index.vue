@@ -411,11 +411,7 @@
                             </div>
                         </div>
                         <div v-if="can('appointments.manage')" class="flex items-center gap-1.5 pr-3 flex-shrink-0">
-                            <button v-if="canQuickRegister(a)" @click.prevent="quickRegister(a)" :disabled="quickRegisteringId === a.id"
-                                class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-teal-700 border border-teal-200 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors disabled:opacity-50">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                Đăng ký khám nhanh
-                            </button>
+                            <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký khám" @registered="loadData" />
                             <button @click.prevent="openReschedule(a)"
                                 class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -475,11 +471,7 @@
                         <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white gap-1.5">
                             <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
                             <div v-if="can('appointments.manage')" class="flex items-center gap-1.5">
-                                <button v-if="canQuickRegister(a)" @click="quickRegister(a)" :disabled="quickRegisteringId === a.id"
-                                    class="flex items-center gap-1 px-2 py-1 text-xs text-teal-700 border border-teal-200 bg-teal-50 rounded-lg hover:bg-teal-100 transition-colors disabled:opacity-50">
-                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
-                                    Đăng ký nhanh
-                                </button>
+                                <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký" @registered="loadData" />
                                 <button @click="openReschedule(a)"
                                     class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
@@ -652,6 +644,7 @@ import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
 import PaginationBar from '@/Components/Shared/PaginationBar.vue';
+import QuickRegisterButton from '@/Components/Schedule/QuickRegisterButton.vue';
 import { usePermission } from '@/composables/usePermission';
 
 const { hasPermission: can } = usePermission();
@@ -1093,21 +1086,6 @@ function doBulkTransition() {
     selectedIds.value = new Set();
     bulkStatus.value = '';
     ids.forEach(id => router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true }));
-}
-
-// ── Quick register (check-in) ───────────────────────────────────
-const QUICK_REGISTER_STATUSES = ['booked', 'confirmed'];
-const quickRegisteringId = ref(null);
-// Chỉ lịch hẹn của hôm nay mới đăng ký khám được — đăng ký khám là danh sách
-// bệnh nhân đã có mặt trong ngày, không phải chỗ đặt trước cho ngày khác.
-function canQuickRegister(a) { return a.is_today && QUICK_REGISTER_STATUSES.includes(a.status); }
-function quickRegister(a) {
-    if (quickRegisteringId.value) return;
-    quickRegisteringId.value = a.id;
-    router.post(route('schedule.appointments.quick-register', a.id), {}, {
-        preserveScroll: true,
-        onFinish: () => { quickRegisteringId.value = null; },
-    });
 }
 
 // ── Reschedule ─────────────────────────────────────────────────

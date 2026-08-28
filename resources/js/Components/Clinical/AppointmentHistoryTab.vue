@@ -63,11 +63,7 @@
                                 </div>
                             </template>
                             <div v-else class="flex items-center gap-2 justify-end">
-                                <button v-if="canQuickRegister(appt)" @click="quickRegister(appt)"
-                                    :disabled="quickRegisteringId === appt.id"
-                                    class="text-xs px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium transition-colors whitespace-nowrap disabled:opacity-50">
-                                    {{ quickRegisteringId === appt.id ? 'Đang xử lý...' : '📋 Đăng ký khám' }}
-                                </button>
+                                <QuickRegisterButton :appointment="appt" />
                                 <button @click="openDeleteAppt(appt)"
                                     class="text-gray-300 hover:text-red-500 transition-colors flex-shrink-0"
                                     title="Xóa lịch hẹn">
@@ -97,35 +93,13 @@
 import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
-import { usePermission } from '@/composables/usePermission';
+import QuickRegisterButton from '@/Components/Schedule/QuickRegisterButton.vue';
 
 const props = defineProps({
     appointments:     { type: Array,  default: () => [] },
     pendingDeletions: { type: Object, default: () => ({}) },
 });
 
-const { hasPermission: can } = usePermission();
-
-// ── Quick register (đăng ký khám) ────────────────────────────────────────────
-const QUICK_REGISTER_STATUSES = ['booked', 'confirmed'];
-const quickRegisteringId = ref(null);
-
-// Chỉ lịch hẹn của hôm nay mới đăng ký khám được — đăng ký khám là danh sách
-// bệnh nhân đã có mặt trong ngày, không phải chỗ đặt trước cho ngày khác.
-function canQuickRegister(appt) {
-    return can('appointments.manage') && appt.is_today
-        && QUICK_REGISTER_STATUSES.includes(appt.status) && !appt.has_registration;
-}
-
-function quickRegister(appt) {
-    if (quickRegisteringId.value) return;
-    quickRegisteringId.value = appt.id;
-    router.post(route('schedule.appointments.quick-register', appt.id), {}, {
-        preserveScroll: true,
-        preserveState: true,
-        onFinish: () => { quickRegisteringId.value = null; },
-    });
-}
 
 // Countdown ticker
 const now = ref(Date.now());
@@ -176,7 +150,7 @@ function undo(pendingId) {
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 function apptStatusClass(status) {
-    const map = { booked: 'bg-gray-100 text-gray-600', confirmed: 'bg-blue-100 text-blue-700', checked_in: 'bg-teal-100 text-teal-700', in_treatment: 'bg-indigo-100 text-indigo-700', completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600', no_show: 'bg-orange-100 text-orange-700', rescheduled: 'bg-yellow-100 text-yellow-700' };
+    const map = { booked: 'bg-gray-100 text-gray-600', confirmed: 'bg-blue-100 text-blue-700', arrived_early: 'bg-cyan-100 text-cyan-700', checked_in: 'bg-teal-100 text-teal-700', arrived_late: 'bg-amber-100 text-amber-700', in_treatment: 'bg-indigo-100 text-indigo-700', completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-red-100 text-red-600', no_show: 'bg-orange-100 text-orange-700', rescheduled: 'bg-yellow-100 text-yellow-700' };
     return map[status] ?? 'bg-gray-100 text-gray-600';
 }
 </script>

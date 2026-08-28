@@ -13,6 +13,7 @@ use App\Models\Patient;
 use App\Models\PendingDeletion;
 use App\Models\ScheduleRegistration;
 use App\Services\AppointmentService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,6 +23,12 @@ use Inertia\Response;
 
 class AppointmentController extends Controller
 {
+    /**
+     * Danh sách trạng thái "đã đến" mà lễ tân được chọn khi đăng ký khám.
+     * Không cho chọn trạng thái khác: đăng ký khám nghĩa là bệnh nhân đã có mặt.
+     */
+    private const ARRIVAL_STATUSES = ['checked_in', 'arrived_early', 'arrived_late'];
+
     public function __construct(private AppointmentService $svc) {}
 
     public function index(): Response
@@ -49,6 +56,7 @@ class AppointmentController extends Controller
         $this->authorize('appointments.view');
 
         $appointments = Appointment::with(['patient', 'doctor', 'chair', 'service', 'branch'])
+            ->withExists('registration')
             ->orderByDesc('scheduled_at')
             ->get()
             ->map(fn ($a) => $this->dto($a));
@@ -107,11 +115,11 @@ class AppointmentController extends Controller
         try {
             $this->svc->reschedule($appointment, $data['scheduled_at'], $data['duration_minutes'] ?? 30);
             $fields = [
-                'patient_id'      => $data['patient_id'],
-                'doctor_id'       => $data['doctor_id'] ?? null,
+                'patient_id' => $data['patient_id'],
+                'doctor_id' => $data['doctor_id'] ?? null,
                 'dental_chair_id' => $data['dental_chair_id'] ?? null,
-                'service_id'      => $data['service_id'] ?? null,
-                'notes'           => $data['notes'] ?? null,
+                'service_id' => $data['service_id'] ?? null,
+                'notes' => $data['notes'] ?? null,
             ];
             if (! empty($data['status'])) {
                 $fields['status'] = $data['status'];
@@ -129,9 +137,9 @@ class AppointmentController extends Controller
         $this->authorize('appointments.manage');
 
         $data = $request->validate([
-            'scheduled_at'     => 'required|date',
+            'scheduled_at' => 'required|date',
             'duration_minutes' => 'nullable|integer|min:5|max:480',
-            'notes'            => 'nullable|string|max:1000',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         try {
@@ -165,32 +173,39 @@ class AppointmentController extends Controller
 
         PendingDeletion::create([
             'deletable_type' => Appointment::class,
-            'deletable_id'   => $appointment->id,
-            'reason'         => $request->reason,
-            'user_id'        => auth()->id(),
-            'label'          => $appointment->code,
-            'execute_at'     => now()->addMinutes(10),
+            'deletable_id' => $appointment->id,
+            'reason' => $request->reason,
+            'user_id' => auth()->id(),
+            'label' => $appointment->code,
+            'execute_at' => now()->addMinutes(10),
         ]);
 
         return back()->with('success', 'Lịch hẹn sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
     }
 
-    public function quickRegister(Appointment $appointment): RedirectResponse
+    public function quickRegister(Request $request, Appointment $appointment): RedirectResponse
     {
         $this->authorize('appointments.manage');
+
+        $data = $request->validate([
+            'arrival_status' => 'nullable|in:'.implode(',', self::ARRIVAL_STATUSES),
+        ]);
 
         if ($appointment->registration()->exists()) {
             return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');
         }
 
-        // Đăng ký khám = bệnh nhân đã có mặt tại phòng khám hôm nay. Lịch hẹn của ngày
-        // khác không được đẩy sang danh sách đăng ký, kể cả khi nhân viên bấm nhầm.
-        if (! $appointment->scheduled_at->isToday()) {
-            return back()->with('error', 'Chỉ đăng ký khám được cho lịch hẹn trong ngày hôm nay.');
-        }
+        // Đăng ký khám luôn thuộc về ngày hôm nay (registration_date = today), kể cả khi
+        // bệnh nhân đến sớm hoặc trễ so với ngày hẹn — lễ tân vẫn phải chốt được trạng thái
+        // đến cho lịch hẹn của ngày khác, nên không chặn theo ngày hẹn.
+
+        // Lễ tân chọn tay; không chọn thì suy ra từ giờ hẹn so với lúc bấm nút.
+        $arrival = isset($data['arrival_status'])
+            ? AppointmentStatus::from($data['arrival_status'])
+            : $appointment->suggestedArrivalStatus();
 
         try {
-            DB::transaction(function () use ($appointment) {
+            DB::transaction(function () use ($appointment, $arrival) {
                 ScheduleRegistration::create([
                     'code' => ScheduleRegistration::generateCode(),
                     'patient_id' => $appointment->patient_id,
@@ -199,21 +214,25 @@ class AppointmentController extends Controller
                     'doctor_id' => $appointment->doctor_id,
                     'dental_chair_id' => $appointment->dental_chair_id,
                     'registration_date' => today()->toDateString(),
-                    'visit_time' => $appointment->scheduled_at->format('H:i'),
+                    // Lịch hẹn của ngày khác: giờ hẹn cũ không còn ý nghĩa cho buổi khám
+                    // hôm nay, lấy giờ bấm nút làm giờ vào khám.
+                    'visit_time' => $appointment->scheduled_at->isToday()
+                        ? $appointment->scheduled_at->format('H:i')
+                        : now()->format('H:i'),
                     'status' => 'pending',
                     'notes' => $appointment->notes,
                     'created_by' => auth()->id(),
                 ]);
 
-                $this->svc->transition($appointment, AppointmentStatus::CheckedIn);
+                $this->svc->transition($appointment, $arrival);
             });
-        } catch (\Illuminate\Database\UniqueConstraintViolationException) {
+        } catch (UniqueConstraintViolationException) {
             return back()->with('error', 'Lịch hẹn này đã được đăng ký khám.');
         } catch (\RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', "Đã đăng ký khám nhanh cho lịch hẹn {$appointment->code}.");
+        return back()->with('success', "Đã đăng ký khám cho lịch hẹn {$appointment->code} — {$arrival->label()}.");
     }
 
     public function transition(Request $request, Appointment $appointment): RedirectResponse
@@ -248,17 +267,17 @@ class AppointmentController extends Controller
 
         return Inertia::render('Schedule/Appointments/Form', [
             'appointment' => $appointment ? [
-                'id'               => $appointment->id,
-                'patient_id'       => $appointment->patient_id,
-                'branch_id'        => $appointment->branch_id,
-                'doctor_id'        => $appointment->doctor_id,
-                'dental_chair_id'  => $appointment->dental_chair_id,
-                'service_id'       => $appointment->service_id,
-                'lead_id'          => $appointment->lead_id,
-                'scheduled_at'     => $appointment->scheduled_at->format('Y-m-d\TH:i'),
+                'id' => $appointment->id,
+                'patient_id' => $appointment->patient_id,
+                'branch_id' => $appointment->branch_id,
+                'doctor_id' => $appointment->doctor_id,
+                'dental_chair_id' => $appointment->dental_chair_id,
+                'service_id' => $appointment->service_id,
+                'lead_id' => $appointment->lead_id,
+                'scheduled_at' => $appointment->scheduled_at->format('Y-m-d\TH:i'),
                 'duration_minutes' => $appointment->duration_minutes,
-                'notes'            => $appointment->notes,
-                'status'           => $appointment->status->value,
+                'notes' => $appointment->notes,
+                'status' => $appointment->status->value,
             ] : array_merge(['patient_id' => null, 'branch_id' => null, 'lead_id' => null, 'doctor_id' => null], $defaults),
             'patients' => DB::table('patients')->where('is_active', true)->orderBy('full_name')
                 ->select('id', 'full_name', 'phone', 'code')->get(),
@@ -280,16 +299,16 @@ class AppointmentController extends Controller
     private function validated(Request $request): array
     {
         return $request->validate([
-            'patient_id'       => 'required|exists:patients,id',
-            'branch_id'        => 'required|exists:branches,id',
-            'doctor_id'        => 'nullable|exists:employees,id',
-            'dental_chair_id'  => 'nullable|exists:dental_chairs,id',
-            'service_id'       => 'nullable|exists:dental_services,id',
-            'lead_id'          => 'nullable|exists:leads,id',
-            'scheduled_at'     => 'required|date',
+            'patient_id' => 'required|exists:patients,id',
+            'branch_id' => 'required|exists:branches,id',
+            'doctor_id' => 'nullable|exists:employees,id',
+            'dental_chair_id' => 'nullable|exists:dental_chairs,id',
+            'service_id' => 'nullable|exists:dental_services,id',
+            'lead_id' => 'nullable|exists:leads,id',
+            'scheduled_at' => 'required|date',
             'duration_minutes' => 'integer|min:5|max:480',
-            'notes'            => 'nullable|string',
-            'status'           => 'nullable|string',
+            'notes' => 'nullable|string',
+            'status' => 'nullable|string',
         ]);
     }
 
@@ -311,6 +330,10 @@ class AppointmentController extends Controller
             // Chỉ lịch hẹn hôm nay mới được đăng ký khám; tính ở server để dùng
             // đúng múi giờ phòng khám thay vì giờ máy của người dùng.
             'is_today' => $a->scheduled_at->isToday(),
+            'has_registration' => (bool) ($a->registration_exists ?? $a->registration()->exists()),
+            // Gợi ý sớm/đúng/muộn để UI đánh dấu sẵn lựa chọn mặc định.
+            'arrival_suggestion' => $a->suggestedArrivalStatus()->value,
+            'is_past_day' => $a->scheduled_at->lt(today()),
             'ends_at' => $a->ends_at->format('H:i'),
             'duration_minutes' => $a->duration_minutes,
             'status' => $a->status->value,
