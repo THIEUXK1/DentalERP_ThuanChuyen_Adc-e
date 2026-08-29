@@ -118,14 +118,10 @@ function openTab(url) {
             active: i === idx,
         }));
     } else {
-        // Tab xem tạm: mở mục mới sẽ đè lên tab đang xem nếu tab đó chưa được ghim.
-        // Muốn giữ lại một màn hình thì ghim nó (chuột phải → Ghim tab).
-        const newTab = { url, title: titleFor(url), active: true };
-        const previewIdx = tabs.value.findIndex(t => t.active && !t.pinned);
-
-        tabs.value = previewIdx !== -1
-            ? tabs.value.map((t, i) => (i === previewIdx ? newTab : { ...t, active: false }))
-            : [...tabs.value.map(t => ({ ...t, active: false })), newTab].slice(-MAX_TABS);
+        tabs.value = [
+            ...tabs.value.map(t => ({ ...t, active: false })),
+            { url, title: titleFor(url), active: true },
+        ].slice(-MAX_TABS);
     }
     save(tabs.value);
 }
