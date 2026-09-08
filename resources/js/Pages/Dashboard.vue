@@ -481,19 +481,14 @@ function goToday() {
     dateSel.value = dayjs().format('YYYY-MM-DD');
     goTo(dateSel.value, branchSel.value);
 }
-function changeMonth(delta) {
-    dateSel.value = dayjs(dateSel.value).add(delta, 'month').format('YYYY-MM-DD');
-    goTo(dateSel.value, branchSel.value);
-}
-
-// Phím mũi tên trái/phải nhảy theo tháng; bỏ qua khi con trỏ đang ở ô nhập liệu
+// Phím mũi tên trái/phải nhảy theo ngày; bỏ qua khi con trỏ đang ở ô nhập liệu
 function onArrowKey(e) {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     const el = e.target;
     if (el && (el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName))) return;
     e.preventDefault();
-    changeMonth(e.key === 'ArrowLeft' ? -1 : 1);
+    changeDate(e.key === 'ArrowLeft' ? -1 : 1);
 }
 onMounted(() => window.addEventListener('keydown', onArrowKey));
 onBeforeUnmount(() => window.removeEventListener('keydown', onArrowKey));
