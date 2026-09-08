@@ -7,6 +7,7 @@
                 <div class="min-w-0">
                     <h1 class="text-xl sm:text-2xl font-bold text-gray-900">Tổng quan</h1>
                     <p class="text-sm text-gray-500 mt-0.5">{{ dateLabel }}</p>
+                    <p class="text-xs text-gray-400 mt-0.5 hidden sm:block">Dùng phím ← → để chuyển tháng</p>
                 </div>
                 <div class="flex flex-wrap items-center gap-2">
                     <!-- Date nav: chiếm trọn hàng trên mobile để ô ngày không bị bóp -->
@@ -413,7 +414,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import dayjs from 'dayjs';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
@@ -480,6 +481,22 @@ function goToday() {
     dateSel.value = dayjs().format('YYYY-MM-DD');
     goTo(dateSel.value, branchSel.value);
 }
+function changeMonth(delta) {
+    dateSel.value = dayjs(dateSel.value).add(delta, 'month').format('YYYY-MM-DD');
+    goTo(dateSel.value, branchSel.value);
+}
+
+// Phím mũi tên trái/phải nhảy theo tháng; bỏ qua khi con trỏ đang ở ô nhập liệu
+function onArrowKey(e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const el = e.target;
+    if (el && (el.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName))) return;
+    e.preventDefault();
+    changeMonth(e.key === 'ArrowLeft' ? -1 : 1);
+}
+onMounted(() => window.addEventListener('keydown', onArrowKey));
+onBeforeUnmount(() => window.removeEventListener('keydown', onArrowKey));
 
 const apptColorMap = {
     blue:   'bg-blue-100 text-blue-700',

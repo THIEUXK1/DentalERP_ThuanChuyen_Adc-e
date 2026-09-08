@@ -22,31 +22,31 @@ class TreatmentPlanItemController extends Controller
         $this->authorize('treatment_plans.edit');
 
         $data = $request->validate([
-            'service_id'           => 'required|exists:dental_services,id',
-            'tooth_number'         => 'nullable|string|max:20',
-            'quantity'             => 'required|integer|min:1',
-            'price_list_id'        => 'nullable|exists:price_lists,id',
-            'unit_price'           => 'nullable|integer|min:0',
-            'discount'             => 'nullable|integer|min:0',
-            'notes'                => 'nullable|string|max:500',
-            'diagnosis'            => 'nullable|string|max:255',
-            'estimated_sessions'   => 'nullable|integer|min:1',
-            'stage_name'           => 'nullable|string|max:255',
+            'service_id' => 'required|exists:dental_services,id',
+            'tooth_number' => 'nullable|string|max:20',
+            'quantity' => 'required|integer|min:1',
+            'price_list_id' => 'nullable|exists:price_lists,id',
+            'unit_price' => 'nullable|integer|min:0',
+            'discount' => 'nullable|integer|min:0',
+            'notes' => 'nullable|string|max:500',
+            'diagnosis' => 'nullable|string|max:255',
+            'estimated_sessions' => 'nullable|integer|min:1',
+            'stage_name' => 'nullable|string|max:255',
             'responsible_doctor_id' => 'nullable|exists:employees,id',
-            'assistant_doctor_id'   => 'nullable|exists:employees,id',
+            'assistant_doctor_id' => 'nullable|exists:employees,id',
         ]);
 
         $priceList = isset($data['price_list_id']) ? PriceList::find($data['price_list_id']) : null;
 
         $extra = array_filter([
-            'unit_price'            => $data['unit_price'] ?? null,
-            'discount'              => $data['discount'] ?? null,
-            'notes'                 => $data['notes'] ?? null,
-            'diagnosis'             => $data['diagnosis'] ?? null,
-            'estimated_sessions'    => $data['estimated_sessions'] ?? null,
-            'stage_name'            => $data['stage_name'] ?? null,
+            'unit_price' => $data['unit_price'] ?? null,
+            'discount' => $data['discount'] ?? null,
+            'notes' => $data['notes'] ?? null,
+            'diagnosis' => $data['diagnosis'] ?? null,
+            'estimated_sessions' => $data['estimated_sessions'] ?? null,
+            'stage_name' => $data['stage_name'] ?? null,
             'responsible_doctor_id' => $data['responsible_doctor_id'] ?? null,
-            'assistant_doctor_id'   => $data['assistant_doctor_id'] ?? null,
+            'assistant_doctor_id' => $data['assistant_doctor_id'] ?? null,
         ], fn ($v) => $v !== null);
 
         try {
@@ -81,16 +81,16 @@ class TreatmentPlanItemController extends Controller
         $this->authorize('treatment_plans.edit');
 
         $data = $request->validate([
-            'quantity'              => 'required|integer|min:1',
-            'unit_price'            => 'required|integer|min:0',
-            'tooth_number'          => 'nullable|string|max:20',
-            'notes'                 => 'nullable|string|max:500',
-            'discount'              => 'nullable|integer|min:0',
-            'stage_name'            => 'nullable|string|max:255',
-            'estimated_sessions'    => 'nullable|integer|min:1',
-            'diagnosis'             => 'nullable|string|max:255',
+            'quantity' => 'required|integer|min:1',
+            'unit_price' => 'required|integer|min:0',
+            'tooth_number' => 'nullable|string|max:20',
+            'notes' => 'nullable|string|max:500',
+            'discount' => 'nullable|integer|min:0',
+            'stage_name' => 'nullable|string|max:255',
+            'estimated_sessions' => 'nullable|integer|min:1',
+            'diagnosis' => 'nullable|string|max:255',
             'responsible_doctor_id' => 'nullable|exists:employees,id',
-            'assistant_doctor_id'   => 'nullable|exists:employees,id',
+            'assistant_doctor_id' => 'nullable|exists:employees,id',
         ]);
 
         try {
@@ -148,6 +148,19 @@ class TreatmentPlanItemController extends Controller
         }
 
         return back()->with('success', 'Đã cập nhật trạng thái.');
+    }
+
+    public function updateNotes(Request $request, TreatmentPlanItem $treatmentPlanItem): JsonResponse
+    {
+        $this->authorize('treatment_plans.edit');
+
+        $data = $request->validate([
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $this->svc->updateItemNotes($treatmentPlanItem, $data['notes'] ?? null);
+
+        return response()->json(['notes' => $treatmentPlanItem->notes]);
     }
 
     public function complete(Request $request, TreatmentPlanItem $treatmentPlanItem): RedirectResponse|JsonResponse
