@@ -299,7 +299,36 @@
                                         <p class="font-medium text-gray-900">{{ item.service_name }}</p>
                                         <p v-if="item.stage_name" class="text-xs text-indigo-500 mt-0.5">📋 {{ item.stage_name }}</p>
                                         <p v-if="item.diagnosis" class="text-xs text-amber-600 mt-0.5">🔍 {{ item.diagnosis }}</p>
-                                        <p v-if="item.notes" class="text-xs text-gray-400 mt-0.5">{{ item.notes }}</p>
+                                        <!-- Ghi chú sửa nhanh tại chỗ, khỏi phải mở modal chi tiết dịch vụ -->
+                                        <div class="mt-0.5" @click.stop>
+                                            <div v-if="noteEditOpen[item.id]" class="flex items-center gap-1">
+                                                <input type="text" :ref="el => setNoteInputRef(item.id, el)"
+                                                    v-model="noteEdits[item.id]" maxlength="500" placeholder="Ghi chú..."
+                                                    @keydown.enter.prevent="saveNote(item)" @keydown.esc.prevent="cancelNoteEdit(item.id)"
+                                                    class="flex-1 min-w-0 border border-gray-300 rounded px-1.5 py-0.5 text-xs focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                                <button @click="saveNote(item)" :disabled="noteSaving[item.id]"
+                                                    class="px-2 py-0.5 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+                                                    {{ noteSaving[item.id] ? 'Đang lưu...' : 'Lưu' }}
+                                                </button>
+                                                <button @click="cancelNoteEdit(item.id)" :disabled="noteSaving[item.id]"
+                                                    class="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50" title="Hủy">
+                                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <div v-else class="flex items-center gap-1">
+                                                <p :class="['text-xs', item.notes ? 'text-gray-400' : 'text-gray-300 italic']">
+                                                    {{ item.notes || 'Chưa có ghi chú' }}
+                                                </p>
+                                                <button @click="openNoteEdit(item)" class="text-gray-300 hover:text-indigo-600 transition-colors flex-shrink-0" title="Sửa ghi chú">
+                                                    <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                            <p v-if="noteErrors[item.id]" class="text-xs text-red-500 mt-0.5">{{ noteErrors[item.id] }}</p>
+                                        </div>
                                         <p v-if="item.estimated_sessions" class="text-xs text-gray-400 mt-0.5">{{ item.estimated_sessions }} buổi</p>
                                         <p v-if="item.doctor_name" class="text-xs text-indigo-500 mt-0.5">
                                             🦷 {{ item.doctor_name }}
@@ -964,6 +993,50 @@ function applyPayload(data) {
 
 function reportError(err, fallback = 'Có lỗi xảy ra, vui lòng thử lại.') {
     alert(err.response?.data?.message ?? fallback);
+}
+
+// ── Ghi chú từng dịch vụ: sửa nhanh tại chỗ ─────────────────────────────────
+const noteEdits = reactive({});
+const noteEditOpen = reactive({});
+const noteSaving = reactive({});
+const noteErrors = reactive({});
+const noteInputRefs = {};
+
+function setNoteInputRef(itemId, el) {
+    if (el) noteInputRefs[itemId] = el;
+}
+
+function openNoteEdit(item) {
+    noteEdits[item.id] = item.notes ?? '';
+    noteErrors[item.id] = '';
+    noteEditOpen[item.id] = true;
+    nextTick(() => noteInputRefs[item.id]?.focus());
+}
+
+function cancelNoteEdit(itemId) {
+    noteEditOpen[itemId] = false;
+    noteErrors[itemId] = '';
+}
+
+async function saveNote(item) {
+    if (noteSaving[item.id]) return;
+
+    const value = (noteEdits[item.id] ?? '').trim();
+    noteSaving[item.id] = true;
+    noteErrors[item.id] = '';
+    try {
+        const { data } = await axios.patch(route('clinical.treatment-plan-items.update-notes', item.id), {
+            notes: value === '' ? null : value,
+        });
+        item.notes = data.notes ?? '';
+        noteEditOpen[item.id] = false;
+    } catch (err) {
+        noteErrors[item.id] = err.response?.data?.errors?.notes?.[0]
+            ?? err.response?.data?.message
+            ?? 'Không lưu được ghi chú, vui lòng thử lại.';
+    } finally {
+        noteSaving[item.id] = false;
+    }
 }
 
 // ── 4-stage stepper ───────────────────────────────────────────────────────
