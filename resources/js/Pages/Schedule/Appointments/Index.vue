@@ -82,6 +82,13 @@
                     <option value="">Tất cả trạng thái</option>
                     <option v-for="s in statuses" :key="s.value" :value="s.value">{{ s.label }}</option>
                 </select>
+                <select v-model="filterCall" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    <option value="">Gọi: tất cả</option>
+                    <option value="none">Chưa gọi</option>
+                    <option value="called">Đã gọi</option>
+                    <option value="answered">Đã nghe máy</option>
+                    <option value="not_answered">Gọi nhưng không nghe</option>
+                </select>
                 <!-- Per page (chỉ list/grid) -->
                 <select v-if="viewMode === 'list' || viewMode === 'grid'" v-model="perPage"
                     class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -410,6 +417,9 @@
                                 </button>
                             </div>
                         </div>
+                        <div class="flex items-center pr-2 flex-shrink-0" @click.stop.prevent>
+                            <CallLogButton :appointment="a" @logged="applyCallLog" />
+                        </div>
                         <div v-if="can('appointments.manage')" class="flex items-center gap-1.5 pr-3 flex-shrink-0">
                             <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký khám" @registered="loadData" />
                             <button @click.prevent="openReschedule(a)"
@@ -468,8 +478,9 @@
                             </div>
                             <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 truncate">📝 {{ a.notes }}</p>
                         </Link>
-                        <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white gap-1.5">
+                        <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white gap-1.5 flex-wrap">
                             <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
+                            <CallLogButton :appointment="a" @logged="applyCallLog" />
                             <div v-if="can('appointments.manage')" class="flex items-center gap-1.5">
                                 <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký" @registered="loadData" />
                                 <button @click="openReschedule(a)"
@@ -645,6 +656,7 @@ import AppLayout from '@/Components/Layout/AppLayout.vue';
 import SearchableSelect from '@/Components/Shared/SearchableSelect.vue';
 import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 import QuickRegisterButton from '@/Components/Schedule/QuickRegisterButton.vue';
+import CallLogButton from '@/Components/Schedule/CallLogButton.vue';
 import { usePermission } from '@/composables/usePermission';
 
 const { hasPermission: can } = usePermission();
@@ -694,6 +706,12 @@ async function loadData() {
     }
 }
 
+// Ghi nhận cuộc gọi chỉ đổi đúng một dòng — vá tại chỗ thay vì nạp lại cả bảng.
+function applyCallLog(updated) {
+    const i = allAppointments.value.findIndex(a => a.id === updated.id);
+    if (i !== -1) allAppointments.value[i] = updated;
+}
+
 // ── Timeline constants ──────────────────────────────────────────
 const DAY_START    = 7      // 07:00
 const DAY_END      = 20     // 20:00
@@ -717,6 +735,7 @@ const todayOnly    = ref(true);
 const branchId     = ref('');
 const doctorId     = ref('');
 const filterStatus = ref('');
+const filterCall   = ref('');
 const perPage      = ref(50);
 const currentPage  = ref(1);
 
@@ -727,12 +746,24 @@ function setViewMode(v) {
     localStorage.setItem('apt_view_mode', v);
 }
 
+function matchCallFilter(a) {
+    const called = (a.call_count ?? 0) > 0;
+    switch (filterCall.value) {
+        case 'none':         return !called;
+        case 'called':       return called;
+        case 'answered':     return a.last_call_outcome === 'answered';
+        case 'not_answered': return called && a.last_call_outcome !== 'answered';
+        default:             return true;
+    }
+}
+
 // ── Base filtered list (branch/doctor/status/search) ───────────
 const filteredAppointments = computed(() => {
     let list = [...allAppointments.value];
     if (branchId.value)     list = list.filter(a => String(a.branch_id) === String(branchId.value));
     if (doctorId.value)     list = list.filter(a => String(a.doctor_id) === String(doctorId.value));
     if (filterStatus.value) list = list.filter(a => a.status === filterStatus.value);
+    if (filterCall.value)   list = list.filter(a => matchCallFilter(a));
     if (todayOnly.value && viewMode.value === 'list')
         list = list.filter(a => a.scheduled_at.startsWith(date.value));
     if (search.value.trim()) {
@@ -806,11 +837,11 @@ const showFilters = ref(localStorage.getItem('apt_filters_open') !== '0');
 watch(showFilters, v => localStorage.setItem('apt_filters_open', v ? '1' : '0'));
 
 const activeFilterCount = computed(() =>
-    [search.value, branchId.value, doctorId.value, filterStatus.value].filter(Boolean).length
+    [search.value, branchId.value, doctorId.value, filterStatus.value, filterCall.value].filter(Boolean).length
 );
 const hasActiveFilters = computed(() => activeFilterCount.value > 0);
 
-watch([search, branchId, doctorId, filterStatus, perPage, date, todayOnly, viewMode], () => { currentPage.value = 1; });
+watch([search, branchId, doctorId, filterStatus, filterCall, perPage, date, todayOnly, viewMode], () => { currentPage.value = 1; });
 // Bộ lọc có thể làm giảm số trang khi đang ở trang cuối
 watch(totalPages, t => { if (currentPage.value > t) currentPage.value = t; });
 
@@ -1018,7 +1049,7 @@ function timeOf(scheduledAt) { return (scheduledAt.split(' ')[1] ?? '').substrin
 function displayDate(scheduledAt) { return dayjs(scheduledAt.split(' ')[0]).format('DD/MM'); }
 function toggleTodayOnly() { todayOnly.value = !todayOnly.value; }
 function changeDate(d) { date.value = dayjs(date.value).add(d, 'day').format('YYYY-MM-DD'); }
-function clearFilters() { search.value = ''; branchId.value = ''; doctorId.value = ''; filterStatus.value = ''; }
+function clearFilters() { search.value = ''; branchId.value = ''; doctorId.value = ''; filterStatus.value = ''; filterCall.value = ''; }
 
 // ── Create form ────────────────────────────────────────────────
 const showCreate = ref(false);

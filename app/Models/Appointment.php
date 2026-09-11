@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\CallOutcome;
 use App\Models\Concerns\GeneratesUniqueCode;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,6 +19,7 @@ class Appointment extends Model
         'code', 'patient_id', 'branch_id', 'doctor_id', 'dental_chair_id',
         'service_id', 'lead_id', 'scheduled_at', 'duration_minutes',
         'status', 'cancel_reason', 'notes', 'created_by',
+        'last_call_at', 'last_call_outcome', 'call_count',
     ];
 
     protected function casts(): array
@@ -26,6 +28,9 @@ class Appointment extends Model
             'scheduled_at' => 'datetime',
             'status' => AppointmentStatus::class,
             'duration_minutes' => 'integer',
+            'last_call_at' => 'datetime',
+            'last_call_outcome' => CallOutcome::class,
+            'call_count' => 'integer',
         ];
     }
 
@@ -89,6 +94,11 @@ class Appointment extends Model
     public function registration()
     {
         return $this->hasOne(ScheduleRegistration::class);
+    }
+
+    public function callLogs()
+    {
+        return $this->hasMany(AppointmentCallLog::class)->orderByDesc('called_at');
     }
 
     public function lead()

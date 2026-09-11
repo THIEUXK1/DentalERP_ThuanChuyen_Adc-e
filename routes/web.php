@@ -314,6 +314,10 @@ Route::middleware(['auth'])->prefix('clinical')->name('clinical.')->group(functi
 // Schedule
 Route::middleware(['auth'])->prefix('schedule')->name('schedule.')->group(function () {
     Route::get('appointments/data', [AppointmentController::class, 'data'])->name('appointments.data')->middleware('can:appointments.view');
+    Route::get('appointments/{appointment}/calls', [AppointmentController::class, 'calls'])
+        ->name('appointments.calls')->middleware('can:appointments.view');
+    Route::post('appointments/{appointment}/calls', [AppointmentController::class, 'logCall'])
+        ->name('appointments.log-call')->middleware('can:appointments.manage');
     Route::resource('appointments', AppointmentController::class)->middleware('can:appointments.view');
     Route::post('appointments/{appointment}/transition', [AppointmentController::class, 'transition'])
         ->name('appointments.transition')->middleware('can:appointments.manage');

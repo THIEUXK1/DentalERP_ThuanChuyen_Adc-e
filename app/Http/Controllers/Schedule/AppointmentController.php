@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Schedule;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\CallOutcome;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Branch;
@@ -12,12 +13,14 @@ use App\Models\Employee;
 use App\Models\Patient;
 use App\Models\PendingDeletion;
 use App\Models\ScheduleRegistration;
+use App\Services\AppointmentCallService;
 use App\Services\AppointmentService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -29,7 +32,10 @@ class AppointmentController extends Controller
      */
     private const ARRIVAL_STATUSES = ['checked_in', 'arrived_early', 'arrived_late'];
 
-    public function __construct(private AppointmentService $svc) {}
+    public function __construct(
+        private AppointmentService $svc,
+        private AppointmentCallService $callSvc,
+    ) {}
 
     public function index(): Response
     {
@@ -235,6 +241,46 @@ class AppointmentController extends Controller
         return back()->with('success', "Đã đăng ký khám cho lịch hẹn {$appointment->code} — {$arrival->label()}.");
     }
 
+    /** Lịch sử gọi điện nhắc lịch của một lịch hẹn. */
+    public function calls(Appointment $appointment): JsonResponse
+    {
+        $this->authorize('appointments.view');
+
+        $logs = $appointment->callLogs()->with('creator:id,name')->get()
+            ->map(fn ($l) => [
+                'id' => $l->id,
+                'outcome' => $l->outcome->value,
+                'outcome_label' => $l->outcome->label(),
+                'outcome_color' => $l->outcome->color(),
+                'phone' => $l->phone,
+                'note' => $l->note,
+                'called_at' => $l->called_at->format('d/m/Y H:i'),
+                'by' => $l->creator->name ?? '—',
+            ]);
+
+        return response()->json($logs);
+    }
+
+    public function logCall(Request $request, Appointment $appointment): JsonResponse
+    {
+        $this->authorize('appointments.manage');
+
+        $data = $request->validate([
+            'outcome' => ['required', Rule::enum(CallOutcome::class)],
+            'note' => 'nullable|string|max:500',
+        ]);
+
+        $appointment->loadMissing('patient:id,phone');
+        $this->callSvc->log($appointment, CallOutcome::from($data['outcome']), $data['note'] ?? null, auth()->id());
+
+        $appointment->refresh()->load(['patient', 'doctor', 'chair', 'service', 'branch']);
+
+        return response()->json([
+            'message' => 'Đã ghi nhận cuộc gọi.',
+            'appointment' => $this->dto($appointment),
+        ]);
+    }
+
     public function transition(Request $request, Appointment $appointment): RedirectResponse
     {
         $this->authorize('appointments.manage');
@@ -341,6 +387,10 @@ class AppointmentController extends Controller
             'status_color' => $a->status->color(),
             'cancel_reason' => $a->cancel_reason,
             'notes' => $a->notes,
+            'call_count' => (int) $a->call_count,
+            'last_call_at' => $a->last_call_at?->format('d/m/Y H:i'),
+            'last_call_outcome' => $a->last_call_outcome?->value,
+            'last_call_outcome_label' => $a->last_call_outcome?->shortLabel(),
         ];
     }
 }

@@ -390,6 +390,11 @@ class PatientController extends Controller
             // Gợi ý sớm/đúng/muộn để UI đánh dấu sẵn lựa chọn mặc định khi đăng ký khám.
             'arrival_suggestion' => $a->suggestedArrivalStatus()->value,
             'is_past_day' => $a->scheduled_at->lt(today()),
+            'patient_phone' => $patient->phone,
+            'call_count' => (int) $a->call_count,
+            'last_call_at' => $a->last_call_at?->format('d/m/Y H:i'),
+            'last_call_outcome' => $a->last_call_outcome?->value,
+            'last_call_outcome_label' => $a->last_call_outcome?->shortLabel(),
         ]);
 
         // ── Treatment history (plans + items) ───────────────────────────────

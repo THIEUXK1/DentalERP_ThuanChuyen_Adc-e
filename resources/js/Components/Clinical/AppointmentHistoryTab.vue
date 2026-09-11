@@ -28,6 +28,7 @@
                         <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Dịch vụ</th>
                         <th class="px-4 py-2 text-left text-gray-500 font-medium hidden md:table-cell">Thời lượng</th>
                         <th class="px-4 py-2 text-center text-gray-500 font-medium">Trạng thái</th>
+                        <th class="px-4 py-2 text-center text-gray-500 font-medium">Gọi điện</th>
                         <th class="px-4 py-2 text-left text-gray-500 font-medium hidden lg:table-cell">Ghi chú</th>
                         <th class="px-4 py-2 w-8"></th>
                     </tr>
@@ -48,6 +49,9 @@
                             <span :class="['inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium', apptStatusClass(appt.status)]">
                                 {{ appt.status_label }}
                             </span>
+                        </td>
+                        <td class="px-4 py-2 text-center whitespace-nowrap">
+                            <CallLogButton :appointment="appt" @logged="applyCallLog" />
                         </td>
                         <td class="px-4 py-2 text-gray-400 hidden lg:table-cell max-w-xs truncate">{{ appt.notes || '—' }}</td>
                         <td class="px-4 py-2 text-right">
@@ -94,12 +98,24 @@ import { ref, reactive, onMounted, onUnmounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
 import QuickRegisterButton from '@/Components/Schedule/QuickRegisterButton.vue';
+import CallLogButton from '@/Components/Schedule/CallLogButton.vue';
 
 const props = defineProps({
     appointments:     { type: Array,  default: () => [] },
     pendingDeletions: { type: Object, default: () => ({}) },
 });
 
+
+// Chỉ vá phần tóm tắt cuộc gọi vào đúng dòng — DTO trả về từ trang Lịch hẹn có
+// định dạng ngày khác, gán cả object sẽ làm hỏng cột ngày giờ của bảng này.
+function applyCallLog(updated) {
+    const appt = props.appointments.find(a => a.id === updated.id);
+    if (!appt) return;
+    appt.call_count = updated.call_count;
+    appt.last_call_at = updated.last_call_at;
+    appt.last_call_outcome = updated.last_call_outcome;
+    appt.last_call_outcome_label = updated.last_call_outcome_label;
+}
 
 // Countdown ticker
 const now = ref(Date.now());
