@@ -235,6 +235,7 @@ class TreatmentPlanService
                 'frequency' => $plan->frequency,
                 'priority' => $plan->priority,
                 'has_payments' => $plan->hasPayments(),
+                'has_net_payments' => $plan->hasNetPayments(),
                 'primary_invoice_id' => $primaryInvoice?->id,
             ],
             'items' => $plan->items->map(fn ($i) => [

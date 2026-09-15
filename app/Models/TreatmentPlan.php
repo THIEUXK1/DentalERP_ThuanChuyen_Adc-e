@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\DebtStatus;
+use App\Enums\InvoiceStatus;
 use App\Enums\TreatmentPlanStatus;
 use App\Models\Concerns\GeneratesUniqueCode;
 use Illuminate\Database\Eloquent\Model;
@@ -10,7 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class TreatmentPlan extends Model
 {
-    use LogsActivity, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity;
 
     protected static function booted(): void
     {
@@ -66,10 +68,26 @@ class TreatmentPlan extends Model
             ->exists();
     }
 
+    /**
+     * Số tiền thực thu của kế hoạch = tổng sổ thu, đã trừ các bút toán hoàn tác
+     * (dòng âm). Hoàn tác không xoá dòng gốc nên chỉ có tổng mới nói đúng
+     * "khách còn đang giữ tiền ở kế hoạch này hay không".
+     */
+    public function netPaidAmount(): int
+    {
+        return (int) PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $this->id))
+            ->sum('amount');
+    }
+
+    public function hasNetPayments(): bool
+    {
+        return $this->netPaidAmount() > 0;
+    }
+
     public function recalcTotals(): void
     {
         $this->update([
-            'total_amount'    => $this->items()->sum('subtotal'),
+            'total_amount' => $this->items()->sum('subtotal'),
             'discount_amount' => $this->items()->sum('discount'),
         ]);
 
@@ -86,18 +104,18 @@ class TreatmentPlan extends Model
         $invoice->update([
             'subtotal' => $this->total_amount,
             'discount' => $this->discount_amount,
-            'total'    => $total,
-            'status'   => $remaining <= 0
-                ? \App\Enums\InvoiceStatus::Paid
-                : ($invoice->amount_paid > 0 ? \App\Enums\InvoiceStatus::PartialPaid : \App\Enums\InvoiceStatus::Sent),
+            'total' => $total,
+            'status' => $remaining <= 0
+                ? InvoiceStatus::Paid
+                : ($invoice->amount_paid > 0 ? InvoiceStatus::PartialPaid : InvoiceStatus::Sent),
         ]);
 
         $invoice->debt?->update([
-            'amount'    => $total,
+            'amount' => $total,
             'remaining' => max(0, $remaining),
-            'status'    => $remaining <= 0
-                ? \App\Enums\DebtStatus::Paid
-                : ($invoice->amount_paid > 0 ? \App\Enums\DebtStatus::Partial : \App\Enums\DebtStatus::Pending),
+            'status' => $remaining <= 0
+                ? DebtStatus::Paid
+                : ($invoice->amount_paid > 0 ? DebtStatus::Partial : DebtStatus::Pending),
         ]);
     }
 
