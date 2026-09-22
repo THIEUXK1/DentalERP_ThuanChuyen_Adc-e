@@ -22,3 +22,11 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Bản sao .env (chứa credential thật) — không bao giờ commit
+.env.bak*
+.env.*.bak
+
+# Claude Code: chỉ chia sẻ rules/docs/plans, giữ riêng phần cục bộ
+.claude/settings.local.json
+.claude/scheduled_tasks.lock

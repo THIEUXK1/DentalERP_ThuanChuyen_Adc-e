@@ -1,0 +1,113 @@
+﻿# Bỏ qua khi quét dự án — tiết kiệm token.
+
+# --- Dependency ---
+node_modules/
+vendor/
+bower_components/
+
+# --- Docs / meta dài dòng ---
+CHANGELOG.md
+CHANGELOG
+LICENSE
+LICENSE.md
+.github/
+
+# --- Build / output ---
+dist/
+build/
+.next/
+out/
+public/build/
+public/hot/
+public/storage/
+public/js/alpine.min.js
+public/css/*.min.css
+*.min.js
+*.min.css
+*.bundle.js
+*.map
+
+# --- Lock file / manifest sinh ra ---
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+composer.lock
+public/build/manifest.json
+
+# --- Log & cache ---
+*.log
+storage/logs/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+storage/debugbar/
+storage/pail/
+bootstrap/cache/
+.phpunit.cache/
+.phpunit.result.cache
+.phpactor.json
+
+# --- Test / coverage ---
+coverage/
+.nyc_output/
+tests/_output/
+
+# --- Bí mật & môi trường ---
+.env
+.env.*
+!.env.example
+auth.json
+storage/*.key
+
+# --- IDE / OS ---
+.idea/
+.vscode/
+.fleet/
+.nova/
+.zed/
+.DS_Store
+Thumbs.db
+
+# --- File tạm của dự án ---
+curl_out.txt
+curl_out_2.txt
+*.sql
+*.sqlite
+*.dump
+*.zip
+*.tar.gz
+
+# --- Media / binary ---
+*.pdf
+*.xlsx
+*.xls
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.svg
+
+# --- Video / audio ---
+*.mp4
+*.webm
+*.mp3
+*.wav
+*.avi
+*.mov
+
+# --- Bổ sung 2026-09-22 ---
+tmp/
+temp/
+*.bak
+*.swp
+*.exe
+*.sql.gz
+*.mdf
+*.bacpac
+.git/
