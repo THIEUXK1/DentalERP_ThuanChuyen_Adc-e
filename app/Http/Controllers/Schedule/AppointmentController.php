@@ -42,6 +42,29 @@ class AppointmentController extends Controller
         $this->authorize('appointments.view');
 
         return Inertia::render('Schedule/Appointments/Index', [
+            ...$this->optionLists(),
+            // The patient picker for "book appointment" is loaded on demand from
+            // patients.lite-list (see Index.vue) instead of embedded here — shipping all
+            // 20k+ patients on every board load was the dominant cost of this page.
+            'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
+        ]);
+    }
+
+    /**
+     * Danh mục cho form đặt lịch hẹn nhanh ở màn hình khác (danh sách khách hàng…),
+     * nạp theo yêu cầu để không nhét vào props của mọi trang.
+     */
+    public function options(): JsonResponse
+    {
+        $this->authorize('appointments.view');
+
+        return response()->json($this->optionLists());
+    }
+
+    /** @return array{branches: mixed, doctors: mixed, chairs: mixed, services: mixed} */
+    private function optionLists(): array
+    {
+        return [
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'doctors' => Employee::doctors()->where('is_active', true)->get()
@@ -50,11 +73,7 @@ class AppointmentController extends Controller
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
             'services' => DentalService::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'duration_minutes' => $s->duration_minutes]),
-            // The patient picker for "book appointment" is loaded on demand from
-            // patients.lite-list (see Index.vue) instead of embedded here — shipping all
-            // 20k+ patients on every board load was the dominant cost of this page.
-            'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
-        ]);
+        ];
     }
 
     public function data(): JsonResponse

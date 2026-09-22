@@ -4,7 +4,10 @@
             <div class="absolute inset-0 bg-black/40" @click="$emit('close')"></div>
             <div class="relative bg-white w-full max-w-lg h-full flex flex-col shadow-2xl overflow-hidden">
                 <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-                    <h3 class="text-base font-semibold text-gray-900">Đặt lịch hẹn mới</h3>
+                    <div>
+                        <h3 class="text-base font-semibold text-gray-900">Đặt lịch hẹn mới</h3>
+                        <p v-if="patientName" class="text-sm text-gray-500 mt-0.5">{{ patientName }}</p>
+                    </div>
                     <button @click="$emit('close')" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                     </button>
@@ -100,6 +103,7 @@ import dayjs from 'dayjs';
 
 const props = defineProps({
     patientId:       { type: Number, required: true },
+    patientName:     { type: String, default: '' },
     defaultBranchId: { type: Number, default: null },
     branches:        { type: Array, default: () => [] },
     doctors:         { type: Array, default: () => [] },

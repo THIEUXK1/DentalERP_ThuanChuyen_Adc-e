@@ -44,6 +44,9 @@ class PatientController extends Controller
             'branches' => Branch::where('is_active', true)->orderBy('name')->get()
                 ->map(fn ($b) => ['id' => $b->id, 'name' => $b->name]),
             'sources' => collect(LeadSource::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
+            // Modal đăng ký khám mở ngay trên danh sách; bác sĩ/ghế nạp theo yêu cầu
+            // từ schedule.appointments.options nên ở đây chỉ cần danh sách trạng thái.
+            'registrationStatuses' => ScheduleRegistration::quickStatuses(),
         ]);
     }
 
@@ -155,13 +158,6 @@ class PatientController extends Controller
                 'duration_minutes' => null,
             ]);
 
-        $quickStatuses = [
-            ['value' => 'pending',      'label' => 'Đang chờ',   'color' => 'yellow'],
-            ['value' => 'in_treatment', 'label' => 'Đang làm',   'color' => 'teal'],
-            ['value' => 'completed',    'label' => 'Hoàn thành', 'color' => 'green'],
-            ['value' => 'cancelled',    'label' => 'Đã hủy',     'color' => 'red'],
-        ];
-
         return Inertia::render('Crm/Patients/AppointmentRegister', [
             'patient' => [
                 'id' => $patient->id,
@@ -175,11 +171,11 @@ class PatientController extends Controller
                 ->map(fn ($e) => ['id' => $e->id, 'name' => $e->full_name, 'branch_id' => $e->branch_id]),
             'chairs' => DentalChair::where('is_active', true)->get()
                 ->map(fn ($c) => ['id' => $c->id, 'name' => $c->name, 'branch_id' => $c->branch_id]),
-            'statuses' => $quickStatuses,
+            'statuses' => ScheduleRegistration::quickStatuses(),
         ]);
     }
 
-    public function quickRegister(Request $request, Patient $patient): RedirectResponse
+    public function quickRegister(Request $request, Patient $patient): RedirectResponse|JsonResponse
     {
         $this->authorize('appointments.create');
 
@@ -193,7 +189,7 @@ class PatientController extends Controller
         ]);
 
         try {
-            ScheduleRegistration::create([
+            $registration = ScheduleRegistration::create([
                 'code' => ScheduleRegistration::generateCode(),
                 'patient_id' => $patient->id,
                 'branch_id' => $patient->branch_id ?? auth()->user()->branch_id ?? null,
@@ -206,7 +202,23 @@ class PatientController extends Controller
                 'created_by' => auth()->id(),
             ]);
         } catch (UniqueConstraintViolationException) {
-            return back()->withErrors(['scheduled_time' => 'Mã đăng ký bị trùng, vui lòng thử lại.'])->withInput();
+            $msg = 'Mã đăng ký bị trùng, vui lòng thử lại.';
+
+            return $request->expectsJson()
+                ? response()->json(['message' => $msg], 409)
+                : back()->withErrors(['scheduled_time' => $msg])->withInput();
+        }
+
+        // Cột "Đã đăng ký khám" của danh sách khách hàng đọc từ cache 20s.
+        Cache::store('file')->forget('patients.data.list');
+
+        // Modal đăng ký ngay trên danh sách khách hàng gọi bằng fetch — trả JSON để
+        // không phải rời trang (trang Đăng ký khám cũ vẫn dùng luồng redirect như trước).
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => "Đã đăng ký khám {$registration->code} cho {$patient->full_name}.",
+                'code' => $registration->code,
+            ]);
         }
 
         return redirect()->route('schedule.registrations.index')

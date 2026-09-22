@@ -195,10 +195,14 @@
                                 </td>
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center gap-1.5 justify-end flex-wrap">
-                                        <Link :href="route('patients.register-appointment', p.id)"
+                                        <button v-if="can('appointments.create')" @click="openAppointment(p)"
+                                            class="px-2.5 py-1 text-xs bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 font-medium whitespace-nowrap">
+                                            ＋ Lịch hẹn
+                                        </button>
+                                        <button v-if="can('appointments.create')" @click="openRegister(p)"
                                             class="px-2.5 py-1 text-xs bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 font-medium whitespace-nowrap">
                                             🗓 Đăng ký khám
-                                        </Link>
+                                        </button>
                                         <Link :href="route('patients.show', p.id)"
                                             class="px-2.5 py-1 text-xs bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 font-medium">
                                             Xem
@@ -261,11 +265,21 @@
                         </svg>
                         <span class="text-xs font-medium text-indigo-700">{{ p.next_appointment_display }}</span>
                     </div>
-                    <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
+                    <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                         <span v-if="p.source" :class="['text-xs px-2 py-0.5 rounded-full font-medium', sourceClass(p.source)]">
                             {{ p.source }}
                         </span>
                         <span v-else class="text-xs text-gray-300">—</span>
+                        <div v-if="can('appointments.create')" class="flex items-center gap-1.5">
+                            <button @click.prevent.stop="openRegister(p)"
+                                class="px-2 py-0.5 text-xs bg-emerald-50 text-emerald-700 rounded-lg hover:bg-emerald-100 font-medium whitespace-nowrap">
+                                🗓 Đăng ký
+                            </button>
+                            <button @click.prevent.stop="openAppointment(p)"
+                                class="px-2 py-0.5 text-xs bg-amber-50 text-amber-700 rounded-lg hover:bg-amber-100 font-medium whitespace-nowrap">
+                                ＋ Lịch hẹn
+                            </button>
+                        </div>
                         <span class="text-xs text-gray-400">{{ p.created_at }}</span>
                     </div>
                 </Link>
@@ -285,11 +299,38 @@
         <PatientEditModal v-if="editTarget"
             :patient="editTarget" :branches="branches" :sources="sources" :stay-on-page="true"
             @close="closeEdit" />
+
+        <AppointmentCreateModal v-if="appointmentTarget && aptOptions"
+            :key="appointmentTarget.id"
+            :patient-id="appointmentTarget.id"
+            :patient-name="appointmentTarget.full_name"
+            :default-branch-id="appointmentTarget.branch_id"
+            :branches="aptOptions.branches" :doctors="aptOptions.doctors"
+            :chairs="aptOptions.chairs" :services="aptOptions.services"
+            @close="closeAppointment" />
+
+        <QuickRegisterModal v-if="registerTarget && aptOptions"
+            :key="'reg-' + registerTarget.id"
+            :patient="registerTarget"
+            :doctors="aptOptions.doctors" :chairs="aptOptions.chairs"
+            :statuses="registrationStatuses"
+            @close="registerTarget = null" @registered="onRegistered" />
+
+        <!-- Thông báo kết quả đăng ký khám, không rời trang -->
+        <div v-if="registerBanner"
+            class="fixed bottom-5 right-5 z-[60] flex items-center gap-2 bg-emerald-600 text-white rounded-xl px-4 py-3 text-sm shadow-lg">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            {{ registerBanner }}
+            <Link :href="route('schedule.registrations.index')" class="underline font-medium ml-1">Xem sổ khám</Link>
+            <button @click="registerBanner = ''" class="ml-1 text-emerald-100 hover:text-white">✕</button>
+        </div>
     </AppLayout>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onUnmounted } from 'vue';
 import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import PaginationBar from '@/Components/Shared/PaginationBar.vue';
@@ -297,9 +338,11 @@ import { usePermission } from '@/composables/usePermission';
 import { usePatientFilters, PER_PAGE_OPTIONS, avatarColor, sourceClass } from '@/composables/usePatientFilters';
 import PatientCreateModal from './components/PatientCreateModal.vue';
 import PatientEditModal from './components/PatientEditModal.vue';
+import AppointmentCreateModal from '@/Components/Clinical/AppointmentCreateModal.vue';
+import QuickRegisterModal from '@/Components/Schedule/QuickRegisterModal.vue';
 
 const { hasPermission: can } = usePermission();
-defineProps({ branches: Array, sources: Array });
+defineProps({ branches: Array, sources: Array, registrationStatuses: Array });
 
 const showCreateModal = ref(false);
 const perPageOptions  = PER_PAGE_OPTIONS;
@@ -340,6 +383,59 @@ function birthYear(dobRaw) {
     if (!dobRaw) return null;
     return new Date(dobRaw).getFullYear();
 }
+
+// ── Đặt lịch hẹn nhanh ngay trên danh sách (không vào hồ sơ bệnh nhân) ──────
+// Danh mục chi nhánh/bác sĩ/ghế/dịch vụ nạp một lần khi mở modal đầu tiên.
+const appointmentTarget = ref(null);
+const aptOptions        = ref(null);
+let   aptOptionsLoading = false;
+
+async function ensureOptions() {
+    if (aptOptions.value || aptOptionsLoading) return;
+    aptOptionsLoading = true;
+    try {
+        const res = await fetch(route('schedule.appointments.options'), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        aptOptions.value = await res.json();
+    } catch {
+        // Không nạp được danh mục: người mở modal sẽ thấy modal không bật, thử lại được.
+    } finally {
+        aptOptionsLoading = false;
+    }
+}
+
+async function openAppointment(p) {
+    appointmentTarget.value = p;
+    await ensureOptions();
+    if (!aptOptions.value) appointmentTarget.value = null;
+}
+
+function closeAppointment() {
+    appointmentTarget.value = null;
+    loadData();
+}
+
+// ── Đăng ký khám ngay trên danh sách (form mở tại chỗ, không rời trang) ─────
+const registerTarget = ref(null);
+const registerBanner = ref('');
+let   registerTimer  = null;
+
+async function openRegister(p) {
+    registerTarget.value = p;
+    await ensureOptions();
+    if (!aptOptions.value) registerTarget.value = null;
+}
+
+function onRegistered(result) {
+    registerTarget.value = null;
+    registerBanner.value = result.message;
+    clearTimeout(registerTimer);
+    registerTimer = setTimeout(() => { registerBanner.value = ''; }, 6000);
+    loadData();
+}
+
+onUnmounted(() => clearTimeout(registerTimer));
 
 // ── Inline edit (opens the edit form right on the list, no navigation) ──────
 const editTarget = ref(null);

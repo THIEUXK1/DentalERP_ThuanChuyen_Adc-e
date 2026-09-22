@@ -6,6 +6,7 @@ use App\Enums\AppointmentStatus;
 use App\Enums\LeadStatus;
 use App\Models\Appointment;
 use App\Models\Lead;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class AppointmentService
@@ -75,8 +76,16 @@ class AppointmentService
                     ->update(['status' => LeadStatus::AppointmentBooked->value]);
             }
 
+            $this->forgetPatientListCache();
+
             return $appointment;
         });
+    }
+
+    /** Cột "Lịch hẹn gần nhất" của danh sách khách hàng đọc từ cache 20s — đặt lịch xong phải xoá. */
+    private function forgetPatientListCache(): void
+    {
+        Cache::store('file')->forget('patients.data.list');
     }
 
     public function reschedule(Appointment $appointment, string $newScheduledAt, int $newDuration): void
@@ -136,6 +145,8 @@ class AppointmentService
             if (! $force) {
                 $this->checkConflict($data);
             }
+
+            $this->forgetPatientListCache();
 
             return Appointment::createWithCode([
                 ...$data,

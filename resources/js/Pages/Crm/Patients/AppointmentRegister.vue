@@ -35,12 +35,24 @@
                     <svg class="w-4 h-4 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
-                    Lịch khám mới — {{ todayDisplay }}
+                    Lịch khám mới
                 </h3>
 
                 <form @submit.prevent="submit('stay')" class="space-y-4">
-                    <!-- Row 1: time + duration -->
-                    <div class="grid grid-cols-2 gap-4">
+                    <!-- Row 1: date (khoá) + time + duration -->
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="text-xs font-medium text-gray-600 mb-1 block">Ngày khám</label>
+                            <div class="relative">
+                                <input :value="todayIso" type="date" disabled
+                                    title="Đăng ký khám luôn thuộc ngày hôm nay. Cần hẹn ngày khác thì dùng nút ＋ Lịch hẹn ở danh sách khách hàng."
+                                    class="w-full border border-gray-200 bg-gray-50 text-gray-700 rounded-lg px-3 py-2 pr-8 text-sm cursor-not-allowed" />
+                                <svg class="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                                </svg>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Hôm nay · {{ todayDisplay }}</p>
+                        </div>
                         <div>
                             <label class="text-xs font-medium text-gray-600 mb-1 block">Giờ khám *</label>
                             <input v-model="form.scheduled_time" type="time"
@@ -229,6 +241,8 @@ const props = defineProps({
 // ── Today display ──────────────────────────────────────────────────────────
 const now = new Date();
 const todayDisplay = now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+// Ô ngày chỉ để nhìn — server luôn chốt registration_date = today (quy tắc đã chốt).
+const todayIso     = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 const currentTime  = now.toTimeString().slice(0, 5);
 
 // ── Form ───────────────────────────────────────────────────────────────────
