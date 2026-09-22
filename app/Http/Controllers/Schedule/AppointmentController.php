@@ -61,7 +61,10 @@ class AppointmentController extends Controller
     {
         $this->authorize('appointments.view');
 
-        $appointments = Appointment::with(['patient', 'doctor', 'chair', 'service', 'branch'])
+        $appointments = Appointment::with([
+            'patient', 'doctor', 'chair', 'service', 'branch',
+            'rescheduledTo:id,code,scheduled_at,rescheduled_from_id', 'rescheduledFrom:id,code,scheduled_at',
+        ])
             ->withExists('registration')
             ->orderByDesc('scheduled_at')
             ->get()
@@ -160,6 +163,64 @@ class AppointmentController extends Controller
         }
 
         return back()->with('success', "Đã rời lịch hẹn {$appointment->code}.");
+    }
+
+    /**
+     * Dời nhiều lịch hẹn sang ngày khác cùng lúc: mỗi lịch cũ được giữ lại (đánh dấu
+     * "Đã chuyển") và sinh một lịch hẹn mới ở ngày được chọn.
+     * Trả JSON theo từng dòng để lễ tân biết ca nào trùng giờ mà chưa dời được.
+     */
+    public function bulkMove(Request $request): JsonResponse
+    {
+        $this->authorize('appointments.manage');
+
+        $data = $request->validate([
+            'ids' => 'required|array|min:1|max:100',
+            'ids.*' => 'integer|exists:appointments,id',
+            'date' => 'required|date_format:Y-m-d',
+            // Bỏ trống = giữ nguyên giờ hẹn cũ của từng bệnh nhân.
+            'time' => 'nullable|date_format:H:i',
+            'note' => 'nullable|string|max:1000',
+            'force' => 'boolean',
+        ]);
+
+        $appointments = Appointment::with('patient:id,full_name')
+            ->whereIn('id', $data['ids'])
+            ->orderBy('scheduled_at')
+            ->get();
+
+        $moved = [];
+        $failed = [];
+
+        foreach ($appointments as $appointment) {
+            $time = $data['time'] ?? $appointment->scheduled_at->format('H:i');
+
+            try {
+                $new = $this->svc->moveToNewDate(
+                    $appointment,
+                    $data['date'].' '.$time.':00',
+                    null,
+                    $data['note'] ?? null,
+                    (bool) ($data['force'] ?? false),
+                );
+                $moved[] = ['id' => $appointment->id, 'new_code' => $new->code];
+            } catch (\RuntimeException $e) {
+                $failed[] = [
+                    'id' => $appointment->id,
+                    'code' => $appointment->code,
+                    'patient' => $appointment->patient->full_name ?? '—',
+                    'message' => $e->getMessage(),
+                ];
+            }
+        }
+
+        return response()->json([
+            'moved' => count($moved),
+            'failed' => $failed,
+            'message' => count($moved) > 0
+                ? 'Đã dời '.count($moved).' lịch hẹn sang '.date('d/m/Y', strtotime($data['date'])).'.'
+                : 'Không dời được lịch hẹn nào.',
+        ]);
     }
 
     public function updateNotes(Request $request, Appointment $appointment): RedirectResponse
@@ -387,6 +448,11 @@ class AppointmentController extends Controller
             'status_color' => $a->status->color(),
             'cancel_reason' => $a->cancel_reason,
             'notes' => $a->notes,
+            // Dấu vết dời lịch — hiển thị ngay trên thẻ/dòng, khỏi phải bấm vào xem.
+            'moved_to' => $a->rescheduledTo?->scheduled_at->format('d/m/Y H:i'),
+            'moved_to_id' => $a->rescheduledTo?->id,
+            'moved_from' => $a->rescheduledFrom?->scheduled_at->format('d/m/Y H:i'),
+            'moved_from_id' => $a->rescheduledFrom?->id,
             'call_count' => (int) $a->call_count,
             'last_call_at' => $a->last_call_at?->format('d/m/Y H:i'),
             'last_call_outcome' => $a->last_call_outcome?->value,

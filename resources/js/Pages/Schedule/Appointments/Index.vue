@@ -33,6 +33,13 @@
                 </div>
             </div>
 
+            <!-- Kết quả dời lịch hàng loạt -->
+            <div v-if="moveBanner" class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-2 text-sm flex-shrink-0">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                {{ moveBanner }}
+                <button @click="moveBanner = ''" class="ml-auto text-emerald-500 hover:text-emerald-700">✕</button>
+            </div>
+
             <!-- ── Filter bar ──────────────────────────────────────────────── -->
             <div class="bg-white rounded-xl border border-gray-200 p-3 space-y-2.5 flex-shrink-0">
               <!-- Thanh luôn hiển thị: tìm kiếm + nút thu gọn bộ lọc -->
@@ -171,6 +178,8 @@
                                     <div class="flex items-center gap-1 flex-wrap">
                                         <span class="text-xs font-bold leading-tight truncate">{{ apt.patient }}</span>
                                         <span class="text-xs opacity-70 flex-shrink-0">{{ timeOf(apt.scheduled_at) }}</span>
+                                        <span v-if="apt.moved_to" class="text-[10px] font-bold bg-amber-500 text-white rounded px-1 flex-shrink-0">➜ {{ apt.moved_to.split(' ')[0] }}</span>
+                                        <span v-else-if="apt.moved_from" class="text-[10px] font-bold bg-emerald-500 text-white rounded px-1 flex-shrink-0">↩ {{ apt.moved_from.split(' ')[0] }}</span>
                                     </div>
                                     <span v-if="apt.height > 40" class="text-xs opacity-80 truncate leading-tight">{{ apt.service !== '—' ? apt.service : '' }}</span>
                                     <span v-if="apt.height > 56" class="text-xs opacity-60 truncate leading-tight">{{ apt.doctor !== '—' ? apt.doctor : '' }}</span>
@@ -334,12 +343,27 @@
                     class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex items-center justify-center text-center text-gray-400">
                     {{ hasActiveFilters || todayOnly ? 'Không tìm thấy lịch hẹn phù hợp' : 'Chưa có lịch hẹn nào' }}
                 </div>
+                <!-- Chọn nhanh cả trang để dời lịch hàng loạt -->
+                <div v-if="filteredAppointments.length" class="flex items-center gap-3 px-1 flex-shrink-0">
+                    <label class="inline-flex items-center gap-1.5 text-xs text-gray-500 cursor-pointer hover:text-gray-700">
+                        <input type="checkbox" :checked="allPageSelected" @change="toggleSelectAllPage"
+                            class="w-3.5 h-3.5 accent-indigo-600 cursor-pointer" />
+                        Chọn tất cả ({{ paginatedAppointments.length }})
+                    </label>
+                </div>
+
                 <!-- Bulk action bar -->
                 <div v-if="selectedIds.size > 0"
                     class="flex items-center gap-3 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex-shrink-0">
                     <span class="text-sm font-medium text-indigo-700">Đã chọn {{ selectedIds.size }} lịch hẹn</span>
                     <button @click="selectedIds = new Set()" class="text-xs text-gray-500 hover:text-gray-700 underline">Bỏ chọn</button>
                     <div class="ml-auto flex items-center gap-2">
+                        <button v-if="can('appointments.manage')" @click="openBulkMove"
+                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-amber-500 text-white rounded-lg hover:bg-amber-600">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M4 5l7 7-7 7"/></svg>
+                            Dời sang ngày khác
+                        </button>
+                        <span class="w-px h-5 bg-indigo-200"></span>
                         <select v-model="bulkStatus" class="border border-indigo-300 rounded-lg px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-white">
                             <option value="">-- Chọn trạng thái --</option>
                             <option v-for="s in QUICK_STATUSES" :key="s.value" :value="s.value">{{ s.label }}</option>
@@ -384,6 +408,13 @@
                                     <span v-if="a.chair !== '—'" class="text-gray-400">{{ a.chair }}</span>
                                 </p>
                                 <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 mt-1 inline-block max-w-xs truncate">📝 {{ a.notes }}</p>
+                                <!-- Dấu vết dời lịch: thấy ngay ngoài danh sách, không cần bấm vào -->
+                                <span v-if="a.moved_to" class="ml-1 text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 mt-1 inline-block">
+                                    ➜ Đã dời sang {{ a.moved_to }}
+                                </span>
+                                <span v-if="a.moved_from" class="ml-1 text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 mt-1 inline-block">
+                                    ↩ Dời từ {{ a.moved_from }}
+                                </span>
                             </div>
                             <div class="hidden sm:flex flex-col items-end gap-0.5 flex-shrink-0">
                                 <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
@@ -422,7 +453,7 @@
                         </div>
                         <div v-if="can('appointments.manage')" class="flex items-center gap-1.5 pr-3 flex-shrink-0">
                             <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký khám" @registered="loadData" />
-                            <button @click.prevent="openReschedule(a)"
+                            <button v-if="!a.moved_to" @click.prevent="openReschedule(a)"
                                 class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                 Rời lịch
@@ -477,13 +508,15 @@
                                 </p>
                             </div>
                             <p v-if="a.notes" class="text-xs text-amber-700 bg-amber-50 rounded px-1.5 py-0.5 truncate">📝 {{ a.notes }}</p>
+                            <p v-if="a.moved_to" class="text-xs font-semibold text-amber-800 bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 truncate">➜ Đã dời sang {{ a.moved_to }}</p>
+                            <p v-else-if="a.moved_from" class="text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5 truncate">↩ Dời từ {{ a.moved_from }}</p>
                         </Link>
                         <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white gap-1.5 flex-wrap">
                             <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
                             <CallLogButton :appointment="a" @logged="applyCallLog" />
                             <div v-if="can('appointments.manage')" class="flex items-center gap-1.5">
                                 <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký" @registered="loadData" />
-                                <button @click="openReschedule(a)"
+                                <button v-if="!a.moved_to" @click="openReschedule(a)"
                                     class="flex items-center gap-1 px-2 py-1 text-xs text-indigo-600 border border-indigo-200 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                                     Rời lịch
@@ -599,6 +632,71 @@
             </div>
         </Teleport>
 
+        <!-- ═══ MODAL: DỜI NHIỀU LỊCH SANG NGÀY KHÁC ═══ -->
+        <Teleport to="body">
+            <div v-if="showBulkMove" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+                <div class="absolute inset-0 bg-black/40" @click="showBulkMove = false"></div>
+                <div class="relative bg-white rounded-2xl shadow-xl w-full max-w-md z-10">
+                    <div class="px-5 pt-5 pb-4 border-b border-gray-100">
+                        <h3 class="text-base font-semibold text-gray-900">Dời {{ bulkMoveTargets.length }} lịch hẹn sang ngày khác</h3>
+                        <p class="text-sm text-gray-500 mt-0.5">Lịch cũ được giữ lại và đánh dấu <span class="font-medium text-amber-700">Đã chuyển</span>; hệ thống tạo lịch hẹn mới ở ngày được chọn.</p>
+                    </div>
+                    <div class="px-5 py-4 space-y-4 max-h-[60vh] overflow-y-auto">
+                        <div class="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 space-y-0.5 max-h-28 overflow-y-auto">
+                            <p v-for="a in bulkMoveTargets" :key="a.id" class="truncate">
+                                <span class="font-medium text-gray-700">{{ a.patient }}</span>
+                                <span class="text-gray-400"> · {{ displayDate(a.scheduled_at) }} {{ timeOf(a.scheduled_at) }}</span>
+                            </p>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1.5">Ngày mới</label>
+                            <input type="date" v-model="bmForm.date"
+                                class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1.5">Giờ hẹn</label>
+                            <div class="flex items-center gap-3">
+                                <label class="inline-flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                                    <input type="radio" value="keep" v-model="bmForm.timeMode" class="accent-indigo-600" />
+                                    Giữ nguyên giờ cũ
+                                </label>
+                                <label class="inline-flex items-center gap-1.5 text-sm text-gray-700 cursor-pointer">
+                                    <input type="radio" value="fixed" v-model="bmForm.timeMode" class="accent-indigo-600" />
+                                    Đặt chung
+                                </label>
+                                <input v-if="bmForm.timeMode === 'fixed'" type="time" v-model="bmForm.time"
+                                    class="border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-gray-600 mb-1.5">Ghi chú cho lịch mới <span class="text-gray-400 font-normal">(bỏ trống = giữ ghi chú cũ)</span></label>
+                            <textarea v-model="bmForm.note" rows="2" class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-none" />
+                        </div>
+                        <label class="inline-flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                            <input type="checkbox" v-model="bmForm.force" class="w-3.5 h-3.5 accent-amber-500" />
+                            Bỏ qua kiểm tra trùng giờ bác sĩ / ghế
+                        </label>
+                        <div v-if="bmFailed.length" class="text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2 space-y-1">
+                            <p class="font-medium text-red-700">{{ bmFailed.length }} lịch chưa dời được:</p>
+                            <p v-for="f in bmFailed" :key="f.id" class="text-red-600 truncate">{{ f.patient }} ({{ f.code }}) — {{ f.message }}</p>
+                        </div>
+                        <p v-if="bmError" class="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{{ bmError }}</p>
+                    </div>
+                    <div class="px-5 pb-5 pt-1 flex justify-end gap-2">
+                        <button @click="showBulkMove = false" class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Đóng</button>
+                        <button @click="submitBulkMove" :disabled="bmSaving || !bmForm.date"
+                            class="px-4 py-2 text-sm font-medium text-white bg-amber-500 rounded-lg hover:bg-amber-600 disabled:opacity-50 flex items-center gap-1.5">
+                            <svg v-if="bmSaving" class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                            </svg>
+                            Dời lịch
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </Teleport>
+
         <!-- ═══ MODAL: RỜI LỊCH NHANH ═══ -->
         <Teleport to="body">
             <div v-if="rescheduleTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -615,6 +713,10 @@
                                 class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
                             <p v-if="rsErrors.scheduled_at" class="text-red-500 text-xs mt-1">{{ rsErrors.scheduled_at }}</p>
                         </div>
+                        <label v-if="rsDateChanged" class="flex items-start gap-2 text-xs text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 cursor-pointer">
+                            <input type="checkbox" v-model="rsKeepOld" class="w-3.5 h-3.5 mt-0.5 accent-amber-500 flex-shrink-0" />
+                            <span>Giữ lại lịch cũ (đánh dấu <span class="font-medium text-amber-700">Đã chuyển</span>) và tạo lịch hẹn mới ở ngày mới.</span>
+                        </label>
                         <div>
                             <label class="block text-xs font-medium text-gray-600 mb-1.5">Thời lượng</label>
                             <select v-model="rsForm.duration_minutes"
@@ -1100,7 +1202,10 @@ onMounted(() => {
     document.addEventListener('click', closeStatusDrop);
     loadData();
 });
-onUnmounted(() => document.removeEventListener('click', closeStatusDrop));
+onUnmounted(() => {
+    document.removeEventListener('click', closeStatusDrop);
+    clearTimeout(bannerTimer);
+});
 
 // ── Bulk selection ──────────────────────────────────────────────
 let selectedIds = ref(new Set());
@@ -1119,24 +1224,151 @@ function doBulkTransition() {
     ids.forEach(id => router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true }));
 }
 
+const allPageSelected = computed(() =>
+    paginatedAppointments.value.length > 0 &&
+    paginatedAppointments.value.every(a => selectedIds.value.has(a.id))
+);
+function toggleSelectAllPage() {
+    const s = new Set(selectedIds.value);
+    const ids = paginatedAppointments.value.map(a => a.id);
+    allPageSelected.value ? ids.forEach(id => s.delete(id)) : ids.forEach(id => s.add(id));
+    selectedIds.value = s;
+}
+
+// ── Dời hàng loạt sang ngày khác (giữ lại lịch cũ) ─────────────
+const showBulkMove  = ref(false);
+const bmForm        = ref({ date: '', timeMode: 'keep', time: '09:00', note: '', force: false });
+const bmSaving      = ref(false);
+const bmFailed      = ref([]);
+const bmError       = ref('');
+const moveBanner    = ref('');
+let   bannerTimer   = null;
+
+const bulkMoveTargets = computed(() =>
+    allAppointments.value.filter(a => selectedIds.value.has(a.id))
+);
+
+function openBulkMove() {
+    bmFailed.value = [];
+    bmError.value = '';
+    bmForm.value = {
+        date: dayjs(date.value).add(1, 'day').format('YYYY-MM-DD'),
+        timeMode: 'keep', time: '09:00', note: '', force: false,
+    };
+    showBulkMove.value = true;
+}
+
+async function submitBulkMove() {
+    const ids = bulkMoveTargets.value.map(a => a.id);
+    if (!ids.length || !bmForm.value.date) return;
+
+    bmSaving.value = true;
+    bmFailed.value = [];
+    bmError.value = '';
+    try {
+        const res = await fetch(route('schedule.appointments.bulk-move'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify({
+                ids,
+                date: bmForm.value.date,
+                time: bmForm.value.timeMode === 'fixed' ? bmForm.value.time : null,
+                note: bmForm.value.note || null,
+                force: bmForm.value.force,
+            }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+            bmError.value = json.message ?? 'Không dời được lịch hẹn.';
+            return;
+        }
+        bmFailed.value = json.failed ?? [];
+        // Chỉ bỏ chọn những ca đã dời thành công để lễ tân xử lý tiếp phần còn trùng giờ.
+        const stillFailing = new Set(bmFailed.value.map(f => f.id));
+        selectedIds.value = new Set([...selectedIds.value].filter(id => stillFailing.has(id)));
+        await loadData();
+        showBanner(json.message);
+        if (!bmFailed.value.length) showBulkMove.value = false;
+    } catch {
+        bmError.value = 'Lỗi kết nối, vui lòng thử lại.';
+    } finally {
+        bmSaving.value = false;
+    }
+}
+
+function showBanner(msg) {
+    moveBanner.value = msg;
+    clearTimeout(bannerTimer);
+    bannerTimer = setTimeout(() => { moveBanner.value = ''; }, 5000);
+}
+
 // ── Reschedule ─────────────────────────────────────────────────
 const rescheduleTarget = ref(null);
 const rsForm   = ref({ scheduled_at: '', duration_minutes: 30, notes: '' });
 const rsErrors = ref({});
 const rsSaving = ref(false);
 
+// Đổi sang ngày khác thì mặc định giữ lịch cũ; đổi giờ trong cùng ngày thì sửa tại chỗ.
+const rsKeepOld = ref(true);
+const rsDateChanged = computed(() =>
+    !!rescheduleTarget.value &&
+    rsForm.value.scheduled_at.slice(0, 10) !== rescheduleTarget.value.scheduled_at.slice(0, 10)
+);
+
 function openReschedule(a) {
     rescheduleTarget.value = a;
     rsForm.value = { scheduled_at: a.scheduled_at.replace(' ', 'T'), duration_minutes: a.duration_minutes, notes: a.notes ?? '' };
     rsErrors.value = {};
+    rsKeepOld.value = true;
 }
+
+async function submitRescheduleAsMove() {
+    const target = rescheduleTarget.value;
+    const [newDate, newTime] = rsForm.value.scheduled_at.split('T');
+    rsSaving.value = true; rsErrors.value = {};
+    try {
+        const res = await fetch(route('schedule.appointments.bulk-move'), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+            },
+            body: JSON.stringify({
+                ids: [target.id],
+                date: newDate,
+                time: newTime.slice(0, 5),
+                note: rsForm.value.notes || null,
+                force: false,
+            }),
+        });
+        const json = await res.json();
+        if (!res.ok) { rsErrors.value = { conflict: json.message ?? 'Không dời được lịch hẹn.' }; return; }
+        if (json.failed?.length) { rsErrors.value = { conflict: json.failed[0].message }; return; }
+        await loadData();
+        showBanner(json.message);
+        rescheduleTarget.value = null;
+    } catch {
+        rsErrors.value = { conflict: 'Lỗi kết nối, vui lòng thử lại.' };
+    } finally {
+        rsSaving.value = false;
+    }
+}
+
 function submitReschedule() {
     if (!rescheduleTarget.value) return;
+    if (rsDateChanged.value && rsKeepOld.value) return submitRescheduleAsMove();
     rsSaving.value = true; rsErrors.value = {};
     router.patch(
         route('schedule.appointments.quick-reschedule', rescheduleTarget.value.id),
         { scheduled_at: rsForm.value.scheduled_at.replace('T', ' ') + ':00', duration_minutes: rsForm.value.duration_minutes, notes: rsForm.value.notes },
-        { preserveScroll: true, onSuccess: () => { rescheduleTarget.value = null; }, onError: e => { rsErrors.value = e; }, onFinish: () => { rsSaving.value = false; } }
+        { preserveScroll: true, onSuccess: () => { rescheduleTarget.value = null; loadData(); }, onError: e => { rsErrors.value = e; }, onFinish: () => { rsSaving.value = false; } }
     );
 }
 </script>

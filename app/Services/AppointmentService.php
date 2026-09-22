@@ -97,6 +97,56 @@ class AppointmentService
         });
     }
 
+    /**
+     * Dời lịch sang ngày khác bằng cách TẠO lịch hẹn mới và đánh dấu lịch cũ là
+     * "Đã chuyển" — khác với reschedule() (sửa tại chỗ, mất dấu lịch cũ).
+     * Lễ tân cần giữ lại lịch gốc để biết bệnh nhân đã lỡ hẹn ngày nào.
+     */
+    public function moveToNewDate(
+        Appointment $appointment,
+        string $newScheduledAt,
+        ?int $duration = null,
+        ?string $note = null,
+        bool $force = false,
+    ): Appointment {
+        if (in_array($appointment->status->value, $this->terminalStatuses, true)) {
+            throw new \RuntimeException("Lịch [{$appointment->status->label()}] không dời được.");
+        }
+
+        if ($appointment->rescheduledTo()->exists()) {
+            throw new \RuntimeException('Lịch này đã được dời trước đó.');
+        }
+
+        $duration ??= $appointment->duration_minutes;
+
+        return DB::transaction(function () use ($appointment, $newScheduledAt, $duration, $note, $force) {
+            // Chuyển lịch cũ sang 'rescheduled' trước để nó không tự chặn khung giờ mới.
+            $appointment->update(['status' => AppointmentStatus::Rescheduled->value]);
+
+            $data = [
+                'patient_id' => $appointment->patient_id,
+                'branch_id' => $appointment->branch_id,
+                'doctor_id' => $appointment->doctor_id,
+                'dental_chair_id' => $appointment->dental_chair_id,
+                'service_id' => $appointment->service_id,
+                'scheduled_at' => $newScheduledAt,
+                'duration_minutes' => $duration,
+            ];
+
+            if (! $force) {
+                $this->checkConflict($data);
+            }
+
+            return Appointment::createWithCode([
+                ...$data,
+                'rescheduled_from_id' => $appointment->id,
+                'notes' => $note !== null && $note !== '' ? $note : $appointment->notes,
+                'status' => AppointmentStatus::Booked->value,
+                'created_by' => auth()->id(),
+            ]);
+        });
+    }
+
     public function transition(Appointment $appointment, AppointmentStatus $to, array $extra = []): void
     {
         if ($to === AppointmentStatus::CheckedIn && now()->toDateString() < $appointment->scheduled_at->toDateString()) {
