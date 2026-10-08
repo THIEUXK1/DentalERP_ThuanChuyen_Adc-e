@@ -20,7 +20,7 @@ class HkdRevenueEntry extends Model
     {
         return [
             'revenue_category' => HkdRevenueCategory::class,
-            'entry_date'       => 'date',
+            'entry_date' => 'date',
         ];
     }
 

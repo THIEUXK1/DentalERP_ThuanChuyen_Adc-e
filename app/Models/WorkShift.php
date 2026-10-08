@@ -12,10 +12,17 @@ class WorkShift extends Model
     {
         return [
             'days_of_week' => 'array',
-            'is_active'    => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
-    public function branch()     { return $this->belongsTo(Branch::class); }
-    public function timesheets() { return $this->hasMany(Timesheet::class, 'shift_id'); }
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function timesheets()
+    {
+        return $this->hasMany(Timesheet::class, 'shift_id');
+    }
 }

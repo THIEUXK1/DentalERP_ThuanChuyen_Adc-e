@@ -16,5 +16,8 @@ class Supplier extends Model
         return ['is_active' => 'boolean'];
     }
 
-    public function purchaseInvoices() { return $this->hasMany(PurchaseInvoice::class); }
+    public function purchaseInvoices()
+    {
+        return $this->hasMany(PurchaseInvoice::class);
+    }
 }

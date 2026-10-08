@@ -18,9 +18,9 @@ class HkdProfile extends Model
     protected function casts(): array
     {
         return [
-            'tax_status'        => HkdTaxStatus::class,
+            'tax_status' => HkdTaxStatus::class,
             'registration_date' => 'date',
-            'is_active'         => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

@@ -17,9 +17,9 @@ class TreatmentPlanItem extends Model
     protected function casts(): array
     {
         return [
-            'status'       => TreatmentItemStatus::class,
-            'quantity'     => 'integer',
-            'started_at'   => 'datetime',
+            'status' => TreatmentItemStatus::class,
+            'quantity' => 'integer',
+            'started_at' => 'datetime',
             'completed_at' => 'datetime',
         ];
     }
@@ -63,7 +63,7 @@ class TreatmentPlanItem extends Model
     public function paidAmount(): int
     {
         $plan = $this->plan;
-        if (!$plan || $plan->total_amount <= 0) {
+        if (! $plan || $plan->total_amount <= 0) {
             return 0;
         }
         $totalPaid = $plan->invoices()->sum('amount_paid');

@@ -18,7 +18,7 @@ class HkdExpenseEntry extends Model
     protected function casts(): array
     {
         return [
-            'category'   => HkdExpenseCategory::class,
+            'category' => HkdExpenseCategory::class,
             'entry_date' => 'date',
         ];
     }

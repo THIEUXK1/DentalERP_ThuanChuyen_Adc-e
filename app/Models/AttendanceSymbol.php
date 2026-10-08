@@ -16,13 +16,13 @@ class AttendanceSymbol extends Model
     protected function casts(): array
     {
         return [
-            'is_paid'                => 'boolean',
-            'counts_as_workday'      => 'boolean',
-            'counts_as_leave'        => 'boolean',
+            'is_paid' => 'boolean',
+            'counts_as_workday' => 'boolean',
+            'counts_as_leave' => 'boolean',
             'counts_as_unpaid_leave' => 'boolean',
-            'counts_as_overtime'     => 'boolean',
-            'default_paid_workday'   => 'float',
-            'active'                 => 'boolean',
+            'counts_as_overtime' => 'boolean',
+            'default_paid_workday' => 'float',
+            'active' => 'boolean',
         ];
     }
 
@@ -36,12 +36,12 @@ class AttendanceSymbol extends Model
         return static::where('active', true)->get()
             ->keyBy('code')
             ->map(fn ($s) => [
-                'code'            => $s->code,
-                'label'           => $s->label,
-                'color'           => $s->color,
-                'display'         => $s->displayCode(),
-                'paid_workday'    => $s->default_paid_workday,
-                'is_overtime'     => $s->counts_as_overtime,
+                'code' => $s->code,
+                'label' => $s->label,
+                'color' => $s->color,
+                'display' => $s->displayCode(),
+                'paid_workday' => $s->default_paid_workday,
+                'is_overtime' => $s->counts_as_overtime,
                 'is_unpaid_leave' => $s->counts_as_unpaid_leave,
             ])->toArray();
     }

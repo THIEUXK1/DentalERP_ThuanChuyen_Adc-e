@@ -18,17 +18,17 @@ class AttendancePeriod extends Model
     protected function casts(): array
     {
         return [
-            'status'      => AttendancePeriodStatus::class,
-            'month'       => 'integer',
-            'year'        => 'integer',
-            'locked_at'   => 'datetime',
+            'status' => AttendancePeriodStatus::class,
+            'month' => 'integer',
+            'year' => 'integer',
+            'locked_at' => 'datetime',
             'unlocked_at' => 'datetime',
         ];
     }
 
     public static function generateCode(int $month, int $year): string
     {
-        return 'CC-' . $year . str_pad($month, 2, '0', STR_PAD_LEFT);
+        return 'CC-'.$year.str_pad($month, 2, '0', STR_PAD_LEFT);
     }
 
     public function isLocked(): bool
@@ -47,9 +47,28 @@ class AttendancePeriod extends Model
     }
 
     // Relations
-    public function creator(): BelongsTo   { return $this->belongsTo(User::class, 'created_by'); }
-    public function locker(): BelongsTo    { return $this->belongsTo(User::class, 'locked_by'); }
-    public function unlocker(): BelongsTo  { return $this->belongsTo(User::class, 'unlocked_by'); }
-    public function records(): HasMany     { return $this->hasMany(AttendanceRecord::class, 'attendance_period_id'); }
-    public function auditLogs(): HasMany   { return $this->hasMany(AttendanceAuditLog::class, 'attendance_period_id'); }
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function locker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    public function unlocker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'unlocked_by');
+    }
+
+    public function records(): HasMany
+    {
+        return $this->hasMany(AttendanceRecord::class, 'attendance_period_id');
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AttendanceAuditLog::class, 'attendance_period_id');
+    }
 }

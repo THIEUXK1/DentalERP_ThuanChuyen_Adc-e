@@ -16,8 +16,8 @@ class HkdInventoryItem extends Model
     protected function casts(): array
     {
         return [
-            'opening_qty'       => 'decimal:3',
-            'is_active'         => 'boolean',
+            'opening_qty' => 'decimal:3',
+            'is_active' => 'boolean',
         ];
     }
 

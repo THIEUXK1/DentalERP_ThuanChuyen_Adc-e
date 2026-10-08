@@ -17,7 +17,7 @@ class HkdBusinessCategory extends Model
     {
         return [
             'revenue_category' => HkdRevenueCategory::class,
-            'is_primary'       => 'boolean',
+            'is_primary' => 'boolean',
         ];
     }
 

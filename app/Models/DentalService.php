@@ -12,7 +12,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class DentalService extends Model
 {
-    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'code', 'name', 'category_id', 'service_group', 'cost_price', 'selling_price',
@@ -23,10 +23,10 @@ class DentalService extends Model
     protected function casts(): array
     {
         return [
-            'is_active'          => 'boolean',
-            'kpi_base_type'      => KpiBaseType::class,
-            'kpi_rate'           => 'float',
-            'fixed_kpi_amount'   => 'integer',
+            'is_active' => 'boolean',
+            'kpi_base_type' => KpiBaseType::class,
+            'kpi_rate' => 'float',
+            'fixed_kpi_amount' => 'integer',
             'estimated_sessions' => 'integer',
         ];
     }

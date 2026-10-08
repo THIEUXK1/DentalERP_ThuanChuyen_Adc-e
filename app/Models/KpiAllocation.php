@@ -22,18 +22,18 @@ class KpiAllocation extends Model
     protected function casts(): array
     {
         return [
-            'status'            => KpiAllocationStatus::class,
-            'share_percent'     => 'float',
-            'quality_factor'    => 'float',
+            'status' => KpiAllocationStatus::class,
+            'share_percent' => 'float',
+            'quality_factor' => 'float',
             'collection_factor' => 'float',
-            'eligible_revenue'  => 'integer',
-            'direct_cost'       => 'integer',
-            'kpi_pool_amount'   => 'integer',
-            'kpi_amount'        => 'integer',
-            'final_kpi_amount'  => 'integer',
-            'calculated_at'     => 'datetime',
-            'approved_at'       => 'datetime',
-            'paid_at'           => 'datetime',
+            'eligible_revenue' => 'integer',
+            'direct_cost' => 'integer',
+            'kpi_pool_amount' => 'integer',
+            'kpi_amount' => 'integer',
+            'final_kpi_amount' => 'integer',
+            'calculated_at' => 'datetime',
+            'approved_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 

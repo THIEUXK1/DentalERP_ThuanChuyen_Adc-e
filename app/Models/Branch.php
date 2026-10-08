@@ -10,7 +10,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Branch extends Model
 {
-    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity, SoftDeletes;
 
     protected $fillable = ['code', 'name', 'address', 'phone', 'manager_id', 'is_active'];
 

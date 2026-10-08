@@ -23,18 +23,18 @@ class Payroll extends Model
     protected function casts(): array
     {
         return [
-            'status'           => PayrollStatus::class,
+            'status' => PayrollStatus::class,
             'union_fee_confirmed' => 'boolean',
-            'confirmed_at'     => 'datetime',
-            'locked_at'        => 'datetime',
-            'posted_at'        => 'datetime',
-            'paid_at'          => 'datetime',
+            'confirmed_at' => 'datetime',
+            'locked_at' => 'datetime',
+            'posted_at' => 'datetime',
+            'paid_at' => 'datetime',
         ];
     }
 
     public static function generateCode(int $month, int $year): string
     {
-        return 'BL-' . $year . str_pad($month, 2, '0', STR_PAD_LEFT);
+        return 'BL-'.$year.str_pad($month, 2, '0', STR_PAD_LEFT);
     }
 
     public function periodLabel(): string
@@ -42,12 +42,38 @@ class Payroll extends Model
         return "Tháng {$this->month}/{$this->year}";
     }
 
-    public function branch(): BelongsTo        { return $this->belongsTo(Branch::class); }
-    public function attendancePeriod(): BelongsTo { return $this->belongsTo(AttendancePeriod::class); }
-    public function creator(): BelongsTo       { return $this->belongsTo(User::class, 'created_by'); }
-    public function confirmedBy(): BelongsTo   { return $this->belongsTo(User::class, 'confirmed_by'); }
-    public function lockedBy(): BelongsTo      { return $this->belongsTo(User::class, 'locked_by'); }
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
 
-    public function items(): HasMany           { return $this->hasMany(PayrollItem::class); }
-    public function auditLogs(): HasMany       { return $this->hasMany(PayrollAuditLog::class); }
+    public function attendancePeriod(): BelongsTo
+    {
+        return $this->belongsTo(AttendancePeriod::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function confirmedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function lockedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'locked_by');
+    }
+
+    public function items(): HasMany
+    {
+        return $this->hasMany(PayrollItem::class);
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(PayrollAuditLog::class);
+    }
 }

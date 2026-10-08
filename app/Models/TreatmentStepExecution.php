@@ -20,9 +20,9 @@ class TreatmentStepExecution extends Model
     protected function casts(): array
     {
         return [
-            'status'         => TreatmentStepStatus::class,
-            'started_at'     => 'datetime',
-            'ended_at'       => 'datetime',
+            'status' => TreatmentStepStatus::class,
+            'started_at' => 'datetime',
+            'ended_at' => 'datetime',
         ];
     }
 

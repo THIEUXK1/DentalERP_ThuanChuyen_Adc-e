@@ -14,14 +14,21 @@ class EmployeeContract extends Model
     protected function casts(): array
     {
         return [
-            'type'       => EmployeeContractType::class,
+            'type' => EmployeeContractType::class,
             'start_date' => 'date',
-            'end_date'   => 'date',
+            'end_date' => 'date',
         ];
     }
 
-    public function employee() { return $this->belongsTo(Employee::class); }
-    public function creator()  { return $this->belongsTo(User::class, 'created_by'); }
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
     public function isActive(): bool
     {

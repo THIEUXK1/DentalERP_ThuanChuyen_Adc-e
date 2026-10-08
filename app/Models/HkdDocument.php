@@ -16,7 +16,7 @@ class HkdDocument extends Model
     protected function casts(): array
     {
         return [
-            'document_date'  => 'date',
+            'document_date' => 'date',
             'retention_until' => 'date',
         ];
     }
@@ -33,7 +33,7 @@ class HkdDocument extends Model
 
     public function url(): string
     {
-        return asset('storage/' . $this->file_path);
+        return asset('storage/'.$this->file_path);
     }
 
     public function isExpired(): bool

@@ -13,5 +13,8 @@ class LeaveType extends Model
         return ['is_paid' => 'boolean', 'is_active' => 'boolean'];
     }
 
-    public function requests() { return $this->hasMany(LeaveRequest::class); }
+    public function requests()
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
 }

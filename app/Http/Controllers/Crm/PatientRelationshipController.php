@@ -15,10 +15,10 @@ class PatientRelationshipController extends Controller
         $this->authorize('patients.edit');
 
         $data = $request->validate([
-            'related_patient_id' => 'required|exists:patients,id|different:' . $patient->id,
-            'relationship_type'  => 'required|in:parent,child,spouse,sibling,referrer',
-            'referral_rate'      => 'nullable|numeric|min:0|max:100',
-            'notes'              => 'nullable|string|max:500',
+            'related_patient_id' => 'required|exists:patients,id|different:'.$patient->id,
+            'relationship_type' => 'required|in:parent,child,spouse,sibling,referrer',
+            'referral_rate' => 'nullable|numeric|min:0|max:100',
+            'notes' => 'nullable|string|max:500',
         ]);
 
         $exists = PatientRelationship::where('patient_id', $patient->id)

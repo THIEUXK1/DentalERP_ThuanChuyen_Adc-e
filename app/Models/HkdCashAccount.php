@@ -17,7 +17,7 @@ class HkdCashAccount extends Model
     protected function casts(): array
     {
         return [
-            'type'      => HkdCashAccountType::class,
+            'type' => HkdCashAccountType::class,
             'is_active' => 'boolean',
         ];
     }
@@ -36,6 +36,7 @@ class HkdCashAccount extends Model
     {
         $receipts = $this->transactions()->where('period', $period)->where('trans_type', 'receipt')->sum('amount');
         $payments = $this->transactions()->where('period', $period)->where('trans_type', 'payment')->sum('amount');
+
         return $this->opening_balance + $receipts - $payments;
     }
 }

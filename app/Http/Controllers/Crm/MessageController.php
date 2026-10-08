@@ -26,14 +26,14 @@ class MessageController extends Controller
 
         return Inertia::render('Crm/Messages/Templates', [
             'templates' => $query->get()->map(fn ($t) => [
-                'id'        => $t->id,
-                'name'      => $t->name,
-                'channel'   => $t->channel->value,
+                'id' => $t->id,
+                'name' => $t->name,
+                'channel' => $t->channel->value,
                 'channel_label' => $t->channel->label(),
-                'content'   => $t->content,
+                'content' => $t->content,
                 'is_active' => $t->is_active,
             ]),
-            'channels'  => collect(MessageChannel::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
+            'channels' => collect(MessageChannel::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
         ]);
     }
 
@@ -42,9 +42,9 @@ class MessageController extends Controller
         $this->authorize('leads.manage');
 
         $data = $request->validate([
-            'name'      => 'required|string|max:255',
-            'channel'   => 'required|in:sms,zalo',
-            'content'   => 'required|string',
+            'name' => 'required|string|max:255',
+            'channel' => 'required|in:sms,zalo',
+            'content' => 'required|string',
             'is_active' => 'boolean',
         ]);
 
@@ -58,9 +58,9 @@ class MessageController extends Controller
         $this->authorize('leads.manage');
 
         $data = $request->validate([
-            'name'      => 'required|string|max:255',
-            'channel'   => 'required|in:sms,zalo',
-            'content'   => 'required|string',
+            'name' => 'required|string|max:255',
+            'channel' => 'required|in:sms,zalo',
+            'content' => 'required|string',
             'is_active' => 'boolean',
         ]);
 
@@ -92,20 +92,20 @@ class MessageController extends Controller
             ->orderByDesc('id');
 
         return Inertia::render('Crm/Messages/Log', [
-            'logs'     => $query->paginate(30)->through(fn ($l) => [
-                'id'           => $l->id,
-                'patient'      => $l->patient->full_name,
-                'phone'        => $l->phone,
-                'channel'      => $l->channel,
-                'template'     => $l->template?->name,
+            'logs' => $query->paginate(30)->through(fn ($l) => [
+                'id' => $l->id,
+                'patient' => $l->patient->full_name,
+                'phone' => $l->phone,
+                'channel' => $l->channel,
+                'template' => $l->template?->name,
                 'content_sent' => $l->content_sent,
-                'status'       => $l->status->value,
+                'status' => $l->status->value,
                 'status_label' => $l->status->label(),
                 'status_color' => $l->status->color(),
-                'sent_at'      => $l->sent_at?->format('d/m/Y H:i'),
+                'sent_at' => $l->sent_at?->format('d/m/Y H:i'),
                 'error_message' => $l->error_message,
             ]),
-            'filters'  => $request->only(['status', 'channel']),
+            'filters' => $request->only(['status', 'channel']),
             'statuses' => collect(MessageLogStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()]),
             'channels' => collect(MessageChannel::cases())->map(fn ($c) => ['value' => $c->value, 'label' => $c->label()]),
         ]);
@@ -116,16 +116,16 @@ class MessageController extends Controller
         $this->authorize('leads.manage');
 
         $data = $request->validate([
-            'patient_id'  => 'required|exists:patients,id',
+            'patient_id' => 'required|exists:patients,id',
             'template_id' => 'required|exists:message_templates,id',
         ]);
 
-        $patient  = Patient::findOrFail($data['patient_id']);
+        $patient = Patient::findOrFail($data['patient_id']);
         $template = MessageTemplate::findOrFail($data['template_id']);
 
         $log = $this->service->send($patient, $template);
 
-        $msg = $log->status->value === 'sent' ? 'Đã gửi tin nhắn.' : 'Gửi thất bại: ' . $log->error_message;
+        $msg = $log->status->value === 'sent' ? 'Đã gửi tin nhắn.' : 'Gửi thất bại: '.$log->error_message;
 
         return back()->with($log->status->value === 'sent' ? 'success' : 'error', $msg);
     }

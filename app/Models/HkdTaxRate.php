@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\HkdRevenueCategory;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
 
 class HkdTaxRate extends Model
@@ -16,14 +17,14 @@ class HkdTaxRate extends Model
     {
         return [
             'revenue_category' => HkdRevenueCategory::class,
-            'vat_rate'         => 'decimal:4',
-            'pit_rate'         => 'decimal:4',
-            'effective_from'   => 'date',
-            'effective_to'     => 'date',
+            'vat_rate' => 'decimal:4',
+            'pit_rate' => 'decimal:4',
+            'effective_from' => 'date',
+            'effective_to' => 'date',
         ];
     }
 
-    public static function rateFor(string $category, \Carbon\Carbon $date): ?self
+    public static function rateFor(string $category, Carbon $date): ?self
     {
         return static::where('revenue_category', $category)
             ->where('effective_from', '<=', $date)

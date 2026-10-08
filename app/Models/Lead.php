@@ -13,7 +13,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Lead extends Model
 {
-    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'code', 'name', 'phone', 'email', 'source', 'status',

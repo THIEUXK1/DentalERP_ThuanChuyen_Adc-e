@@ -16,8 +16,8 @@ class EmployeeKpi extends Model
     {
         return [
             'revenue_target' => 'integer',
-            'case_target'    => 'integer',
-            'bonus_amount'   => 'integer',
+            'case_target' => 'integer',
+            'bonus_amount' => 'integer',
         ];
     }
 

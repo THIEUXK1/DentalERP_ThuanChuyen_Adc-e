@@ -18,14 +18,14 @@ class PatientMergeService
 
     /** Related-record counts shown on the merge preview screen. */
     private const PREVIEW_TABLES = [
-        'invoices'         => ['table' => 'patient_invoices', 'label' => 'Hóa đơn'],
-        'treatment_plans'  => ['table' => 'treatment_plans', 'label' => 'Kế hoạch điều trị'],
-        'appointments'     => ['table' => 'appointments', 'label' => 'Lịch hẹn'],
-        'clinical_notes'   => ['table' => 'clinical_notes', 'label' => 'Ghi chú lâm sàng'],
-        'attachments'      => ['table' => 'patient_attachments', 'label' => 'Tệp đính kèm'],
-        'consent_forms'    => ['table' => 'consent_forms', 'label' => 'Cam kết'],
+        'invoices' => ['table' => 'patient_invoices', 'label' => 'Hóa đơn'],
+        'treatment_plans' => ['table' => 'treatment_plans', 'label' => 'Kế hoạch điều trị'],
+        'appointments' => ['table' => 'appointments', 'label' => 'Lịch hẹn'],
+        'clinical_notes' => ['table' => 'clinical_notes', 'label' => 'Ghi chú lâm sàng'],
+        'attachments' => ['table' => 'patient_attachments', 'label' => 'Tệp đính kèm'],
+        'consent_forms' => ['table' => 'consent_forms', 'label' => 'Cam kết'],
         'tooth_conditions' => ['table' => 'tooth_conditions', 'label' => 'Tình trạng răng'],
-        'relationships'    => ['table' => 'patient_relationships', 'label' => 'Mối quan hệ'],
+        'relationships' => ['table' => 'patient_relationships', 'label' => 'Mối quan hệ'],
     ];
 
     /** Profile fields that get filled in on the survivor when empty (never overwritten). */
@@ -41,16 +41,16 @@ class PatientMergeService
         $counts = [];
         foreach (self::PREVIEW_TABLES as $key => $meta) {
             $counts[$key] = [
-                'label'    => $meta['label'],
+                'label' => $meta['label'],
                 'survivor' => DB::table($meta['table'])->where('patient_id', $survivor->id)->count(),
-                'loser'    => DB::table($meta['table'])->where('patient_id', $loser->id)->count(),
+                'loser' => DB::table($meta['table'])->where('patient_id', $loser->id)->count(),
             ];
         }
 
         $fieldDiffs = [];
         foreach (self::MERGEABLE_FIELDS as $field) {
             $survivorValue = $survivor->{$field};
-            $loserValue    = $loser->{$field};
+            $loserValue = $loser->{$field};
             if (blank($survivorValue) && ! blank($loserValue)) {
                 $fieldDiffs[$field] = ['survivor' => $survivorValue, 'loser' => $loserValue];
             }
@@ -72,9 +72,9 @@ class PatientMergeService
                 'id' => $loser->id, 'code' => $loser->code,
                 'full_name' => $loser->full_name, 'phone' => $loser->phone,
             ],
-            'counts'              => $counts,
-            'field_diffs'         => $fieldDiffs,
-            'notes_will_append'   => filled($loser->notes),
+            'counts' => $counts,
+            'field_diffs' => $fieldDiffs,
+            'notes_will_append' => filled($loser->notes),
             'medical_flags_union' => collect($survivor->medical_flags ?? [])
                 ->merge($loser->medical_flags ?? [])->unique()->values()->all(),
             'extra_phones' => $extraPhones->all(),
@@ -92,7 +92,7 @@ class PatientMergeService
             sort($ids);
             $locked = Patient::whereIn('id', $ids)->lockForUpdate()->get()->keyBy('id');
             $survivor = $locked->get($survivorId);
-            $loser    = $locked->get($loserId);
+            $loser = $locked->get($loserId);
 
             if (! $survivor || ! $loser) {
                 throw new \RuntimeException('Một trong hai hồ sơ không còn tồn tại hoặc đã bị xóa.');
@@ -221,18 +221,19 @@ class PatientMergeService
 
     private function mergePhones(Patient $survivor, Patient $loser): void
     {
-        $incoming = collect([$loser->phone])
-            ->merge(DB::table('patient_phones')->where('patient_id', $loser->id)->pluck('phone'))
-            ->filter()
-            ->unique();
+        // phone => nhãn chủ số; mang nhãn theo để sau khi gộp CSKH vẫn biết số đó của ai.
+        $incoming = collect([$loser->phone => $loser->phone_label])
+            ->union(DB::table('patient_phones')->where('patient_id', $loser->id)->pluck('label', 'phone'))
+            ->filter(fn ($label, $phone) => $phone !== '');
 
-        foreach ($incoming as $phone) {
+        foreach ($incoming as $phone => $label) {
+            $phone = (string) $phone;
             if ($phone === $survivor->phone) {
                 continue;
             }
             DB::table('patient_phones')->updateOrInsert(
                 ['patient_id' => $survivor->id, 'phone' => $phone],
-                ['updated_at' => now(), 'created_at' => now()]
+                ['label' => $label, 'updated_at' => now(), 'created_at' => now()]
             );
         }
 
@@ -243,7 +244,7 @@ class PatientMergeService
     {
         $loser->notes = trim(collect([
             $loser->notes,
-            '[MERGED] Đã gộp vào hồ sơ ' . $survivor->code . ' lúc ' . now()->format('d/m/Y H:i'),
+            '[MERGED] Đã gộp vào hồ sơ '.$survivor->code.' lúc '.now()->format('d/m/Y H:i'),
         ])->filter()->implode("\n\n"));
         $loser->save();
         $loser->delete();

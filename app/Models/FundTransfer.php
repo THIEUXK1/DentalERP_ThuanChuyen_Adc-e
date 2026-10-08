@@ -15,7 +15,18 @@ class FundTransfer extends Model
         return ['transfer_date' => 'date'];
     }
 
-    public function fromAccount() { return $this->belongsTo(FundAccount::class, 'from_account_id'); }
-    public function toAccount()   { return $this->belongsTo(FundAccount::class, 'to_account_id'); }
-    public function creator()     { return $this->belongsTo(User::class, 'created_by'); }
+    public function fromAccount()
+    {
+        return $this->belongsTo(FundAccount::class, 'from_account_id');
+    }
+
+    public function toAccount()
+    {
+        return $this->belongsTo(FundAccount::class, 'to_account_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

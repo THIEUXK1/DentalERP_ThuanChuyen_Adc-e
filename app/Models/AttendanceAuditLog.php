@@ -18,15 +18,30 @@ class AttendanceAuditLog extends Model
     protected function casts(): array
     {
         return [
-            'old_value'  => 'array',
-            'new_value'  => 'array',
-            'work_date'  => 'date',
+            'old_value' => 'array',
+            'new_value' => 'array',
+            'work_date' => 'date',
             'changed_at' => 'datetime',
         ];
     }
 
-    public function period(): BelongsTo  { return $this->belongsTo(AttendancePeriod::class, 'attendance_period_id'); }
-    public function record(): BelongsTo  { return $this->belongsTo(AttendanceRecord::class, 'attendance_record_id'); }
-    public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }
-    public function changer(): BelongsTo  { return $this->belongsTo(User::class, 'changed_by'); }
+    public function period(): BelongsTo
+    {
+        return $this->belongsTo(AttendancePeriod::class, 'attendance_period_id');
+    }
+
+    public function record(): BelongsTo
+    {
+        return $this->belongsTo(AttendanceRecord::class, 'attendance_record_id');
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function changer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'changed_by');
+    }
 }

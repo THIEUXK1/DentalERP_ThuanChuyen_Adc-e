@@ -33,6 +33,13 @@ class HkdCashTransaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function isReceipt(): bool { return $this->trans_type === 'receipt'; }
-    public function isPayment(): bool { return $this->trans_type === 'payment'; }
+    public function isReceipt(): bool
+    {
+        return $this->trans_type === 'receipt';
+    }
+
+    public function isPayment(): bool
+    {
+        return $this->trans_type === 'payment';
+    }
 }

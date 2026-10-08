@@ -15,10 +15,10 @@ class ConsentFormController extends Controller
         $this->authorize('patients.edit');
 
         $data = $request->validate([
-            'title'             => 'required|string|max:255',
-            'content'           => 'required|string',
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
             'treatment_plan_id' => 'nullable|exists:treatment_plans,id',
-            'notes'             => 'nullable|string|max:1000',
+            'notes' => 'nullable|string|max:1000',
         ]);
 
         $patient->consentForms()->create([...$data, 'status' => 'pending', 'created_by' => auth()->id()]);
@@ -39,8 +39,8 @@ class ConsentFormController extends Controller
         ]);
 
         $consentForm->update([
-            'status'         => 'signed',
-            'signed_at'      => now(),
+            'status' => 'signed',
+            'signed_at' => now(),
             'signed_by_name' => $data['signed_by_name'],
         ]);
 

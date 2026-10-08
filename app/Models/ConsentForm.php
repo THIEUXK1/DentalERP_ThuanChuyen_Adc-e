@@ -15,12 +15,23 @@ class ConsentForm extends Model
     protected function casts(): array
     {
         return [
-            'status'    => ConsentStatus::class,
+            'status' => ConsentStatus::class,
             'signed_at' => 'datetime',
         ];
     }
 
-    public function patient()       { return $this->belongsTo(Patient::class); }
-    public function treatmentPlan() { return $this->belongsTo(TreatmentPlan::class); }
-    public function creator()       { return $this->belongsTo(User::class, 'created_by'); }
+    public function patient()
+    {
+        return $this->belongsTo(Patient::class);
+    }
+
+    public function treatmentPlan()
+    {
+        return $this->belongsTo(TreatmentPlan::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

@@ -21,10 +21,10 @@ class LabOrder extends Model
     protected function casts(): array
     {
         return [
-            'status'        => LabOrderStatus::class,
-            'items'         => 'array',
+            'status' => LabOrderStatus::class,
+            'items' => 'array',
             'expected_date' => 'date',
-            'sent_date'     => 'date',
+            'sent_date' => 'date',
             'received_date' => 'date',
         ];
     }
@@ -32,6 +32,7 @@ class LabOrder extends Model
     public static function generateCode(): string
     {
         $last = static::max('id') ?? 0;
+
         return 'DXL-'.str_pad($last + 1, 4, '0', STR_PAD_LEFT);
     }
 

@@ -10,7 +10,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class DentalExamination extends Model
 {
-    use LogsActivity, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity;
 
     protected $fillable = [
         'code', 'patient_id', 'appointment_id', 'branch_id', 'doctor_id', 'consultant_id',
@@ -21,7 +21,7 @@ class DentalExamination extends Model
     protected function casts(): array
     {
         return [
-            'status'      => ExaminationStatus::class,
+            'status' => ExaminationStatus::class,
             'examined_at' => 'datetime',
         ];
     }

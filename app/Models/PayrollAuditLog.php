@@ -18,14 +18,29 @@ class PayrollAuditLog extends Model
     protected function casts(): array
     {
         return [
-            'old_value'  => 'array',
-            'new_value'  => 'array',
+            'old_value' => 'array',
+            'new_value' => 'array',
             'changed_at' => 'datetime',
         ];
     }
 
-    public function payroll(): BelongsTo     { return $this->belongsTo(Payroll::class); }
-    public function payrollItem(): BelongsTo { return $this->belongsTo(PayrollItem::class); }
-    public function employee(): BelongsTo    { return $this->belongsTo(Employee::class); }
-    public function changedBy(): BelongsTo   { return $this->belongsTo(User::class, 'changed_by'); }
+    public function payroll(): BelongsTo
+    {
+        return $this->belongsTo(Payroll::class);
+    }
+
+    public function payrollItem(): BelongsTo
+    {
+        return $this->belongsTo(PayrollItem::class);
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function changedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'changed_by');
+    }
 }

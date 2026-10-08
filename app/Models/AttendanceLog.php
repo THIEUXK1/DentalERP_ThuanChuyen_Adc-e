@@ -15,13 +15,20 @@ class AttendanceLog extends Model
     protected function casts(): array
     {
         return [
-            'punched_at'   => 'datetime',
+            'punched_at' => 'datetime',
             'is_processed' => 'boolean',
         ];
     }
 
-    public function device(): BelongsTo   { return $this->belongsTo(AttendanceDevice::class, 'device_id'); }
-    public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(AttendanceDevice::class, 'device_id');
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
 
     // Human-readable status labels
     public function statusLabel(): string

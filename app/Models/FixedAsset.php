@@ -24,14 +24,15 @@ class FixedAsset extends Model
     {
         return [
             'acquisition_date' => 'date',
-            'status'           => FixedAssetStatus::class,
-            'category'         => FixedAssetCategory::class,
+            'status' => FixedAssetStatus::class,
+            'category' => FixedAssetCategory::class,
         ];
     }
 
     public static function generateCode(): string
     {
         $last = static::max('id') ?? 0;
+
         return 'TSC-'.str_pad($last + 1, 4, '0', STR_PAD_LEFT);
     }
 

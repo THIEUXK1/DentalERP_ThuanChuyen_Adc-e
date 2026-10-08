@@ -17,7 +17,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Employee extends Model
 {
-    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity, SoftDeletes;
 
     protected $fillable = [
         'code', 'user_id', 'branch_id', 'department_id',
@@ -44,22 +44,22 @@ class Employee extends Model
     protected function casts(): array
     {
         return [
-            'role_type'                 => RoleType::class,
-            'contract_type'             => ContractType::class,
-            'employment_status'         => EmploymentStatus::class,
-            'dental_role'               => DentalRole::class,
-            'is_active'                 => 'boolean',
-            'social_insurance_enabled'  => 'boolean',
-            'date_of_birth'             => 'date',
-            'start_date'                => 'date',
-            'base_salary'               => 'integer',
-            'responsibility_allowance'  => 'integer',
-            'fixed_allowance'           => 'integer',
-            'lunch_allowance'           => 'integer',
-            'travel_allowance'          => 'integer',
-            'phone_allowance'           => 'integer',
-            'default_kpi_rate'          => 'float',
-            'support_step_rate'         => 'float',
+            'role_type' => RoleType::class,
+            'contract_type' => ContractType::class,
+            'employment_status' => EmploymentStatus::class,
+            'dental_role' => DentalRole::class,
+            'is_active' => 'boolean',
+            'social_insurance_enabled' => 'boolean',
+            'date_of_birth' => 'date',
+            'start_date' => 'date',
+            'base_salary' => 'integer',
+            'responsibility_allowance' => 'integer',
+            'fixed_allowance' => 'integer',
+            'lunch_allowance' => 'integer',
+            'travel_allowance' => 'integer',
+            'phone_allowance' => 'integer',
+            'default_kpi_rate' => 'float',
+            'support_step_rate' => 'float',
         ];
     }
 

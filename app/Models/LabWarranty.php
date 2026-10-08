@@ -16,9 +16,9 @@ class LabWarranty extends Model
     protected function casts(): array
     {
         return [
-            'status'     => LabWarrantyStatus::class,
+            'status' => LabWarrantyStatus::class,
             'start_date' => 'date',
-            'end_date'   => 'date',
+            'end_date' => 'date',
         ];
     }
 

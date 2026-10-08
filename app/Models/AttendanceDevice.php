@@ -17,10 +17,17 @@ class AttendanceDevice extends Model
     {
         return [
             'last_sync_at' => 'datetime',
-            'is_active'    => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
-    public function branch(): BelongsTo  { return $this->belongsTo(Branch::class); }
-    public function logs(): HasMany      { return $this->hasMany(AttendanceLog::class, 'device_id'); }
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(AttendanceLog::class, 'device_id');
+    }
 }

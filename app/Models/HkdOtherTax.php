@@ -16,9 +16,9 @@ class HkdOtherTax extends Model
     protected function casts(): array
     {
         return [
-            'due_date'  => 'date',
+            'due_date' => 'date',
             'paid_date' => 'date',
-            'tax_rate'  => 'decimal:4',
+            'tax_rate' => 'decimal:4',
         ];
     }
 

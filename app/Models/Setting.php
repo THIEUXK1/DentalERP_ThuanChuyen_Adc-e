@@ -38,10 +38,10 @@ class Setting extends Model
             ],
             'accounting' => [
                 'accounting.regime' => [
-                    'label'   => 'Chế độ kế toán',
-                    'type'    => 'select',
+                    'label' => 'Chế độ kế toán',
+                    'type' => 'select',
                     'options' => [
-                        'TT152_HKD'        => 'Hộ kinh doanh (TT152/2025)',
+                        'TT152_HKD' => 'Hộ kinh doanh (TT152/2025)',
                         'TT133_ENTERPRISE' => 'Doanh nghiệp (TT133)',
                     ],
                 ],

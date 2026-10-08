@@ -41,20 +41,21 @@ class FundAccount extends Model
 
     public function currentBalance(): int
     {
-        $income          = $this->payments()->where('amount', '>', 0)->sum('amount');
-        $expense         = $this->expenses()->sum('amount');
-        $purchasePaid    = $this->purchaseInvoices()->sum('paid_amount');
-        $transfersOut    = $this->transfersOut()->sum('amount');
-        $transfersIn     = $this->transfersIn()->sum('amount');
+        $income = $this->payments()->where('amount', '>', 0)->sum('amount');
+        $expense = $this->expenses()->sum('amount');
+        $purchasePaid = $this->purchaseInvoices()->sum('paid_amount');
+        $transfersOut = $this->transfersOut()->sum('amount');
+        $transfersIn = $this->transfersIn()->sum('amount');
+
         return $this->initial_balance + $income - $expense - $purchasePaid - $transfersOut + $transfersIn;
     }
 
     public function typeLabel(): string
     {
-        return match($this->type) {
-            'bank'    => 'Ngân hàng',
+        return match ($this->type) {
+            'bank' => 'Ngân hàng',
             'ewallet' => 'Ví điện tử',
-            default   => 'Tiền mặt',
+            default => 'Tiền mặt',
         };
     }
 }

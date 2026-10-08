@@ -17,10 +17,10 @@ class PendingDeletion extends Model
     ];
 
     protected $casts = [
-        'execute_at'   => 'datetime',
+        'execute_at' => 'datetime',
         'cancelled_at' => 'datetime',
-        'executed_at'  => 'datetime',
-        'created_at'   => 'datetime',
+        'executed_at' => 'datetime',
+        'created_at' => 'datetime',
     ];
 
     public function deletable(): MorphTo

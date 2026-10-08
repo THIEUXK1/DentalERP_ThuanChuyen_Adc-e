@@ -30,20 +30,39 @@ class PayrollItem extends Model
     protected function casts(): array
     {
         return [
-            'kpi_source_type'         => KpiSourceType::class,
-            'social_insurance_enabled'=> 'boolean',
-            'insurance_manual_override'=> 'boolean',
-            'salary_manual_override'  => 'boolean',
-            'pit_manual_override'     => 'boolean',
-            'union_fee_confirmed'     => 'boolean',
-            'actual_working_days'     => 'float',
-            'workday_ratio'           => 'float',
+            'kpi_source_type' => KpiSourceType::class,
+            'social_insurance_enabled' => 'boolean',
+            'insurance_manual_override' => 'boolean',
+            'salary_manual_override' => 'boolean',
+            'pit_manual_override' => 'boolean',
+            'union_fee_confirmed' => 'boolean',
+            'actual_working_days' => 'float',
+            'workday_ratio' => 'float',
         ];
     }
 
-    public function payroll(): BelongsTo    { return $this->belongsTo(Payroll::class); }
-    public function employee(): BelongsTo   { return $this->belongsTo(Employee::class); }
-    public function department(): BelongsTo { return $this->belongsTo(Department::class); }
-    public function creator(): BelongsTo    { return $this->belongsTo(User::class, 'created_by'); }
-    public function updater(): BelongsTo    { return $this->belongsTo(User::class, 'updated_by'); }
+    public function payroll(): BelongsTo
+    {
+        return $this->belongsTo(Payroll::class);
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function department(): BelongsTo
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 }

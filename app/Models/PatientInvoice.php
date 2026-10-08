@@ -10,7 +10,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class PatientInvoice extends Model
 {
-    use LogsActivity, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity;
 
     protected $fillable = [
         'code', 'patient_id', 'treatment_plan_id', 'installment_index', 'branch_id',

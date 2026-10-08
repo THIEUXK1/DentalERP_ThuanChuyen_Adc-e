@@ -9,7 +9,7 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class PriceList extends Model
 {
-    use LogsActivity, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity;
 
     protected $fillable = ['code', 'name', 'is_active'];
 

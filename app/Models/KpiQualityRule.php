@@ -15,9 +15,9 @@ class KpiQualityRule extends Model
     {
         return [
             'quality_factor' => 'float',
-            'hold_kpi'       => 'boolean',
-            'reverse_kpi'    => 'boolean',
-            'is_active'      => 'boolean',
+            'hold_kpi' => 'boolean',
+            'reverse_kpi' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -25,13 +25,13 @@ class KpiQualityRule extends Model
     public function triggerLabel(): string
     {
         return match ($this->trigger_event) {
-            'refund'              => 'Hoàn tiền',
-            'redo'                => 'Làm lại',
-            'complaint'           => 'Khiếu nại',
-            'missing_attachment'  => 'Thiếu hồ sơ/file',
-            'protocol_violation'  => 'Vi phạm quy trình',
-            'incomplete_service'  => 'Dịch vụ chưa hoàn thành',
-            default               => $this->trigger_event ?? '—',
+            'refund' => 'Hoàn tiền',
+            'redo' => 'Làm lại',
+            'complaint' => 'Khiếu nại',
+            'missing_attachment' => 'Thiếu hồ sơ/file',
+            'protocol_violation' => 'Vi phạm quy trình',
+            'incomplete_service' => 'Dịch vụ chưa hoàn thành',
+            default => $this->trigger_event ?? '—',
         };
     }
 }

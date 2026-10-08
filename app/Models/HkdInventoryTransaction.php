@@ -17,7 +17,7 @@ class HkdInventoryTransaction extends Model
     {
         return [
             'trans_date' => 'date',
-            'qty'        => 'decimal:3',
+            'qty' => 'decimal:3',
         ];
     }
 
@@ -36,6 +36,13 @@ class HkdInventoryTransaction extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function isImport(): bool { return $this->trans_type === 'import'; }
-    public function isExport(): bool { return $this->trans_type === 'export'; }
+    public function isImport(): bool
+    {
+        return $this->trans_type === 'import';
+    }
+
+    public function isExport(): bool
+    {
+        return $this->trans_type === 'export';
+    }
 }

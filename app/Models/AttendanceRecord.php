@@ -17,12 +17,12 @@ class AttendanceRecord extends Model
     protected function casts(): array
     {
         return [
-            'work_date'      => 'date',
-            'working_hours'  => 'float',
+            'work_date' => 'date',
+            'working_hours' => 'float',
             'overtime_hours' => 'float',
-            'paid_workday'   => 'float',
+            'paid_workday' => 'float',
             'unpaid_workday' => 'float',
-            'weekday'        => 'integer',
+            'weekday' => 'integer',
         ];
     }
 
@@ -37,8 +37,23 @@ class AttendanceRecord extends Model
     }
 
     // Relations
-    public function period(): BelongsTo   { return $this->belongsTo(AttendancePeriod::class, 'attendance_period_id'); }
-    public function employee(): BelongsTo { return $this->belongsTo(Employee::class); }
-    public function creator(): BelongsTo  { return $this->belongsTo(User::class, 'created_by'); }
-    public function updater(): BelongsTo  { return $this->belongsTo(User::class, 'updated_by'); }
+    public function period(): BelongsTo
+    {
+        return $this->belongsTo(AttendancePeriod::class, 'attendance_period_id');
+    }
+
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function updater(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
 }

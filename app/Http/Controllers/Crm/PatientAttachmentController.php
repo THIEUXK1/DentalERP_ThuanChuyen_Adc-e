@@ -16,19 +16,19 @@ class PatientAttachmentController extends Controller
         $this->authorize('patients.edit');
 
         $data = $request->validate([
-            'type'  => 'required|in:xray,document,photo,other',
+            'type' => 'required|in:xray,document,photo,other',
             'title' => 'required|string|max:255',
-            'file'  => 'required|file|mimes:jpeg,jpg,png,webp,pdf,doc,docx|max:5120',
+            'file' => 'required|file|mimes:jpeg,jpg,png,webp,pdf,doc,docx|max:5120',
         ]);
 
-        $file     = $request->file('file');
-        $path     = $file->store("patients/{$patient->id}/attachments", 'public');
+        $file = $request->file('file');
+        $path = $file->store("patients/{$patient->id}/attachments", 'public');
         $patient->attachments()->create([
-            'type'        => $data['type'],
-            'title'       => $data['title'],
-            'file_path'   => $path,
-            'file_size'   => $file->getSize(),
-            'mime_type'   => $file->getMimeType(),
+            'type' => $data['type'],
+            'title' => $data['title'],
+            'file_path' => $path,
+            'file_size' => $file->getSize(),
+            'mime_type' => $file->getMimeType(),
             'uploaded_by' => auth()->id(),
         ]);
 

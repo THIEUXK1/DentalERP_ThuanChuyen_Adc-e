@@ -18,16 +18,17 @@ class PurchaseInvoice extends Model
     protected function casts(): array
     {
         return [
-            'status'       => PurchaseInvoiceStatus::class,
+            'status' => PurchaseInvoiceStatus::class,
             'invoice_date' => 'date',
-            'due_date'     => 'date',
+            'due_date' => 'date',
         ];
     }
 
     public static function generateCode(): string
     {
         $last = static::max('id') ?? 0;
-        return 'HD-MUA-' . str_pad($last + 1, 4, '0', STR_PAD_LEFT);
+
+        return 'HD-MUA-'.str_pad($last + 1, 4, '0', STR_PAD_LEFT);
     }
 
     public function amountDue(): int
@@ -35,9 +36,28 @@ class PurchaseInvoice extends Model
         return max(0, $this->total - $this->paid_amount);
     }
 
-    public function supplier()    { return $this->belongsTo(Supplier::class); }
-    public function branch()      { return $this->belongsTo(Branch::class); }
-    public function fundAccount() { return $this->belongsTo(FundAccount::class); }
-    public function items()       { return $this->hasMany(PurchaseInvoiceItem::class); }
-    public function creator()     { return $this->belongsTo(User::class, 'created_by'); }
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
+    public function branch()
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    public function fundAccount()
+    {
+        return $this->belongsTo(FundAccount::class);
+    }
+
+    public function items()
+    {
+        return $this->hasMany(PurchaseInvoiceItem::class);
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

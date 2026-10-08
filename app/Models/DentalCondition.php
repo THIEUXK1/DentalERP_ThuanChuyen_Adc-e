@@ -17,8 +17,8 @@ class DentalCondition extends Model
     protected function casts(): array
     {
         return [
-            'group'      => DentalConditionGroup::class,
-            'is_active'  => 'boolean',
+            'group' => DentalConditionGroup::class,
+            'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
     }

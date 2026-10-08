@@ -14,6 +14,13 @@ class PatientRelationship extends Model
         return ['relationship_type' => RelationshipType::class];
     }
 
-    public function patient()        { return $this->belongsTo(Patient::class, 'patient_id'); }
-    public function relatedPatient() { return $this->belongsTo(Patient::class, 'related_patient_id'); }
+    public function patient()
+    {
+        return $this->belongsTo(Patient::class, 'patient_id');
+    }
+
+    public function relatedPatient()
+    {
+        return $this->belongsTo(Patient::class, 'related_patient_id');
+    }
 }

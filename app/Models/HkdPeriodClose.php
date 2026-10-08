@@ -17,9 +17,9 @@ class HkdPeriodClose extends Model
     protected function casts(): array
     {
         return [
-            'status'        => HkdPeriodCloseStatus::class,
-            'closed_at'     => 'datetime',
-            'unlocked_at'   => 'datetime',
+            'status' => HkdPeriodCloseStatus::class,
+            'closed_at' => 'datetime',
+            'unlocked_at' => 'datetime',
             'snapshot_data' => 'array',
         ];
     }

@@ -15,7 +15,7 @@ class InventoryServiceTemplate extends Model
     {
         return [
             'qty_per_execution' => 'float',
-            'is_active'         => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 

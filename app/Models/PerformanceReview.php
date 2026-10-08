@@ -18,9 +18,20 @@ class PerformanceReview extends Model
         return ['status' => PerformanceReviewStatus::class];
     }
 
-    public function employee() { return $this->belongsTo(Employee::class); }
-    public function reviewer() { return $this->belongsTo(User::class, 'reviewer_id'); }
-    public function creator()  { return $this->belongsTo(User::class, 'created_by'); }
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function reviewer()
+    {
+        return $this->belongsTo(User::class, 'reviewer_id');
+    }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 
     public function averageScore(): float
     {

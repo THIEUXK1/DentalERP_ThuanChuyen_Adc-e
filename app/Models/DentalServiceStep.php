@@ -15,11 +15,11 @@ class DentalServiceStep extends Model
     protected function casts(): array
     {
         return [
-            'kpi_share_percent'       => 'float',
+            'kpi_share_percent' => 'float',
             'deduct_from_main_doctor' => 'boolean',
-            'require_quality_check'   => 'boolean',
-            'require_attachment'      => 'boolean',
-            'is_active'               => 'boolean',
+            'require_quality_check' => 'boolean',
+            'require_attachment' => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -37,17 +37,17 @@ class DentalServiceStep extends Model
     public static function roleLabel(string $role): string
     {
         return match ($role) {
-            'counseling'         => 'Tư vấn',
-            'examination'        => 'Khám',
-            'imaging'            => 'Chụp phim/CT/scan',
+            'counseling' => 'Tư vấn',
+            'examination' => 'Khám',
+            'imaging' => 'Chụp phim/CT/scan',
             'treatment_planning' => 'Lập kế hoạch',
-            'main_treatment'     => 'Điều trị chính',
-            'chairside_assist'   => 'Phụ tá ghế',
-            'impression'         => 'Lấy dấu/scan',
-            'prosthetics'        => 'Gắn phục hình',
-            'follow_up'          => 'Tái khám',
-            'aftercare'          => 'CSKH sau điều trị',
-            default              => $role,
+            'main_treatment' => 'Điều trị chính',
+            'chairside_assist' => 'Phụ tá ghế',
+            'impression' => 'Lấy dấu/scan',
+            'prosthetics' => 'Gắn phục hình',
+            'follow_up' => 'Tái khám',
+            'aftercare' => 'CSKH sau điều trị',
+            default => $role,
         };
     }
 }

@@ -17,9 +17,9 @@ class InventoryTransaction extends Model
     {
         return [
             'transaction_type' => InventoryTransactionType::class,
-            'qty'              => 'float',
-            'unit_cost'        => 'integer',
-            'amount'           => 'integer',
+            'qty' => 'float',
+            'unit_cost' => 'integer',
+            'amount' => 'integer',
             'transaction_date' => 'date',
         ];
     }

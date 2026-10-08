@@ -14,9 +14,9 @@ class DentalServiceCost extends Model
     protected function casts(): array
     {
         return [
-            'standard_cost'            => 'integer',
+            'standard_cost' => 'integer',
             'is_excluded_from_kpi_base' => 'boolean',
-            'is_active'                => 'boolean',
+            'is_active' => 'boolean',
         ];
     }
 
@@ -29,13 +29,13 @@ class DentalServiceCost extends Model
     public static function costTypeLabel(string $type): string
     {
         return match ($type) {
-            'material'       => 'Vật tư',
-            'lab'            => 'Labo',
+            'material' => 'Vật tư',
+            'lab' => 'Labo',
             'implant_fixture' => 'Trụ Implant',
-            'medicine'       => 'Thuốc',
-            'imaging'        => 'Chụp chiếu',
+            'medicine' => 'Thuốc',
+            'imaging' => 'Chụp chiếu',
             'chair_overhead' => 'Chi phí ghế',
-            default          => 'Khác',
+            default => 'Khác',
         };
     }
 }
