@@ -98,3 +98,14 @@ tail -50 storage/logs/laravel.log
 
 `composer dev` chạy gộp serve + queue + pail + vite bằng `concurrently` — tiện nhưng output
 trộn lẫn; khi cần đọc log thì chạy tách từng lệnh ở nền.
+
+## 6. Máy deploy & SSH
+
+| | |
+|---|---|
+| Production (duy nhất) | `root@103.176.179.167`, app ở `/var/www/DentalERP` — Ubuntu 24.04, nginx, PHP 8.3-FPM, PostgreSQL 16 |
+| SSH | `ssh -i ~/.ssh/dental_erp_backup root@103.176.179.167 "cd /var/www/DentalERP && …"` — chỉ key, cấm `-pw`/mật khẩu trong lệnh hay rule |
+
+Quy trình deploy chi tiết (build tráo đổi `public/build`, smoke test, backup) nằm trong memory
+`reference_deploy_infra.md`. Chỉ deploy khi người dùng yêu cầu; ghi production → xem
+[database-safety.md](database-safety.md).

@@ -39,11 +39,11 @@ Lịch sử cũ hơn: [decision-log.md](decision-log.md).
 
 | Ngày | Quyết định | Lý do | Hệ quả |
 |---|---|---|---|
+| 2026-10-08 | Quyền công cụ tách 2 lớp: `settings.json` (dev, commit được; `ask` cho `migrate`/`tinker`/`db`/`git push`, `deny` cho lệnh phá huỷ) + `settings.local.json` (SSH production bằng key `dental_erp_backup`) | `.env` local trỏ DB production mà `settings.local.json` có sẵn `php artisan *` → migrate chạy không qua hỏi; mật khẩu root máy cũ nằm plaintext trong settings toàn cục | Allow rule không thay xác nhận: ghi production vẫn hỏi từng lần ([database-safety.md](../docs/database-safety.md)). DB ghi đúng là PostgreSQL 16, không phải MySQL |
 | 2026-09-22 | Gom `.claude/rules/` về **một** file `core.md`; 4 file cũ chuyển sang `.claude/docs/` | `rules/` bị tự nạp mỗi phiên — 23 KB tài liệu tra cứu ngốn ngữ cảnh vô ích | Phần tự nạp còn ~9 KB; tài liệu chi tiết đọc theo bảng lazy-load ở `core.md` §9 |
 | 2026-09-22 | Dời lịch sang ngày khác = **tạo lịch hẹn mới + giữ lịch cũ** ở trạng thái `rescheduled`, liên kết bằng `rescheduled_from_id`; `reschedule()` (sửa tại chỗ) chỉ còn dùng khi đổi giờ trong cùng ngày | Lễ tân cần thấy bệnh nhân đã lỡ hẹn ngày nào; sửa tại chỗ làm mất dấu lịch cũ | Một bệnh nhân lỡ hẹn nhiều lần sẽ sinh chuỗi lịch hẹn → báo cáo đếm lịch hẹn **phải loại** trạng thái `rescheduled` |
 | 2026-08-28 | Dev luôn chạy hot reload: `npm run dev -- --clearScreen false` (Vite HMR + `refresh: true`) | Sửa file là trình duyệt tự cập nhật | Cờ `--clearScreen false` là bắt buộc — thiếu nó Vite xoá terminal và nuốt log lỗi giữa phiên |
 | 2026-08-27 | Mốc dữ liệu: `clinic_records` (Excel cũ) kết thúc **10/05/2026**, từ đó ERP chạy thật (`patient_payments` live) | Bàn giao sạch, không chồng lấn | Không import thêm Excel sau mốc này |
-| 2026-08-27 | Quy tắc phục hồi ngày Excel bị đọc kiểu Mỹ: **ngày ≤ 12 thì đảo ngày↔tháng** (`App\Support\LegacyExcelValue::unswapLegacyDate`) | Khớp đúng dữ liệu production (49.348/136.523 dòng đã đảo) | Mọi lần bù dữ liệu sau phải dùng cùng quy tắc, nếu không sẽ sinh bản ghi trùng lệch ngày |
 
 ## Ghi chú cho phiên sau
 

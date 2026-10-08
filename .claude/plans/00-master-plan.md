@@ -21,7 +21,7 @@ hộ kinh doanh (TT152/HKD) và báo cáo.
 | Frontend hiện tại | Inertia 2 + Vue 3 (`resources/js/Pages`, ~140 trang) + Tailwind 3 + Vite 7 |
 | Frontend đích | Blade + Alpine.js 3 + JavaScript thuần (`resources/views/`, `public/js/`) |
 | Route helper | Ziggy |
-| DB | MySQL (xem `config/database.php`, `.env`) |
+| DB | PostgreSQL 16 (xem `config/database.php`, `.env`) |
 
 **Stack đã chốt — không tự ý đổi.** Không thêm SPA framework mới, không đổi ORM, không
 thay Tailwind, không thêm build tool ngoài Vite mà chưa có quyết định ghi lại ở

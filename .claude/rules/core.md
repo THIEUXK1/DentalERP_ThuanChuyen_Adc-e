@@ -8,7 +8,7 @@ ERP cho một phòng khám nha khoa (nội bộ, không phải SaaS, không có 
 CRM · đăng ký khám & lịch hẹn · lâm sàng · kế hoạch điều trị · thu ngân/công nợ · kho & labo ·
 nhân sự (chấm công, lương, KPI) · kế toán hộ kinh doanh TT152 · báo cáo.
 
-**Stack đã chốt — không tự ý đổi:** PHP 8.2 · Laravel 12 · MySQL · `spatie/laravel-permission`
+**Stack đã chốt — không tự ý đổi:** PHP 8.2 · Laravel 12 · PostgreSQL 16 · `spatie/laravel-permission`
 + `activitylog` · Tailwind 3 + Vite 7 · lớp UI cũ Inertia 2 + Vue 3 · **lớp UI mới Blade +
 Alpine + JS thuần** (Phase 2 đang chuyển dần). Thêm dependency hay đổi stack → ADR trong
 [Decision Log](../plans/00-context-memory.md).

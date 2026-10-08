@@ -71,6 +71,6 @@ reload trang · fetch + CSRF + `preventDefault` + cập nhật DOM cục bộ). 
 
 ## 6. Khi cần đổi kiến trúc
 
-Không tự ý đổi stack đã chốt (Laravel 12, MySQL, Tailwind 3, Vite, Blade+Alpine cho UI mới).
+Không tự ý đổi stack đã chốt (Laravel 12, PostgreSQL, Tailwind 3, Vite, Blade+Alpine cho UI mới).
 Muốn đổi: ghi đề xuất kèm **trade-off + blast radius** vào Decision Log của
 `00-context-memory.md` và hỏi người dùng trước.

@@ -7,6 +7,12 @@ Mọi lệnh `php artisan` chạy ở local đều tác động **dữ liệu th
 Trước bất kỳ lệnh nào có khả năng ghi: kiểm tra `DB_HOST`/`DB_DATABASE` trong `.env`,
 chạy dry-run, rồi **hỏi xác nhận người dùng**.
 
+**Allow rule ≠ được phép ghi.** `settings.local.json` cho phép
+`ssh -i ~/.ssh/dental_erp_backup root@103.176.179.167 *` chỉ để công cụ không chặn lệnh đọc.
+Mọi lệnh GHI production (qua SSH, `psql`, `artisan` ở local hay trên server, `git push` deploy)
+vẫn phải hỏi xác nhận **từng lần**, kèm lệnh chính xác + bảng/số hàng bị chạm + rollback.
+DB production là **PostgreSQL 16** (`DB_CONNECTION=pgsql`) — SQL đề xuất viết theo cú pháp Postgres.
+
 ## 1. Lệnh CẤM tuyệt đối (không chạy, kể cả khi "chắc là an toàn")
 
 ```
