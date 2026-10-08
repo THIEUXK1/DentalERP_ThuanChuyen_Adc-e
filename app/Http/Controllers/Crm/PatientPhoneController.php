@@ -16,6 +16,8 @@ class PatientPhoneController extends Controller
 
         $data = $request->validate([
             'phone' => ['required', 'string', 'max:20', 'regex:/^0\d{8,10}$/'],
+            // Không cho ',' và '|': danh sách khách hàng nối SĐT|nhãn bằng hai ký tự này.
+            'label' => ['nullable', 'string', 'max:30', 'regex:/^[^,|]*$/'],
         ]);
 
         if ($data['phone'] === $patient->phone) {

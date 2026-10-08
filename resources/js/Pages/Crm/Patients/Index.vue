@@ -102,6 +102,16 @@
                     </select>
                 </div>
                 <div>
+                    <label class="text-xs text-gray-500 mb-1 block">Thanh toán</label>
+                    <select v-model="debtStatus"
+                        class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                        <option value="">Tất cả</option>
+                        <option value="owing">Còn nợ</option>
+                        <option value="paid">Đã trả đủ</option>
+                        <option value="none">Chưa có hoá đơn</option>
+                    </select>
+                </div>
+                <div>
                     <label class="text-xs text-gray-500 mb-1 block">Hiển thị</label>
                     <select v-model="perPage"
                         class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none">
@@ -149,6 +159,7 @@
                                 <th class="px-4 py-3 text-left font-medium hidden xl:table-cell">
                                     <span class="flex items-center gap-1">🗓 Lịch hẹn gần nhất</span>
                                 </th>
+                                <th class="px-4 py-3 text-right font-medium">Công nợ</th>
                                 <th class="px-4 py-3 text-right font-medium">Hành động</th>
                             </tr>
                         </thead>
@@ -169,7 +180,11 @@
                                 </td>
                                 <td class="px-4 py-3 text-gray-600 hidden sm:table-cell">
                                     {{ p.phone }}
-                                    <span v-if="p.extra_phones?.length" class="block text-xs text-gray-400">+{{ p.extra_phones.join(', ') }}</span>
+                                    <span v-if="p.phone_label" :class="PHONE_LABEL_CLASS">{{ p.phone_label }}</span>
+                                    <span v-for="(ph, i) in p.extra_phones" :key="ph" class="block text-xs text-gray-400">
+                                        +{{ ph }}
+                                        <span v-if="p.extra_phone_labels?.[i]" :class="PHONE_LABEL_CLASS">{{ p.extra_phone_labels[i] }}</span>
+                                    </span>
                                 </td>
                                 <td class="px-4 py-3 hidden md:table-cell">
                                     <span v-if="p.source" :class="['text-xs px-2 py-0.5 rounded-full font-medium', sourceClass(p.source)]">
@@ -191,6 +206,15 @@
                                         class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 whitespace-nowrap">
                                         🗓 {{ p.next_appointment_display }}
                                     </span>
+                                    <span v-else class="text-gray-300 text-xs">—</span>
+                                </td>
+                                <td class="px-4 py-3 text-right whitespace-nowrap">
+                                    <template v-if="p.debt_status === 'owing'">
+                                        <span class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-red-50 text-red-700">Còn nợ</span>
+                                        <p class="text-xs font-semibold text-red-600 mt-0.5">{{ formatVnd(p.amount_due) }}</p>
+                                    </template>
+                                    <span v-else-if="p.debt_status === 'paid'"
+                                        class="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">Đã trả đủ</span>
                                     <span v-else class="text-gray-300 text-xs">—</span>
                                 </td>
                                 <td class="px-4 py-3 text-right">
@@ -243,6 +267,7 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/>
                             </svg>
                             {{ p.phone }}
+                            <span v-if="p.phone_label" :class="PHONE_LABEL_CLASS">{{ p.phone_label }}</span>
                         </div>
                         <div v-if="calcAge(p.dob_raw) !== null" class="flex items-center gap-1.5">
                             <svg class="w-3.5 h-3.5 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -265,6 +290,13 @@
                         </svg>
                         <span class="text-xs font-medium text-indigo-700">{{ p.next_appointment_display }}</span>
                     </div>
+                    <div v-if="p.debt_status === 'owing'"
+                        class="mt-2 flex items-center justify-between px-2 py-1 bg-red-50 rounded-lg text-xs">
+                        <span class="font-medium text-red-700">Còn nợ</span>
+                        <span class="font-semibold text-red-600">{{ formatVnd(p.amount_due) }}</span>
+                    </div>
+                    <div v-else-if="p.debt_status === 'paid'"
+                        class="mt-2 px-2 py-1 bg-emerald-50 rounded-lg text-xs font-medium text-emerald-700">Đã trả đủ</div>
                     <div class="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between gap-2">
                         <span v-if="p.source" :class="['text-xs px-2 py-0.5 rounded-full font-medium', sourceClass(p.source)]">
                             {{ p.source }}
@@ -335,6 +367,7 @@ import { Link } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import PaginationBar from '@/Components/Shared/PaginationBar.vue';
 import { usePermission } from '@/composables/usePermission';
+import { useCurrency } from '@/composables/useCurrency';
 import { usePatientFilters, PER_PAGE_OPTIONS, avatarColor, sourceClass } from '@/composables/usePatientFilters';
 import PatientCreateModal from './components/PatientCreateModal.vue';
 import PatientEditModal from './components/PatientEditModal.vue';
@@ -342,6 +375,9 @@ import AppointmentCreateModal from '@/Components/Clinical/AppointmentCreateModal
 import QuickRegisterModal from '@/Components/Schedule/QuickRegisterModal.vue';
 
 const { hasPermission: can } = usePermission();
+const { formatVnd } = useCurrency();
+// Nhãn chủ số ("Bố", "Mẹ"…) cạnh SĐT để CSKH biết đang gọi cho ai.
+const PHONE_LABEL_CLASS = 'ml-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-medium whitespace-nowrap';
 defineProps({ branches: Array, sources: Array, registrationStatuses: Array });
 
 const showCreateModal = ref(false);
@@ -349,7 +385,7 @@ const perPageOptions  = PER_PAGE_OPTIONS;
 
 const {
     loading, loadError, loadData, totalCount,
-    search, branchId, source, perPage, currentPage, viewMode,
+    search, branchId, source, debtStatus, perPage, currentPage, viewMode,
     filteredPatients, totalPages, fromRecord, toRecord, paginatedPatients, pageNumbers,
     hasActiveFilters, clearFilters,
 } = usePatientFilters();
@@ -360,7 +396,7 @@ watch(showFilters, v => localStorage.setItem('patients_filters_open', v ? '1' : 
 
 // Số dòng/trang không tính là "điều kiện lọc" trên badge
 const activeFilterCount = computed(() =>
-    [search.value, branchId.value !== '' ? branchId.value : '', source.value].filter(Boolean).length
+    [search.value, branchId.value !== '' ? branchId.value : '', source.value, debtStatus.value].filter(Boolean).length
 );
 
 function closeCreate() {

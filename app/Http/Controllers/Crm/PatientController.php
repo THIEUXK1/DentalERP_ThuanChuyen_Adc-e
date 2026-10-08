@@ -36,6 +36,9 @@ use Inertia\Response;
 
 class PatientController extends Controller
 {
+    /** Nhãn chủ số ("Bố", "Mẹ"…). Cấm ',' và '|' vì danh sách nối SĐT|nhãn bằng hai ký tự này. */
+    private const PHONE_LABEL_RULE = ['nullable', 'string', 'max:30', 'regex:/^[^,|]*$/'];
+
     public function index(Request $request): Response
     {
         $this->authorize('patients.view');
@@ -82,12 +85,21 @@ class PatientController extends Controller
                 ->select('patient_id', DB::raw('MIN(scheduled_at) as next_at'))
                 ->pluck('next_at', 'patient_id');
 
+            // Công nợ: cùng công thức với trang chi tiết (showData) — tổng hoá đơn chưa huỷ
+            // trừ tổng đã thu — gộp một query để danh sách khỏi phải mở từng bệnh nhân.
+            $invoiceTotals = DB::table('patient_invoices')
+                ->where('status', '!=', InvoiceStatus::Cancelled->value)
+                ->groupBy('patient_id')
+                ->select('patient_id', DB::raw('SUM(total) - SUM(amount_paid) as due'))
+                ->pluck('due', 'patient_id');
+
             $isSqlite = DB::getDriverName() === 'sqlite';
 
             $extraPhones = DB::table('patient_phones')
                 ->select('patient_id', DB::raw($isSqlite
-                    ? "group_concat(phone, ',') as phones"
-                    : "string_agg(phone, ',') as phones"))
+                    // "sđt|nhãn" nối bằng dấu phẩy; nhãn bị validate không chứa ',' và '|'.
+                    ? "group_concat(phone || '|' || coalesce(label, ''), ',') as phones"
+                    : "string_agg(phone || '|' || coalesce(label, ''), ',') as phones"))
                 ->groupBy('patient_id')
                 ->pluck('phones', 'patient_id');
 
@@ -96,7 +108,7 @@ class PatientController extends Controller
                 ->whereNull('p.deleted_at')
                 ->orderByDesc('p.id')
                 ->select(
-                    'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.gender', 'p.source',
+                    'p.id', 'p.code', 'p.full_name', 'p.phone', 'p.phone_label', 'p.gender', 'p.source',
                     'p.branch_id', 'p.is_active', 'p.address', 'p.dob',
                     DB::raw($isSqlite
                         ? "strftime('%d/%m/%Y', p.created_at) as created_at"
@@ -108,15 +120,22 @@ class PatientController extends Controller
                 )
                 ->get();
 
-            return $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments, $extraPhones) {
+            return $rows->map(function ($p) use ($registeredPatientIds, $nextAppointments, $extraPhones, $invoiceTotals) {
                 $next = $nextAppointments[$p->id] ?? null;
+                $hasInvoice = isset($invoiceTotals[$p->id]);
+                $amountDue = $hasInvoice ? max(0, (int) $invoiceTotals[$p->id]) : 0;
+                $extras = isset($extraPhones[$p->id])
+                    ? array_map(fn ($e) => explode('|', $e, 2) + [1 => ''], explode(',', $extraPhones[$p->id]))
+                    : [];
 
                 return [
                     'id' => $p->id,
                     'code' => $p->code,
                     'full_name' => $p->full_name,
                     'phone' => $p->phone ?? '',
-                    'extra_phones' => isset($extraPhones[$p->id]) ? explode(',', $extraPhones[$p->id]) : [],
+                    'phone_label' => $p->phone_label,
+                    'extra_phones' => array_column($extras, 0),
+                    'extra_phone_labels' => array_column($extras, 1),
                     'gender' => $p->gender,
                     'source' => $p->source,
                     'dob_raw' => $p->dob,
@@ -129,6 +148,9 @@ class PatientController extends Controller
                     'next_appointment_at' => $next,
                     'next_appointment_display' => $next ? Carbon::parse($next)->format('d/m H:i') : null,
                     'has_registration' => isset($registeredPatientIds[$p->id]),
+                    'amount_due' => $amountDue,
+                    // none = chưa có hoá đơn · owing = còn nợ · paid = đã trả đủ
+                    'debt_status' => ! $hasInvoice ? 'none' : ($amountDue > 0 ? 'owing' : 'paid'),
                 ];
             })->values()->toJson();
         });
@@ -279,10 +301,11 @@ class PatientController extends Controller
         $forceSave = (bool) $request->input('force_save', false);
         $data = $this->validated($request, null, $forceSave);
         $extraPhones = $data['extra_phones'] ?? [];
-        unset($data['extra_phones']);
+        $extraLabels = $data['extra_phone_labels'] ?? [];
+        unset($data['extra_phones'], $data['extra_phone_labels']);
 
         $patient = Patient::createWithCode($data);
-        $this->syncExtraPhones($patient, $extraPhones);
+        $this->syncExtraPhones($patient, $extraPhones, $extraLabels);
         Cache::store('file')->forget('patients.data.list');
         Cache::store('file')->forget('patients.lite-list');
 
@@ -541,7 +564,8 @@ class PatientController extends Controller
                 'code' => $patient->code,
                 'full_name' => $patient->full_name,
                 'phone' => $patient->phone,
-                'extra_phones' => $patient->phones()->get(['id', 'phone']),
+                'phone_label' => $patient->phone_label,
+                'extra_phones' => $patient->phones()->get(['id', 'phone', 'label']),
                 'email' => $patient->email,
                 'dob' => $patient->dob?->format('d/m/Y'),
                 'dob_raw' => $patient->dob?->format('Y-m-d'),
@@ -659,7 +683,8 @@ class PatientController extends Controller
             'id' => $patient->id,
             'full_name' => $patient->full_name,
             'phone' => $patient->phone,
-            'extra_phones' => $patient->phones()->pluck('phone'),
+            'phone_label' => $patient->phone_label,
+            'extra_phones' => $patient->phones()->get(['phone', 'label']),
             'email' => $patient->email,
             'dob_raw' => $patient->dob?->format('Y-m-d'),
             'gender' => $patient->gender,
@@ -725,13 +750,14 @@ class PatientController extends Controller
         $data = $this->validated($request, $patient->id, $forceSave);
         $hasExtraPhones = $request->has('extra_phones');
         $extraPhones = $data['extra_phones'] ?? [];
-        unset($data['extra_phones']);
+        $extraLabels = $data['extra_phone_labels'] ?? [];
+        unset($data['extra_phones'], $data['extra_phone_labels']);
 
         $patient->update($data);
         // Only touch secondary phones when the caller actually sent this field —
         // older forms that don't know about it (e.g. Form.vue) must not wipe them out.
         if ($hasExtraPhones) {
-            $this->syncExtraPhones($patient, $extraPhones);
+            $this->syncExtraPhones($patient, $extraPhones, $extraLabels);
         }
         Cache::store('file')->forget('patients.data.list');
         Cache::store('file')->forget('patients.lite-list');
@@ -804,6 +830,7 @@ class PatientController extends Controller
                 $forceSave ? 'nullable' : 'required', 'string', 'max:20',
                 'regex:/^0\d{8,10}$/',
             ],
+            'phone_label' => self::PHONE_LABEL_RULE,
             'email' => 'nullable|email|max:255',
             'dob' => 'nullable|date',
             'gender' => 'nullable|in:male,female,other',
@@ -819,20 +846,24 @@ class PatientController extends Controller
             'is_active' => 'boolean',
             'extra_phones' => 'nullable|array',
             'extra_phones.*' => ['string', 'max:20', 'regex:/^0\d{8,10}$/'],
+            // Song song theo chỉ số với extra_phones: extra_phone_labels[i] là nhãn của extra_phones[i].
+            'extra_phone_labels' => 'nullable|array',
+            'extra_phone_labels.*' => self::PHONE_LABEL_RULE,
         ]);
     }
 
     /** Replace a patient's secondary phone numbers with the given list (dedup, skip the primary phone). */
-    private function syncExtraPhones(Patient $patient, array $extraPhones): void
+    private function syncExtraPhones(Patient $patient, array $extraPhones, array $labels = []): void
     {
-        $unique = collect($extraPhones)
-            ->filter(fn ($p) => $p !== '' && $p !== $patient->phone)
-            ->unique()
-            ->values();
+        // phone => label; số trùng giữ nhãn của lần xuất hiện đầu.
+        $wanted = collect($extraPhones)
+            ->map(fn ($p, $i) => ['phone' => $p, 'label' => ($labels[$i] ?? null) ?: null])
+            ->filter(fn ($row) => $row['phone'] !== '' && $row['phone'] !== $patient->phone)
+            ->unique('phone')
+            ->pluck('label', 'phone');
 
-        $patient->phones()->whereNotIn('phone', $unique)->delete();
+        $patient->phones()->whereNotIn('phone', $wanted->keys())->delete();
 
-        $existing = $patient->phones()->pluck('phone');
-        $unique->diff($existing)->each(fn ($phone) => $patient->phones()->create(['phone' => $phone]));
+        $wanted->each(fn ($label, $phone) => $patient->phones()->updateOrCreate(['phone' => $phone], ['label' => $label]));
     }
 }

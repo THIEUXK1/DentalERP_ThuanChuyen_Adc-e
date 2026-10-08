@@ -15,7 +15,7 @@
                 :style="{ top: pos.top + 'px', left: pos.left + 'px' }">
                 <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2">
                     <p class="text-xs font-semibold text-gray-700">Gọi nhắc lịch</p>
-                    <span v-if="appointment.patient_phone" class="font-mono text-[11px] text-gray-400">{{ appointment.patient_phone }}</span>
+                    <span v-if="appointment.patient_phone" class="font-mono text-[11px] text-gray-400">{{ appointment.patient_phone }} <span v-if="appointment.patient_phone_label" class="px-1 rounded bg-sky-50 text-sky-700 text-[10px] font-medium font-sans">{{ appointment.patient_phone_label }}</span></span>
                 </div>
 
                 <!-- Ghi nhận cuộc gọi: bấm thẳng vào phương án là lưu luôn, không cần bước xác nhận -->

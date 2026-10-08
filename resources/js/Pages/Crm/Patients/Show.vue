@@ -52,9 +52,11 @@
                         <h2 class="text-xl font-bold text-gray-900">{{ patient.full_name }}</h2>
                         <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
                             <span class="text-sm text-gray-500">{{ patient.phone }}</span>
+                            <span v-if="patient.phone_label" class="px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 text-[10px] font-medium">{{ patient.phone_label }}</span>
                             <span v-for="ph in patient.extra_phones" :key="ph.id"
                                 class="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-600 rounded-full pl-2 pr-1 py-0.5">
                                 {{ ph.phone }}
+                                <span v-if="ph.label" class="text-sky-700 font-medium">· {{ ph.label }}</span>
                                 <button v-if="can('patients.edit')" @click="removePhone(ph)"
                                     class="text-gray-400 hover:text-red-500 transition-colors" title="Xóa số này">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -66,8 +68,9 @@
                                 <form v-if="showAddPhone" @submit.prevent="submitAddPhone" class="inline-flex items-center gap-1">
                                     <input v-model="newPhone" type="tel" placeholder="0912345678" autofocus
                                         class="w-28 text-xs border border-gray-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-indigo-400 focus:outline-none" />
+                                    <PhoneLabelInput v-model="newPhoneLabel" />
                                     <button type="submit" class="text-xs px-1.5 py-0.5 bg-indigo-600 text-white rounded hover:bg-indigo-700">Lưu</button>
-                                    <button type="button" @click="showAddPhone = false; newPhone = ''" class="text-gray-400 hover:text-gray-600">
+                                    <button type="button" @click="showAddPhone = false; newPhone = ''; newPhoneLabel = ''" class="text-gray-400 hover:text-gray-600">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                         </svg>
@@ -414,6 +417,7 @@ import PatientEditModal from './components/PatientEditModal.vue';
 import PatientMergeModal from './components/PatientMergeModal.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
+import PhoneLabelInput from '@/Components/Shared/PhoneLabelInput.vue';
 import { recordPatientView } from '@/composables/useRecentlyViewedPatients';
 import { usePatientDetail } from '@/composables/usePatientDetail';
 
@@ -505,14 +509,15 @@ const activeMedicalFlags = computed(() => {
 
 const showAddPhone = ref(false);
 const newPhone      = ref('');
+const newPhoneLabel = ref('');
 const phoneError    = ref('');
 
 function submitAddPhone() {
     phoneError.value = '';
-    router.post(route('patient-phones.store', props.patientId), { phone: newPhone.value }, {
+    router.post(route('patient-phones.store', props.patientId), { phone: newPhone.value, label: newPhoneLabel.value.trim() }, {
         preserveScroll: true,
-        onSuccess: () => { showAddPhone.value = false; newPhone.value = ''; },
-        onError: (errors) => { phoneError.value = errors.phone ?? 'Có lỗi xảy ra.'; },
+        onSuccess: () => { showAddPhone.value = false; newPhone.value = ''; newPhoneLabel.value = ''; },
+        onError: (errors) => { phoneError.value = errors.phone ?? errors.label ?? 'Có lỗi xảy ra.'; },
     });
 }
 

@@ -14,7 +14,7 @@
                         </div>
                         <h2 class="text-xl font-bold text-gray-900">{{ appointment.patient }}</h2>
                         <p class="text-sm text-gray-500 mt-0.5">
-                            <span v-if="appointment.patient_phone">📞 {{ appointment.patient_phone }}</span>
+                            <span v-if="appointment.patient_phone">📞 {{ appointment.patient_phone }}<template v-if="appointment.patient_phone_label"> ({{ appointment.patient_phone_label }})</template></span>
                             <span v-if="appointment.doctor" class="ml-3">🦷 {{ appointment.doctor }}</span>
                             <span class="ml-3 text-gray-400">{{ appointment.branch }}</span>
                         </p>
@@ -61,7 +61,7 @@
                             </div>
                             <div>
                                 <dt class="text-xs text-gray-400 mb-0.5">Số điện thoại</dt>
-                                <dd class="text-gray-800">{{ appointment.patient_phone || '—' }}</dd>
+                                <dd class="text-gray-800">{{ appointment.patient_phone || '—' }}<template v-if="appointment.patient_phone_label"> ({{ appointment.patient_phone_label }})</template></dd>
                             </div>
                             <div>
                                 <dt class="text-xs text-gray-400 mb-0.5">Bác sĩ phụ trách</dt>

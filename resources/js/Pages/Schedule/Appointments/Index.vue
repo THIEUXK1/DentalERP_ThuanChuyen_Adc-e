@@ -398,7 +398,7 @@
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <p class="text-base font-bold text-gray-900 truncate">{{ a.patient }}</p>
-                                    <span v-if="a.patient_phone" class="text-xs text-gray-400 font-mono">{{ a.patient_phone }}</span>
+                                    <span v-if="a.patient_phone" class="text-xs text-gray-400 font-mono">{{ a.patient_phone }} <span v-if="a.patient_phone_label" class="px-1 rounded bg-sky-50 text-sky-700 text-[10px] font-medium font-sans">{{ a.patient_phone_label }}</span></span>
                                 </div>
                                 <p class="text-sm text-gray-600 truncate mt-0.5">
                                     <span v-if="a.service !== '—'">{{ a.service }}</span>
@@ -491,7 +491,7 @@
                             </div>
                             <div>
                                 <p class="text-base font-bold text-gray-900 truncate">{{ a.patient }}</p>
-                                <p class="text-xs text-gray-400 font-mono mt-0.5">{{ a.patient_phone }}</p>
+                                <p class="text-xs text-gray-400 font-mono mt-0.5">{{ a.patient_phone }} <span v-if="a.patient_phone_label" class="px-1 rounded bg-sky-50 text-sky-700 text-[10px] font-medium font-sans">{{ a.patient_phone_label }}</span></p>
                             </div>
                             <div class="text-sm text-gray-600 space-y-1">
                                 <p v-if="a.doctor !== '—'" class="truncate flex items-center gap-1.5">

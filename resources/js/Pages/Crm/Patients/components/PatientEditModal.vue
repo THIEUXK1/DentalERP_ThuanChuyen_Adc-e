@@ -27,22 +27,26 @@
                             </div>
                             <div>
                                 <label class="block text-xs font-medium text-gray-700 mb-1">Số điện thoại</label>
-                                <input v-model="form.phone" type="tel" placeholder="0912345678"
-                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
-                                    :class="{'border-red-400': form.errors.phone}" />
+                                <div class="flex items-center gap-1">
+                                    <input v-model="form.phone" type="tel" placeholder="0912345678"
+                                        class="flex-1 min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 focus:outline-none"
+                                        :class="{'border-red-400': form.errors.phone}" />
+                                    <PhoneLabelInput v-model="form.phone_label" />
+                                </div>
                                 <p v-if="form.errors.phone" class="mt-0.5 text-xs text-red-500">{{ form.errors.phone }}</p>
                                 <div class="mt-1.5 space-y-1.5">
                                     <div v-for="(p, i) in form.extra_phones" :key="i" class="flex items-center gap-1">
                                         <input v-model="form.extra_phones[i]" type="tel" placeholder="SĐT phụ"
                                             class="flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-xs focus:ring-2 focus:ring-indigo-300 focus:outline-none"
                                             :class="{'border-red-400': form.errors[`extra_phones.${i}`]}" />
-                                        <button type="button" @click="form.extra_phones.splice(i, 1)" class="text-gray-400 hover:text-red-500">
+                                        <PhoneLabelInput v-model="form.extra_phone_labels[i]" />
+                                        <button type="button" @click="removeExtraPhone(i)" class="text-gray-400 hover:text-red-500">
                                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                             </svg>
                                         </button>
                                     </div>
-                                    <button type="button" @click="form.extra_phones.push('')"
+                                    <button type="button" @click="form.extra_phones.push(''); form.extra_phone_labels.push('')"
                                         class="text-xs text-indigo-600 hover:text-indigo-700">
                                         + Thêm số điện thoại khác
                                     </button>
@@ -158,6 +162,7 @@
 
 <script setup>
 import { useForm } from '@inertiajs/vue3';
+import PhoneLabelInput from '@/Components/Shared/PhoneLabelInput.vue';
 
 const props = defineProps({
     patient: Object, branches: Array, sources: Array,
@@ -182,7 +187,9 @@ const MEDICAL_FLAGS = [
 const form = useForm({
     full_name:         props.patient.full_name ?? '',
     phone:             props.patient.phone ?? '',
+    phone_label:       props.patient.phone_label ?? '',
     extra_phones:      (props.patient.extra_phones ?? []).map(p => typeof p === 'string' ? p : p.phone),
+    extra_phone_labels: (props.patient.extra_phones ?? []).map(p => typeof p === 'string' ? '' : (p.label ?? '')),
     email:             props.patient.email ?? '',
     dob:               props.patient.dob_raw ?? props.patient.dob ?? '',
     gender:            props.patient.gender ?? '',
@@ -204,10 +211,21 @@ function toTitleCase(str) {
     return str.replace(/(^|[\s,\-\/])(\S)/g, (_, sep, char) => sep + char.toUpperCase());
 }
 
+function removeExtraPhone(i) {
+    form.extra_phones.splice(i, 1);
+    form.extra_phone_labels.splice(i, 1);
+}
+
 function doSave() {
     form.full_name = toTitleCase(form.full_name);
     form.address   = toTitleCase(form.address);
-    form.extra_phones = form.extra_phones.map(p => p.trim()).filter(Boolean);
+    // Bỏ dòng SĐT trống nhưng giữ nhãn đi cùng đúng chỉ số (server ghép theo vị trí).
+    const rows = form.extra_phones
+        .map((phone, i) => ({ phone: phone.trim(), label: (form.extra_phone_labels[i] ?? '').trim() }))
+        .filter(r => r.phone);
+    form.extra_phones       = rows.map(r => r.phone);
+    form.extra_phone_labels = rows.map(r => r.label);
+    form.phone_label        = (form.phone_label ?? '').trim();
     form.put(route('patients.update', props.patient.id), {
         onSuccess: () => emit('close'),
     });

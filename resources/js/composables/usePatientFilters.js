@@ -77,6 +77,8 @@ export function usePatientFilters() {
     const search      = ref(_q.has('search')    ? _q.get('search')                                              : (_ss.search   ?? ''));
     const branchId    = ref(_q.has('branch_id') ? Number(_q.get('branch_id'))                                   : (_ss.branchId ?? ''));
     const source      = ref(_q.has('source')    ? _q.get('source')                                              : (_ss.source   ?? ''));
+    // '' = tất cả · 'owing' = còn nợ · 'paid' = đã trả đủ · 'none' = chưa có hoá đơn
+    const debtStatus  = ref(_q.has('debt')      ? _q.get('debt')                                                : (_ss.debtStatus ?? ''));
     const perPage     = ref(_q.has('per_page')  ? (_q.get('per_page') === 'all' ? 'all' : Number(_q.get('per_page'))) : (_ss.perPage ?? DEFAULT_PER_PAGE));
     const currentPage = ref(Number(_q.get('page') ?? 1));
     const viewMode    = ref('table');
@@ -93,10 +95,13 @@ export function usePatientFilters() {
                   && !matchesQuery(p.address, q)) return false;
             if (branchId.value !== '' && p.branch_id !== branchId.value) return false;
             if (source.value && p.source !== source.value) return false;
+            if (debtStatus.value && p.debt_status !== debtStatus.value) return false;
             return true;
         });
 
         return [...list].sort((a, b) => {
+            // Lọc "Còn nợ" thì đưa người nợ nhiều lên đầu để thu ngân gọi trước.
+            if (debtStatus.value === 'owing' && a.amount_due !== b.amount_due) return b.amount_due - a.amount_due;
             if (a.has_registration !== b.has_registration) return a.has_registration ? -1 : 1;
             const diff = recencyScore(b) - recencyScore(a);
             if (diff !== 0) return diff;
@@ -109,7 +114,7 @@ export function usePatientFilters() {
     );
 
     // Reset to page 1 when filter/per_page changes
-    watch([search, branchId, source, perPage], () => { currentPage.value = 1; });
+    watch([search, branchId, source, debtStatus, perPage], () => { currentPage.value = 1; });
 
     // Clamp page if it goes out of range
     watch(totalPages, (n) => { if (currentPage.value > n) currentPage.value = n; });
@@ -144,34 +149,35 @@ export function usePatientFilters() {
     });
 
     // Sync URL + sessionStorage without triggering a page reload
-    watch([search, branchId, source, perPage, currentPage], () => {
+    watch([search, branchId, source, debtStatus, perPage, currentPage], () => {
         const p = new URLSearchParams();
         if (search.value)                          p.set('search',    search.value);
         if (branchId.value !== '')                 p.set('branch_id', String(branchId.value));
         if (source.value)                          p.set('source',    source.value);
+        if (debtStatus.value)                      p.set('debt',      debtStatus.value);
         if (String(perPage.value) !== String(DEFAULT_PER_PAGE)) p.set('per_page', String(perPage.value));
         if (currentPage.value > 1)                 p.set('page',      String(currentPage.value));
         const qs = p.toString();
         history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
         sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-            search: search.value, branchId: branchId.value, source: source.value,
+            search: search.value, branchId: branchId.value, source: source.value, debtStatus: debtStatus.value,
             perPage: perPage.value,
         }));
     });
 
     const hasActiveFilters = computed(() =>
-        !!(search.value || branchId.value !== '' || source.value || String(perPage.value) !== String(DEFAULT_PER_PAGE))
+        !!(search.value || branchId.value !== '' || source.value || debtStatus.value || String(perPage.value) !== String(DEFAULT_PER_PAGE))
     );
 
     function clearFilters() {
-        search.value = ''; branchId.value = ''; source.value = '';
+        search.value = ''; branchId.value = ''; source.value = ''; debtStatus.value = '';
         perPage.value = DEFAULT_PER_PAGE;
         sessionStorage.removeItem(STORAGE_KEY);
     }
 
     return {
         loading, loadError, loadData, totalCount,
-        search, branchId, source, perPage, currentPage, viewMode,
+        search, branchId, source, debtStatus, perPage, currentPage, viewMode,
         filteredPatients, totalPages, fromRecord, toRecord, paginatedPatients, pageNumbers,
         hasActiveFilters, clearFilters,
     };

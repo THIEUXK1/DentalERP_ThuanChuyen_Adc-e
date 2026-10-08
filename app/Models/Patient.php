@@ -2,9 +2,7 @@
 
 namespace App\Models;
 
-use App\Models\Appointment;
 use App\Models\Concerns\GeneratesUniqueCode;
-use App\Models\ScheduleRegistration;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -13,10 +11,10 @@ use Spatie\Activitylog\Traits\LogsActivity;
 
 class Patient extends Model
 {
-    use LogsActivity, SoftDeletes, GeneratesUniqueCode;
+    use GeneratesUniqueCode, LogsActivity, SoftDeletes;
 
     protected $fillable = [
-        'code', 'legacy_code', 'full_name', 'phone', 'email', 'dob', 'gender', 'address',
+        'code', 'legacy_code', 'full_name', 'phone', 'phone_label', 'email', 'dob', 'gender', 'address',
         'source', 'allergies', 'medical_history', 'medical_flags', 'photo_path',
         'emergency_contact', 'branch_id', 'notes', 'is_active',
     ];
@@ -24,8 +22,8 @@ class Patient extends Model
     protected function casts(): array
     {
         return [
-            'dob'           => 'date',
-            'is_active'     => 'boolean',
+            'dob' => 'date',
+            'is_active' => 'boolean',
             'medical_flags' => 'array',
         ];
     }
