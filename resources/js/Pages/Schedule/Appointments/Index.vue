@@ -398,6 +398,7 @@
                             <div class="flex-1 min-w-0">
                                 <div class="flex items-center gap-2 flex-wrap">
                                     <p class="text-base font-bold text-gray-900 truncate">{{ a.patient }}</p>
+                                    <span v-if="a.patient_birth_year" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 ring-1 ring-amber-300 text-xs font-bold">{{ a.patient_birth_year }}<span v-if="a.patient_age !== null" class="font-semibold text-amber-700">· {{ a.patient_age }} tuổi</span></span>
                                     <span v-if="a.patient_phone" class="text-xs text-gray-400 font-mono">{{ a.patient_phone }} <span v-if="a.patient_phone_label" class="px-1 rounded bg-sky-50 text-sky-700 text-[10px] font-medium font-sans">{{ a.patient_phone_label }}</span></span>
                                 </div>
                                 <p class="text-sm text-gray-600 truncate mt-0.5">
@@ -490,7 +491,10 @@
                                 <span :class="['flex-shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold mt-0.5', statusBadge(a.status)]">{{ a.status_label }}</span>
                             </div>
                             <div>
-                                <p class="text-base font-bold text-gray-900 truncate">{{ a.patient }}</p>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <p class="text-base font-bold text-gray-900 truncate">{{ a.patient }}</p>
+                                    <span v-if="a.patient_birth_year" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 ring-1 ring-amber-300 text-xs font-bold">{{ a.patient_birth_year }}<span v-if="a.patient_age !== null" class="font-semibold text-amber-700">· {{ a.patient_age }} tuổi</span></span>
+                                </div>
                                 <p class="text-xs text-gray-400 font-mono mt-0.5">{{ a.patient_phone }} <span v-if="a.patient_phone_label" class="px-1 rounded bg-sky-50 text-sky-700 text-[10px] font-medium font-sans">{{ a.patient_phone_label }}</span></p>
                             </div>
                             <div class="text-sm text-gray-600 space-y-1">

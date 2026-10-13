@@ -449,6 +449,8 @@ class AppointmentController extends Controller
             'branch_id' => $a->branch_id,
             'patient_phone' => $a->patient->phone ?? null,
             'patient_phone_label' => $a->patient->phone_label ?? null,
+            'patient_birth_year' => $a->patient?->dob?->format('Y'),
+            'patient_age' => $a->patient?->dob?->age,
             'doctor' => $a->doctor?->full_name ?? '—',
             'chair' => $a->chair?->name ?? '—',
             'service' => $a->service?->name ?? '—',
