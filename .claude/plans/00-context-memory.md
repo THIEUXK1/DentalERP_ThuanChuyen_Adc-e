@@ -1,56 +1,35 @@
-# Context Memory — trạng thái làm việc hiện tại
+# Context Memory — việc đang dở
 
-> Cập nhật file này **mỗi khi** đổi task, gặp blocker, hoặc chốt một quyết định kỹ thuật.
-> Đây là bộ nhớ bối cảnh giữa các phiên làm việc.
+Đọc đầu mỗi task. ≤ 3 KB. Quá 5 quyết định → đẩy dòng cũ nhất xuống [decision-log.md](decision-log.md).
 
-## Ràng buộc cứng
+## Đang làm
 
-Quy tắc đầy đủ ở [`../rules/core.md`](../rules/core.md) (tự nạp mỗi phiên). Bốn điều không được
-quên giữa các phiên:
-
-1. View là **Dumb UI** — không query, không gọi Service, không tính nghiệp vụ trong Blade.
-2. Thao tác web **không bao giờ reload trang** — fetch + JSON + cập nhật DOM cục bộ,
-   luôn `event.preventDefault()`.
-3. `.env` local trỏ **DB production** — không chạy lệnh ghi khi chưa dry-run + xin xác nhận.
-4. Không commit / push / deploy nếu người dùng không yêu cầu.
-
-## Sprint / Task đang làm
-
-| Mục | Nội dung |
-|---|---|
-| Giai đoạn | Phase 2 — chuyển UI từ Inertia + Vue sang Blade + Alpine + JS thuần |
-| Nhánh | `main` |
-| Đang dở | Lớp Blade **chưa khởi động lại**: `resources/views/` mới có `app.blade.php` + `pdf/`; chưa có `layouts/`, `partials/`, `components/`, `public/js/`, `config/menu.php`, `App\Support\{Asset,Icons,Menu}`. (Ghi chú phiên trước nói các file này đã tồn tại dạng untracked — **không đúng với working tree hiện tại**) |
-| Vừa xong | (2026-09-22) Dời lịch hẹn hàng loạt: cột `appointments.rescheduled_from_id`, `AppointmentService::moveToNewDate()`, endpoint `schedule.appointments.bulk-move`, UI chọn nhiều + nhãn "Đã dời sang / Dời từ" trong `Schedule/Appointments/Index.vue`. Migration **đã chạy** (backup `storage/app/backups/appointments_20260922_before_rescheduled_from_id.csv`, 4992 dòng trước/sau). Kèm nút "＋ Lịch hẹn" và "🗓 Đăng ký khám" mở form ngay trên `/patients` (`QuickRegisterModal.vue`, `patients.quick-register` trả JSON khi `expectsJson`) + endpoint `schedule.appointments.options` |
-| Vừa xong trước đó | (2026-08-27) Đối soát `clinic_records` với bộ Excel `DuLieuHeThong`: bù 559 dòng thiếu, xoá cứng 64.823 dòng tàn dư import lỗi (đã sao lưu CSV) |
-| Tiếp theo | Dựng lại khung Blade (layout + partials + `@vite`), rồi chuyển từng trang Vue → Blade theo thứ tự route trong `routes/web.php`, bắt đầu từ Dashboard và Đăng ký khám |
+- Phase 2: chuyển UI Inertia + Vue → Blade + Alpine + JS thuần. Nhánh `main`.
+- Đang dở: khung Blade chưa có — `resources/views/` chỉ có `app.blade.php` + `pdf/`; thiếu
+  `layouts/` `partials/` `components/` `public/js/` `config/menu.php` `App\Support\{Asset,Icons,Menu}`.
+- Tiếp theo: dựng layout + partials + `@vite`, rồi chuyển từng trang theo thứ tự route,
+  bắt đầu Dashboard và Đăng ký khám.
+- Vừa xong (2026-09-22): dời lịch hẹn hàng loạt (`rescheduled_from_id`, `bulk-move`);
+  nút "＋ Lịch hẹn"/"Đăng ký khám" trên `/patients`. Migration đã chạy, backup ở `storage/app/backups/`.
 
 ## Blockers
 
-| # | Blocker | Ảnh hưởng |
-|---|---|---|
-| B2 | Khung Blade Phase 2 không còn trong working tree (xem "Đang dở") | Phải dựng lại trước khi chuyển trang; tránh lặp lỗi cũ P2/P3 trong `../docs/laravel-architecture.md` §4 |
-| B3 | Hai lớp UI (Vue + Blade) song song, chưa có tiêu chí "trang nào đã chuyển xong" | Rủi ro sửa nhầm lớp cũ |
-| B4 | Test coverage rất mỏng (~14 file, chủ yếu Breeze mặc định) | Refactor UI không có lưới an toàn |
+- B2 Khung Blade chưa có → dựng trước khi chuyển trang; tránh P2/P3 ở `docs/laravel-architecture.md` §4.
+- B3 Vue + Blade song song, chưa có tiêu chí "trang đã chuyển xong" → dễ sửa nhầm lớp cũ.
+- B4 Test mỏng (~14 file, chủ yếu Breeze) → refactor UI thiếu lưới an toàn.
 
-## Decision Log — 5 quyết định gần nhất
+## 5 quyết định gần nhất
 
-Lịch sử cũ hơn: [decision-log.md](decision-log.md).
+- 2026-10-13 — `core.md` cắt về ≤ 6 KB, bỏ phần trùng global; settings thêm deny `Read` rác/secret —
+  phần tự nạp ≤ 10 KB — tài liệu chi tiết chỉ đọc theo `core.md` §9.
+- 2026-10-08 — Quyền tách `settings.json` (dev) + `settings.local.json` (SSH key `dental_erp_backup`) —
+  `.env` local = DB production — ghi production vẫn hỏi từng lần ([database-safety.md](../docs/database-safety.md)).
+- 2026-09-22 — `rules/` chỉ còn `core.md`, 4 file cũ sang `docs/` — `rules/` tự nạp mỗi lượt —
+  tra cứu theo bảng lazy-load.
+- 2026-09-22 — Dời lịch sang ngày khác = tạo lịch mới + giữ lịch cũ `rescheduled` (`rescheduled_from_id`);
+  `reschedule()` chỉ đổi giờ cùng ngày — lễ tân cần thấy ngày lỡ hẹn — báo cáo đếm lịch hẹn **phải loại** `rescheduled`.
+- 2026-08-28 — Dev luôn `npm run dev -- --clearScreen false` — HMR — thiếu cờ thì mất log lỗi.
 
-| Ngày | Quyết định | Lý do | Hệ quả |
-|---|---|---|---|
-| 2026-10-08 | Quyền công cụ tách 2 lớp: `settings.json` (dev, commit được; `ask` cho `migrate`/`tinker`/`db`/`git push`, `deny` cho lệnh phá huỷ) + `settings.local.json` (SSH production bằng key `dental_erp_backup`) | `.env` local trỏ DB production mà `settings.local.json` có sẵn `php artisan *` → migrate chạy không qua hỏi; mật khẩu root máy cũ nằm plaintext trong settings toàn cục | Allow rule không thay xác nhận: ghi production vẫn hỏi từng lần ([database-safety.md](../docs/database-safety.md)). DB ghi đúng là PostgreSQL 16, không phải MySQL |
-| 2026-09-22 | Gom `.claude/rules/` về **một** file `core.md`; 4 file cũ chuyển sang `.claude/docs/` | `rules/` bị tự nạp mỗi phiên — 23 KB tài liệu tra cứu ngốn ngữ cảnh vô ích | Phần tự nạp còn ~9 KB; tài liệu chi tiết đọc theo bảng lazy-load ở `core.md` §9 |
-| 2026-09-22 | Dời lịch sang ngày khác = **tạo lịch hẹn mới + giữ lịch cũ** ở trạng thái `rescheduled`, liên kết bằng `rescheduled_from_id`; `reschedule()` (sửa tại chỗ) chỉ còn dùng khi đổi giờ trong cùng ngày | Lễ tân cần thấy bệnh nhân đã lỡ hẹn ngày nào; sửa tại chỗ làm mất dấu lịch cũ | Một bệnh nhân lỡ hẹn nhiều lần sẽ sinh chuỗi lịch hẹn → báo cáo đếm lịch hẹn **phải loại** trạng thái `rescheduled` |
-| 2026-08-28 | Dev luôn chạy hot reload: `npm run dev -- --clearScreen false` (Vite HMR + `refresh: true`) | Sửa file là trình duyệt tự cập nhật | Cờ `--clearScreen false` là bắt buộc — thiếu nó Vite xoá terminal và nuốt log lỗi giữa phiên |
-| 2026-08-27 | Mốc dữ liệu: `clinic_records` (Excel cũ) kết thúc **10/05/2026**, từ đó ERP chạy thật (`patient_payments` live) | Bàn giao sạch, không chồng lấn | Không import thêm Excel sau mốc này |
+## Ghi chú phiên sau
 
-## Ghi chú cho phiên sau
-
-- Chạy dev: `php artisan serve` + `npm run dev -- --clearScreen false` (nền, không mở Laragon GUI).
-- Format PHP: `php vendor/bin/pint --quiet`.
-- Deploy: GitHub repo + server SSH `/var/www/DentalERP` — **chỉ khi được yêu cầu**.
-- Thay đổi chưa commit tính đến 2026-09-22: `AppointmentController`, `Appointment`,
-  `AppointmentService`, `Schedule/Appointments/Index.vue`, `routes/web.php`,
-  migration `rescheduled_from_id`, `BackfillLegacyNotes`, `tests/Feature/AppointmentMoveTest.php`,
-  cùng toàn bộ `.claude/`.
+- (trống)

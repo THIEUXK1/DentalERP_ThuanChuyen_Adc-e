@@ -38,7 +38,27 @@
       "Bash(*DROP TABLE*)",
       "Bash(*DROP DATABASE*)",
       "Bash(*TRUNCATE*)",
-      "PowerShell(Remove-Item*-Recurse*)"
+      "PowerShell(Remove-Item*-Recurse*)",
+      "Bash(git reset --hard*)",
+      "PowerShell(git reset --hard*)",
+      "PowerShell(git push --force*)",
+      "PowerShell(git push -f*)",
+      "Read(./node_modules/**)",
+      "Read(./vendor/**)",
+      "Read(./public/build/**)",
+      "Read(./public/hot)",
+      "Read(./bootstrap/cache/**)",
+      "Read(./storage/framework/**)",
+      "Read(./storage/logs/**)",
+      "Read(./**/*.log)",
+      "Read(./storage/app/backups/**)",
+      "Read(./composer.lock)",
+      "Read(./package-lock.json)",
+      "Read(./.phpunit.result.cache)",
+      "Read(./curl_out*.txt)",
+      "Read(./.env)",
+      "Read(./.env.backup)",
+      "Read(./.env.bak*)"
     ]
   }
 }

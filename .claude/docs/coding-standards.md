@@ -82,5 +82,5 @@ Ngắn gọn, tra nhanh. Chuẩn của repo thắng sở thích cá nhân.
 
 ## 8. Terminal output, hot reload, zero-fluff
 
-Bảng lệnh thu gọn output, quy tắc hot reload (`npm run dev -- --clearScreen false`) và quy tắc
-zero-fluff nằm ở [`../rules/core.md`](../rules/core.md) §7–§8. Không nhắc lại ở đây.
+Lệnh stack đã kẹp output và hot reload ở [`../rules/core.md`](../rules/core.md) §7–§8; zero-fluff
+và clamping chung ở `~/.claude/CLAUDE.md`. Không nhắc lại ở đây.
