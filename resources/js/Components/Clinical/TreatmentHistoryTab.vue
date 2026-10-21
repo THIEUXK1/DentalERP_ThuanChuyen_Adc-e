@@ -96,7 +96,7 @@
                             </svg>
                             Xem
                         </Link>
-                        <button v-if="!plan.amount_paid" @click.stop="openDeletePlan(plan)"
+                        <button @click.stop="openDeletePlan(plan)"
                             class="flex-shrink-0 text-gray-300 hover:text-red-500 transition-colors"
                             title="Xóa kế hoạch">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -280,10 +280,11 @@
     </Teleport>
 
     <!-- Delete confirm modal -->
-    <DeleteConfirmModal
+    <DeletePlanModal
         :show="modal.show"
-        :title="modal.title"
-        :subtitle="modal.subtitle"
+        :plan="modal.plan"
+        :error="modal.error"
+        :processing="modal.processing"
         @confirm="onModalConfirm"
         @cancel="modal.show = false"
     />
@@ -295,7 +296,7 @@
 import { ref, reactive, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { Link, router } from '@inertiajs/vue3';
 import axios from 'axios';
-import DeleteConfirmModal from '@/Components/DeleteConfirmModal.vue';
+import DeletePlanModal from '@/Components/Clinical/DeletePlanModal.vue';
 
 const props = defineProps({
     treatmentPlans:   { type: Array,  default: () => [] },
@@ -349,21 +350,26 @@ function countdown(isoDate) {
 }
 
 // ── Delete modal ────────────────────────────────────────────────────────────
-const modal = reactive({
-    show: false, title: '', subtitle: '',
-    route: null, id: null,
-});
+const modal = reactive({ show: false, plan: null, error: '', processing: false });
 
 function openDeletePlan(plan) {
-    modal.show     = true;
-    modal.title    = `Xóa kế hoạch ${plan.code}`;
-    modal.subtitle = `Ngày tạo: ${plan.created_at}`;
-    modal.route    = route('clinical.treatment-plans.destroy', plan.id);
+    modal.plan  = plan;
+    modal.error = '';
+    modal.show  = true;
 }
 
+// Giữ modal mở tới khi server trả lời: xoá có thể bị chặn (vd. hoàn tác khoản thu thất bại)
+// và người dùng cần thấy lỗi ngay trong modal.
 function onModalConfirm(reason) {
-    modal.show = false;
-    router.delete(modal.route, { data: { reason }, preserveScroll: true });
+    modal.processing = true;
+    modal.error = '';
+    router.delete(route('clinical.treatment-plans.destroy', modal.plan.id), {
+        data: { reason },
+        preserveScroll: true,
+        onSuccess: () => { modal.show = false; },
+        onError: (errors) => { modal.error = errors.reason ?? 'Có lỗi xảy ra.'; },
+        onFinish: () => { modal.processing = false; },
+    });
 }
 
 // ── Undo ────────────────────────────────────────────────────────────────────

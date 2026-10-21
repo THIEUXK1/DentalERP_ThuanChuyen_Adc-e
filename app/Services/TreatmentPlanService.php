@@ -2,17 +2,32 @@
 
 namespace App\Services;
 
+use App\Enums\CommissionStatus;
+use App\Enums\KpiAllocationStatus;
 use App\Enums\TreatmentItemStatus;
 use App\Enums\TreatmentPlanStatus;
+use App\Models\CommissionTransaction;
+use App\Models\ConsentForm;
 use App\Models\DentalService;
+use App\Models\KpiAllocation;
+use App\Models\LabOrder;
+use App\Models\PatientPayment;
+use App\Models\PendingDeletion;
 use App\Models\PriceList;
 use App\Models\TreatmentPlan;
 use App\Models\TreatmentPlanItem;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Spatie\Activitylog\Models\Activity;
 
 class TreatmentPlanService
 {
-    public function __construct(private PriceResolver $priceResolver) {}
+    private const REVERSAL_IDS_KEY = 'reversal_payment_ids';
+
+    public function __construct(
+        private PriceResolver $priceResolver,
+        private InvoiceService $invoiceService,
+    ) {}
 
     public function addItem(
         TreatmentPlan $plan,
@@ -261,5 +276,141 @@ class TreatmentPlanService
             ])->values(),
             'transitions' => collect($allowed)->map(fn ($s) => ['value' => $s->value, 'label' => $s->label()])->values(),
         ];
+    }
+
+    /**
+     * Liệt kê mọi hậu quả của việc xoá kế hoạch để người dùng thấy trước khi xác nhận.
+     * Hard-delete khi hết 10 phút sẽ kéo theo hoá đơn, sổ thu, công nợ (hook deleting),
+     * hoa hồng (cascade theo hoá đơn) và KPI (cascade theo dòng dịch vụ) — nên phải nói rõ.
+     */
+    public function deletionImpact(TreatmentPlan $plan, bool $canReverse): array
+    {
+        $plan->loadMissing('invoices.debt');
+        $invoiceIds = $plan->invoices->pluck('id');
+
+        $toReverse = $this->paymentsToReverse($plan);
+        $netPaid = $plan->netPaidAmount();
+
+        $items = $plan->items()->get(['id', 'status']);
+        $completedItems = $items->filter(fn ($i) => $i->status === TreatmentItemStatus::Completed)->count();
+
+        $commissions = CommissionTransaction::whereIn('invoice_id', $invoiceIds)->get(['status', 'amount']);
+        $kpis = KpiAllocation::whereIn('treatment_plan_item_id', $items->pluck('id'))
+            ->where('status', '!=', KpiAllocationStatus::Reversed->value)
+            ->get(['status', 'final_kpi_amount']);
+
+        $paidCommissions = $commissions->filter(fn ($c) => $c->status === CommissionStatus::Paid);
+        $paidKpis = $kpis->filter(fn ($k) => $k->status === KpiAllocationStatus::Paid);
+
+        $blockers = [];
+        if ($netPaid > 0 && ! $canReverse) {
+            $blockers[] = 'Kế hoạch còn '.number_format($netPaid, 0, ',', '.').' đ đã thu. Bạn cần quyền "Duyệt hoàn tiền" (thu ngân) để hoàn tác các khoản thu này.';
+        }
+        if ($paidCommissions->isNotEmpty()) {
+            $blockers[] = 'Có '.$paidCommissions->count().' khoản hoa hồng đã chi lương. Xoá kế hoạch sẽ làm lệch bảng lương đã trả.';
+        }
+        if ($paidKpis->isNotEmpty()) {
+            $blockers[] = 'Có '.$paidKpis->count().' khoản KPI đã chi lương. Xoá kế hoạch sẽ làm lệch bảng lương đã trả.';
+        }
+        // Tổng dòng sổ thu khác số đã thu trên hoá đơn (dữ liệu đồng bộ hệ cũ) → hoàn tác
+        // từng dòng không đưa được kế hoạch về 0, xoá tiếp sẽ mất dấu tiền.
+        if ((int) $toReverse->sum('amount') !== $netPaid) {
+            $blockers[] = 'Sổ thu của kế hoạch không khớp (có khoản đã hoàn tác một phần hoặc dữ liệu hệ cũ). Hãy xử lý ở màn hình thu ngân trước.';
+        }
+
+        return [
+            'code' => $plan->code,
+            'items_count' => $items->count(),
+            'completed_items_count' => $completedItems,
+            'invoices' => $plan->invoices->map(fn ($inv) => [
+                'code' => $inv->code,
+                'total' => (int) $inv->total,
+                'amount_paid' => (int) $inv->amount_paid,
+                'has_debt' => $inv->debt !== null,
+            ])->values(),
+            'net_paid' => $netPaid,
+            'payments_to_reverse' => $toReverse->map(fn (PatientPayment $p) => [
+                'id' => $p->id,
+                'amount' => (int) $p->amount,
+                'method' => $p->method->label(),
+                'payment_date' => $p->payment_date->format('d/m/Y'),
+            ])->values(),
+            'commissions' => ['count' => $commissions->count(), 'amount' => (int) $commissions->sum('amount')],
+            'kpis' => ['count' => $kpis->count(), 'amount' => (int) $kpis->sum('final_kpi_amount')],
+            'lab_orders_count' => LabOrder::where('treatment_plan_id', $plan->id)->count(),
+            'consent_forms_count' => ConsentForm::where('treatment_plan_id', $plan->id)->count(),
+            'blockers' => $blockers,
+        ];
+    }
+
+    /**
+     * Hoàn tác ngay mọi khoản thu còn hiệu lực (bút toán âm, cùng đường sổ HKD với nút
+     * "Hoàn tác" ở thu ngân) rồi mới hẹn giờ xoá. Hoàn tác ngay — không đợi lúc hard-delete —
+     * vì lệnh xoá chạy trong console không có người dùng để ghi created_by, và sổ quỹ
+     * cần ghi nhận chi hoàn tiền tại thời điểm thực tế trả khách.
+     */
+    public function requestDeletion(TreatmentPlan $plan, string $reason, int $userId, bool $canReverse): PendingDeletion
+    {
+        $impact = $this->deletionImpact($plan, $canReverse);
+        if ($impact['blockers']) {
+            throw new \RuntimeException(implode(' ', $impact['blockers']));
+        }
+
+        return DB::transaction(function () use ($plan, $reason, $userId) {
+            $reversalIds = $this->paymentsToReverse($plan)
+                ->map(fn (PatientPayment $p) => $this->invoiceService->reversePayment($p)->id)
+                ->all();
+
+            $pending = PendingDeletion::create([
+                'deletable_type' => TreatmentPlan::class,
+                'deletable_id' => $plan->id,
+                'reason' => $reason,
+                'user_id' => $userId,
+                'label' => $plan->code,
+                'execute_at' => now()->addMinutes(10),
+            ]);
+
+            // pending_deletions không có cột phụ → ghi id bút toán hoàn tác vào audit log
+            // để khi huỷ lệnh xoá biết chính xác dòng nào cần gỡ.
+            if ($reversalIds) {
+                activity()->performedOn($pending)
+                    ->withProperties([self::REVERSAL_IDS_KEY => $reversalIds])
+                    ->log('Hoàn tác khoản thu khi xoá kế hoạch '.$plan->code);
+            }
+
+            return $pending;
+        });
+    }
+
+    /**
+     * Huỷ lệnh xoá trong thời gian chờ: gỡ luôn các bút toán hoàn tác mà lệnh xoá đã tạo,
+     * để hoá đơn/sổ quỹ trở về đúng như trước khi bấm xoá.
+     */
+    public function cancelDeletion(PendingDeletion $pending): void
+    {
+        DB::transaction(function () use ($pending) {
+            $ids = Activity::where('subject_type', PendingDeletion::class)
+                ->where('subject_id', $pending->id)
+                ->get()
+                ->flatMap(fn (Activity $a) => $a->properties->get(self::REVERSAL_IDS_KEY, []))
+                ->all();
+
+            PatientPayment::whereIn('id', $ids)->get()
+                ->each(fn (PatientPayment $p) => $this->invoiceService->deleteReversal($p));
+
+            $pending->update(['cancelled_at' => now()]);
+        });
+    }
+
+    /** Khoản thu dương chưa bị hoàn tác — đúng tập mà reversePayment() chấp nhận. */
+    private function paymentsToReverse(TreatmentPlan $plan): Collection
+    {
+        return PatientPayment::whereHas('invoice', fn ($q) => $q->where('treatment_plan_id', $plan->id))
+            ->where('amount', '>', 0)
+            ->whereNull('reverses_payment_id')
+            ->whereDoesntHave('reversal')
+            ->with('invoice')
+            ->orderBy('payment_date')
+            ->get();
     }
 }

@@ -8,7 +8,6 @@ use App\Models\Branch;
 use App\Models\DentalService;
 use App\Models\Employee;
 use App\Models\Patient;
-use App\Models\PendingDeletion;
 use App\Models\PriceList;
 use App\Models\TreatmentPlan;
 use App\Services\InvoiceService;
@@ -390,23 +389,35 @@ class TreatmentPlanController extends Controller
 
         $request->validate(['reason' => 'required|string|max:500']);
 
-        // Chặn theo số thực thu, không theo "đã từng thu": kế hoạch đã hoàn tác
-        // sạch về 0 thì không còn ràng buộc tiền nong nào để giữ lại.
-        if ($treatmentPlan->hasNetPayments()) {
-            return back()->withErrors(['reason' => 'Không thể xóa kế hoạch điều trị khi khách vẫn còn tiền đã thu ở kế hoạch này. Hãy hoàn tác hết các khoản thu trước.']);
+        $hadPayments = $treatmentPlan->hasNetPayments();
+
+        try {
+            $this->svc->requestDeletion($treatmentPlan, $request->reason, auth()->id(), $this->canReversePayments());
+        } catch (\RuntimeException $e) {
+            return back()->withErrors(['reason' => $e->getMessage()]);
         }
 
-        PendingDeletion::create([
-            'deletable_type' => TreatmentPlan::class,
-            'deletable_id' => $treatmentPlan->id,
-            'reason' => $request->reason,
-            'user_id' => auth()->id(),
-            'label' => $treatmentPlan->code,
-            'execute_at' => now()->addMinutes(10),
-        ]);
+        $message = 'Kế hoạch sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.';
+        if ($hadPayments) {
+            $message .= ' Các khoản thu đã được hoàn tác — hoàn tác xoá sẽ khôi phục lại tiền thu.';
+        }
 
-        return redirect()->route('patients.show', $treatmentPlan->patient_id)
-            ->with('success', 'Kế hoạch sẽ bị xóa sau 10 phút. Bạn có thể hoàn tác trong thời gian này.');
+        return redirect()->route('patients.show', $treatmentPlan->patient_id)->with('success', $message);
+    }
+
+    public function deleteImpact(TreatmentPlan $treatmentPlan): JsonResponse
+    {
+        $this->authorize('treatment_plans.edit');
+
+        return response()->json($this->svc->deletionImpact($treatmentPlan, $this->canReversePayments()));
+    }
+
+    // Hoàn tác khoản thu khi xoá KHDT đi cùng đường với nút "Hoàn tác" ở thu ngân → cùng quyền.
+    private function canReversePayments(): bool
+    {
+        $user = auth()->user();
+
+        return $user->can('cashier.manage') && $user->can('cashier.approve_refund');
     }
 
     public function transition(Request $request, TreatmentPlan $treatmentPlan): RedirectResponse|JsonResponse

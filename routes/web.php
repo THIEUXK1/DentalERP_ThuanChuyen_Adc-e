@@ -308,6 +308,7 @@ Route::middleware(['auth'])->prefix('clinical')->name('clinical.')->group(functi
     Route::post('treatment-plans/{treatmentPlan}/approve', [TreatmentPlanController::class, 'approve'])->name('treatment-plans.approve')->middleware('can:treatment_plans.approve');
     Route::patch('treatment-plans/{treatmentPlan}/payment-schedule', [TreatmentPlanController::class, 'savePaymentSchedule'])->name('treatment-plans.payment-schedule')->middleware('can:treatment_plans.edit');
     Route::patch('treatment-plans/{treatmentPlan}/payment-notes', [TreatmentPlanController::class, 'savePaymentNotes'])->name('treatment-plans.payment-notes')->middleware('can:treatment_plans.edit');
+    Route::get('treatment-plans/{treatmentPlan}/delete-impact', [TreatmentPlanController::class, 'deleteImpact'])->name('treatment-plans.delete-impact')->middleware('can:treatment_plans.edit');
     Route::get('treatment-plans/{treatmentPlan}/pdf', [TreatmentPlanController::class, 'pdf'])->name('treatment-plans.pdf')->middleware('can:treatment_plans.view');
 });
 

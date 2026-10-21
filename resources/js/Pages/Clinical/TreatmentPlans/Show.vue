@@ -595,14 +595,10 @@
                     <!-- Delete plan -->
                     <div v-if="can('treatment_plans.edit')" class="bg-white rounded-xl border border-gray-200 p-4">
                         <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Vùng nguy hiểm</h3>
-                        <div v-if="plan.has_net_payments"
-                            class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-700">
-                            <svg class="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-                            </svg>
-                            <span>Không thể xóa kế hoạch khi vẫn còn tiền đã thu. Hoàn tác hết các khoản thu rồi thử lại.</span>
-                        </div>
-                        <button v-else @click="showDeleteModal = true"
+                        <p v-if="plan.has_net_payments" class="mb-2 text-xs text-amber-700">
+                            Kế hoạch đã có tiền thu — khi xóa, các khoản thu sẽ được hoàn tác.
+                        </p>
+                        <button @click="openDeleteModal"
                             class="w-full py-1.5 text-xs text-red-500 border border-red-200 rounded-lg hover:bg-red-50 font-medium transition-colors">
                             Xóa kế hoạch điều trị
                         </button>
@@ -886,45 +882,8 @@
         </Teleport>
 
         <!-- ── Delete plan modal ──────────────────────────────────────────── -->
-        <Teleport to="body">
-            <div v-if="showDeleteModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-                <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm">
-                    <div class="px-5 pt-5 pb-4 border-b border-red-200 bg-red-50 rounded-t-2xl">
-                        <div class="flex items-center gap-2">
-                            <svg class="w-5 h-5 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                            </svg>
-                            <h3 class="font-semibold text-base text-red-800">Xóa kế hoạch điều trị</h3>
-                        </div>
-                    </div>
-                    <div class="px-5 py-4 space-y-3 text-sm text-gray-700">
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-3 text-xs text-red-600 space-y-1">
-                            <p class="font-medium text-red-700">⚠ Cảnh báo:</p>
-                            <ul class="list-disc list-inside space-y-1">
-                                <li>Kế hoạch sẽ bị xóa sau 10 phút</li>
-                                <li>Bạn có thể hoàn tác trong thời gian đó</li>
-                            </ul>
-                        </div>
-                        <div>
-                            <label class="text-xs text-gray-500 mb-1 block">Lý do xóa <span class="text-red-500">*</span></label>
-                            <textarea v-model="deleteReason" rows="3" placeholder="Nhập lý do xóa kế hoạch..."
-                                class="block w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:outline-none resize-none"></textarea>
-                            <p v-if="deleteError" class="text-red-500 text-xs mt-1">{{ deleteError }}</p>
-                        </div>
-                    </div>
-                    <div class="px-5 pb-5 flex justify-end gap-2">
-                        <button @click="showDeleteModal = false; deleteReason = ''; deleteError = ''"
-                            class="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">
-                            Hủy bỏ
-                        </button>
-                        <button @click="submitDelete" :disabled="!deleteReason.trim()"
-                            class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50">
-                            Xác nhận xóa
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </Teleport>
+        <DeletePlanModal :show="showDeleteModal" :plan="plan" :error="deleteError" :processing="deleting"
+            @confirm="submitDelete" @cancel="showDeleteModal = false" />
 
         <!-- Menu đổi nhanh trạng thái dịch vụ (z cao hơn modal chi tiết) -->
         <Teleport to="body">
@@ -952,6 +911,7 @@ import axios from 'axios';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import StatusBadge from '@/Components/Shared/StatusBadge.vue';
 import ToothChart from '@/Components/Shared/ToothChart.vue';
+import DeletePlanModal from '@/Components/Clinical/DeletePlanModal.vue';
 import { usePermission } from '@/composables/usePermission';
 import { useCurrency } from '@/composables/useCurrency';
 
@@ -1496,15 +1456,21 @@ function saveFinancials() {
 // action that still has to navigate away — back to the patient's profile — rather
 // than update local state in place.
 const showDeleteModal = ref(false);
-const deleteReason    = ref('');
 const deleteError     = ref('');
+const deleting        = ref(false);
 
-function submitDelete() {
-    if (!deleteReason.value.trim()) return;
+function openDeleteModal() {
+    deleteError.value = '';
+    showDeleteModal.value = true;
+}
+
+function submitDelete(reason) {
+    deleting.value = true;
     router.delete(route('clinical.treatment-plans.destroy', plan.id), {
-        data: { reason: deleteReason.value },
+        data: { reason },
         onError: (errors) => { deleteError.value = errors.reason ?? 'Có lỗi xảy ra.'; },
-        onSuccess: () => { showDeleteModal.value = false; deleteReason.value = ''; deleteError.value = ''; },
+        onSuccess: () => { showDeleteModal.value = false; },
+        onFinish: () => { deleting.value = false; },
     });
 }
 </script>
