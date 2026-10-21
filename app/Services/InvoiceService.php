@@ -4,9 +4,9 @@ namespace App\Services;
 
 use App\Enums\DebtStatus;
 use App\Enums\InvoiceStatus;
+use App\Enums\TreatmentItemStatus;
 use App\Models\HkdCashTransaction;
 use App\Models\HkdRevenueEntry;
-use App\Enums\TreatmentItemStatus;
 use App\Models\PatientDebt;
 use App\Models\PatientInvoice;
 use App\Models\PatientPayment;
@@ -154,6 +154,53 @@ class InvoiceService
             'treatment_plan_item_id' => $payment->treatment_plan_item_id,
             'doctor_id' => $payment->doctor_id,
         ]);
+    }
+
+    /**
+     * Gỡ hẳn một bút toán hoàn tác (dòng âm) như thể chưa từng hoàn tác: chỉ dùng khi
+     * người dùng huỷ lệnh xoá KHDT trong thời gian chờ — khách thực tế chưa nhận lại tiền,
+     * nên ghi thêm một khoản thu mới sẽ làm sổ quỹ phình ra cả chi lẫn thu không có thật.
+     */
+    public function deleteReversal(PatientPayment $reversal): void
+    {
+        if ($reversal->reverses_payment_id === null || $reversal->amount >= 0) {
+            throw new \RuntimeException('Chỉ gỡ được bút toán hoàn tác.');
+        }
+
+        DB::transaction(function () use ($reversal) {
+            $invoice = $reversal->invoice;
+            $amountPaid = $invoice->amount_paid - $reversal->amount;
+            $remaining = $invoice->total - $amountPaid;
+
+            $invoiceStatus = $remaining <= 0
+                ? InvoiceStatus::Paid
+                : ($amountPaid > 0 ? InvoiceStatus::PartialPaid : InvoiceStatus::Sent);
+
+            $invoice->update(['amount_paid' => $amountPaid, 'status' => $invoiceStatus]);
+
+            $invoice->debt?->update([
+                'paid_amount' => $amountPaid,
+                'remaining' => max(0, $remaining),
+                'status' => $remaining <= 0
+                    ? DebtStatus::Paid
+                    : ($amountPaid > 0 ? DebtStatus::Partial : DebtStatus::Pending),
+            ]);
+
+            HkdRevenueEntry::where('source_type', 'patient_payment')->where('source_id', $reversal->id)->delete();
+            HkdCashTransaction::where('source_type', 'patient_payment')->where('source_id', $reversal->id)->delete();
+
+            $item = $reversal->treatmentPlanItem;
+            $reversal->delete();
+
+            if ($invoiceStatus === InvoiceStatus::Paid) {
+                (new CommissionService)->calculateForInvoice($invoice->fresh());
+            }
+
+            // KPI đã bị tính lại theo số thu giảm khi hoàn tác → tính lại lần nữa theo số thu cũ.
+            if ($item && $item->status === TreatmentItemStatus::Completed) {
+                app(DentalKpiService::class)->calculateForItem($item);
+            }
+        });
     }
 
     /**
