@@ -82,6 +82,26 @@ class AppointmentMoveTest extends TestCase
         $this->svc->moveToNewDate($old->refresh(), '2026-09-26 09:00:00');
     }
 
+    public function test_data_endpoint_only_returns_appointments_in_requested_range(): void
+    {
+        Permission::create(['name' => 'appointments.view', 'guard_name' => 'web']);
+        $this->user->givePermissionTo('appointments.view');
+
+        $this->makeAppointment('2026-08-31 23:30:00');
+        $inside = $this->makeAppointment('2026-09-01 08:00:00');
+        $lastDay = $this->makeAppointment('2026-09-30 19:00:00');
+        $this->makeAppointment('2026-10-01 08:00:00');
+
+        $ids = $this->getJson(route('schedule.appointments.data', ['from' => '2026-09-01', 'to' => '2026-09-30']))
+            ->assertOk()
+            ->json('*.id');
+
+        $this->assertEqualsCanonicalizing([$inside->id, $lastDay->id], $ids);
+
+        // Thiếu khoảng ngày → không được trả toàn bộ lịch sử như trước.
+        $this->getJson(route('schedule.appointments.data'))->assertUnprocessable();
+    }
+
     public function test_bulk_move_endpoint_moves_selected_appointments(): void
     {
         Permission::create(['name' => 'appointments.manage', 'guard_name' => 'web']);

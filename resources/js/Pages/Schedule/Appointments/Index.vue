@@ -337,6 +337,7 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                         </button>
                     </template>
+                    <span v-else class="text-xs text-gray-400">Lịch hẹn từ {{ loadedRangeLabel }}</span>
                 </div>
 
                 <div v-if="filteredAppointments.length === 0"
@@ -473,6 +474,7 @@
                  CHẾ ĐỘ: LƯỚI
             ══════════════════════════════════════════════════════════════ -->
             <div v-else-if="!loading && !loadError && viewMode === 'grid'" class="flex flex-col flex-1 min-h-0 gap-2">
+                <div class="text-xs text-gray-400 flex-shrink-0">Lịch hẹn từ {{ loadedRangeLabel }}</div>
                 <div v-if="filteredAppointments.length === 0"
                     class="bg-white rounded-xl border border-gray-200 flex-1 min-h-0 flex items-center justify-center text-gray-400">
                     Không có lịch hẹn nào
@@ -796,20 +798,54 @@ async function loadPatients() {
 const allAppointments = ref([]);
 const loading         = ref(true);
 const loadError       = ref(false);
+const loadedRange     = ref(null);   // { from, to } đã nạp — tránh gọi lại khi lùi/tới trong cùng khoảng
+let   loadSeq         = 0;
+
+// Server chỉ trả lịch hẹn trong khoảng ngày (trước đây trả toàn bộ lịch sử, >5 MB).
+// Lịch ngày/tuần/tháng: nạp trọn tháng (nới ra cả tuần vắt qua tháng bên cạnh).
+// Danh sách/lưới: ±3 tháng quanh ngày đang chọn.
+function neededRange() {
+    const d = dayjs(date.value);
+    if (isCalendarView.value) {
+        const mon  = getMonday(date.value);
+        const from = [d.startOf('month').format('YYYY-MM-DD'), mon.format('YYYY-MM-DD')].sort()[0];
+        const to   = [d.endOf('month').format('YYYY-MM-DD'), mon.add(6, 'day').format('YYYY-MM-DD')].sort()[1];
+        return { from, to };
+    }
+    return {
+        from: d.subtract(3, 'month').startOf('month').format('YYYY-MM-DD'),
+        to:   d.add(3, 'month').endOf('month').format('YYYY-MM-DD'),
+    };
+}
 
 async function loadData() {
+    const range = neededRange();
+    const seq   = ++loadSeq;
     loading.value   = true;
     loadError.value = false;
     try {
-        const res = await fetch(route('schedule.appointments.data'), {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        const res = await fetch(route('schedule.appointments.data', range), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
         });
-        allAppointments.value = await res.json();
+        if (!res.ok) throw new Error(res.status);
+        const rows = await res.json();
+        // Bỏ kết quả của request cũ nếu người dùng đã chuyển khoảng ngày trong lúc chờ.
+        if (seq !== loadSeq) return;
+        allAppointments.value = rows;
+        loadedRange.value     = range;
     } catch {
-        loadError.value = true;
+        if (seq === loadSeq) loadError.value = true;
     } finally {
-        loading.value = false;
+        if (seq === loadSeq) loading.value = false;
     }
+}
+
+// Chỉ nạp lại khi khoảng cần xem vượt ra ngoài khoảng đã có.
+function ensureRange() {
+    const need = neededRange();
+    const have = loadedRange.value;
+    if (have && need.from >= have.from && need.to <= have.to) return;
+    loadData();
 }
 
 // Ghi nhận cuộc gọi chỉ đổi đúng một dòng — vá tại chỗ thay vì nạp lại cả bảng.
@@ -846,6 +882,13 @@ const perPage      = ref(50);
 const currentPage  = ref(1);
 
 const isCalendarView = computed(() => ['day', 'week', 'month'].includes(viewMode.value));
+
+watch([date, viewMode], ensureRange);
+
+// Ghi chú cho danh sách/lưới: dữ liệu chỉ gồm khoảng đã nạp, không phải toàn bộ lịch sử.
+const loadedRangeLabel = computed(() => loadedRange.value
+    ? `${dayjs(loadedRange.value.from).format('DD/MM/YYYY')} – ${dayjs(loadedRange.value.to).format('DD/MM/YYYY')}`
+    : '');
 
 function setViewMode(v) {
     viewMode.value = v;

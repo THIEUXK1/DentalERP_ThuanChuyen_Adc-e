@@ -76,15 +76,28 @@ class AppointmentController extends Controller
         ];
     }
 
-    public function data(): JsonResponse
+    public function data(Request $request): JsonResponse
     {
         $this->authorize('appointments.view');
 
+        // Bắt buộc khoảng ngày: trước đây trả toàn bộ lịch sử (>5 MB và phình mãi).
+        // Chặn tối đa ~1 năm để không ai gọi lại kiểu "lấy hết".
+        $request->validate([
+            'from' => ['required', 'date_format:Y-m-d'],
+            'to' => ['required', 'date_format:Y-m-d', 'after_or_equal:from'],
+        ]);
+        abort_if($request->date('from')->diffInDays($request->date('to')) > 400, 422, 'Khoảng ngày quá dài.');
+
         $appointments = Appointment::with([
-            'patient', 'doctor', 'chair', 'service', 'branch',
+            'patient:id,full_name,phone,phone_label,dob', 'doctor:id,full_name',
+            'chair:id,name', 'service:id,name', 'branch:id,name',
             'rescheduledTo:id,code,scheduled_at,rescheduled_from_id', 'rescheduledFrom:id,code,scheduled_at',
         ])
             ->withExists('registration')
+            ->whereBetween('scheduled_at', [
+                $request->date('from')->startOfDay(),
+                $request->date('to')->endOfDay(),
+            ])
             ->orderByDesc('scheduled_at')
             ->get()
             ->map(fn ($a) => $this->dto($a));
