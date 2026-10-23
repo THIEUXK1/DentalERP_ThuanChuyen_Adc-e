@@ -102,6 +102,23 @@ class AppointmentMoveTest extends TestCase
         $this->getJson(route('schedule.appointments.data'))->assertUnprocessable();
     }
 
+    public function test_transition_via_json_returns_updated_row(): void
+    {
+        Permission::create(['name' => 'appointments.manage', 'guard_name' => 'web']);
+        $this->user->givePermissionTo('appointments.manage');
+        $apt = $this->makeAppointment('2026-09-22 09:00:00');
+
+        $this->postJson(route('schedule.appointments.transition', $apt), ['status' => 'confirmed'])
+            ->assertOk()
+            ->assertJsonPath('appointment.id', $apt->id)
+            ->assertJsonPath('appointment.status', 'confirmed');
+
+        // Đã xác nhận → Đang hẹn không hợp lệ: trả 422 kèm lý do, không redirect.
+        $this->postJson(route('schedule.appointments.transition', $apt), ['status' => 'booked'])
+            ->assertUnprocessable()
+            ->assertJsonStructure(['message']);
+    }
+
     public function test_bulk_move_endpoint_moves_selected_appointments(): void
     {
         Permission::create(['name' => 'appointments.manage', 'guard_name' => 'web']);

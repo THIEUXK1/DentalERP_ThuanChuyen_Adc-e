@@ -32,6 +32,13 @@ class AppointmentController extends Controller
      */
     private const ARRIVAL_STATUSES = ['checked_in', 'arrived_early', 'arrived_late'];
 
+    /** Quan hệ (chỉ cột cần) để dựng dto() — dùng chung cho danh sách và vá từng dòng. */
+    private const DTO_RELATIONS = [
+        'patient:id,full_name,phone,phone_label,dob', 'doctor:id,full_name',
+        'chair:id,name', 'service:id,name', 'branch:id,name',
+        'rescheduledTo:id,code,scheduled_at,rescheduled_from_id', 'rescheduledFrom:id,code,scheduled_at',
+    ];
+
     public function __construct(
         private AppointmentService $svc,
         private AppointmentCallService $callSvc,
@@ -46,7 +53,11 @@ class AppointmentController extends Controller
             // The patient picker for "book appointment" is loaded on demand from
             // patients.lite-list (see Index.vue) instead of embedded here — shipping all
             // 20k+ patients on every board load was the dominant cost of this page.
-            'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => ['value' => $s->value, 'label' => $s->label(), 'color' => $s->color()]),
+            // 'next' = các trạng thái được phép chuyển tới, để menu đổi nhanh chỉ hiện lựa chọn hợp lệ.
+            'statuses' => collect(AppointmentStatus::cases())->map(fn ($s) => [
+                'value' => $s->value, 'label' => $s->label(), 'color' => $s->color(),
+                'next' => array_map(fn ($n) => $n->value, $s->allowedTransitions()),
+            ]),
         ]);
     }
 
@@ -88,11 +99,7 @@ class AppointmentController extends Controller
         ]);
         abort_if($request->date('from')->diffInDays($request->date('to')) > 400, 422, 'Khoảng ngày quá dài.');
 
-        $appointments = Appointment::with([
-            'patient:id,full_name,phone,phone_label,dob', 'doctor:id,full_name',
-            'chair:id,name', 'service:id,name', 'branch:id,name',
-            'rescheduledTo:id,code,scheduled_at,rescheduled_from_id', 'rescheduledFrom:id,code,scheduled_at',
-        ])
+        $appointments = Appointment::with(self::DTO_RELATIONS)
             ->withExists('registration')
             ->whereBetween('scheduled_at', [
                 $request->date('from')->startOfDay(),
@@ -374,19 +381,28 @@ class AppointmentController extends Controller
         ]);
     }
 
-    public function transition(Request $request, Appointment $appointment): RedirectResponse
+    public function transition(Request $request, Appointment $appointment): RedirectResponse|JsonResponse
     {
         $this->authorize('appointments.manage');
 
         $data = $request->validate([
-            'status' => 'required|string',
+            'status' => ['required', Rule::enum(AppointmentStatus::class)],
             'cancel_reason' => 'nullable|string|max:500',
         ]);
 
         try {
             $this->svc->transition($appointment, AppointmentStatus::from($data['status']), $data);
         } catch (\RuntimeException $e) {
-            return back()->with('error', $e->getMessage());
+            return $request->expectsJson()
+                ? response()->json(['message' => $e->getMessage()], 422)
+                : back()->with('error', $e->getMessage());
+        }
+
+        // Màn danh sách gọi bằng fetch: trả lại đúng dòng đã đổi để vá tại chỗ, khỏi nạp lại cả bảng.
+        if ($request->expectsJson()) {
+            $appointment = Appointment::with(self::DTO_RELATIONS)->withExists('registration')->findOrFail($appointment->id);
+
+            return response()->json(['message' => 'Đã cập nhật trạng thái lịch hẹn.', 'appointment' => $this->dto($appointment)]);
         }
 
         return back()->with('success', 'Đã cập nhật trạng thái lịch hẹn.');

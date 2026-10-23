@@ -33,11 +33,12 @@
                 </div>
             </div>
 
-            <!-- Kết quả dời lịch hàng loạt -->
-            <div v-if="moveBanner" class="flex items-center gap-2 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-2 text-sm flex-shrink-0">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <!-- Kết quả dời lịch / đổi trạng thái -->
+            <div v-if="moveBanner" :class="['flex items-center gap-2 border rounded-xl px-4 py-2 text-sm flex-shrink-0',
+                bannerIsError ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-800']">
+                <svg v-if="!bannerIsError" class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 {{ moveBanner }}
-                <button @click="moveBanner = ''" class="ml-auto text-emerald-500 hover:text-emerald-700">✕</button>
+                <button @click="moveBanner = ''" :class="['ml-auto', bannerIsError ? 'text-red-400 hover:text-red-600' : 'text-emerald-500 hover:text-emerald-700']">✕</button>
             </div>
 
             <!-- ── Filter bar ──────────────────────────────────────────────── -->
@@ -379,7 +380,7 @@
 
                 <!-- Vùng cuộn duy nhất của chế độ danh sách -->
                 <div v-if="filteredAppointments.length" class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-1.5 pr-1">
-                    <div v-for="(a, idx) in paginatedAppointments" :key="a.id"
+                    <div v-for="a in paginatedAppointments" :key="a.id"
                         :class="['flex items-stretch flex-wrap bg-white rounded-xl border hover:shadow-sm transition-all overflow-hidden', statusBorder(a.status)]">
                         <!-- Checkbox -->
                         <label class="flex items-center pl-3 cursor-pointer flex-shrink-0" @click.stop>
@@ -427,19 +428,18 @@
                         <div class="relative flex items-center px-3 flex-shrink-0" @click.stop>
                             <button
                                 :class="['inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold hover:opacity-75 transition-opacity', statusBadge(a.status)]"
-                                @click="toggleStatusDrop(a.id)">
+                                @click="toggleStatusDrop(a.id, $event)">
                                 {{ a.status_label }}
                                 <svg class="w-2.5 h-2.5 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/>
                                 </svg>
                             </button>
-                            <!-- Mở lên trên ở các dòng cuối để không bị vùng cuộn cắt mất -->
-                            <div v-if="statusDrop === a.id"
-                                :class="['absolute right-0 z-30 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]',
-                                    idx >= paginatedAppointments.length - 2 ? 'bottom-full mb-1' : 'top-full mt-1']">
+                            <!-- position: fixed để thoát khung dòng (overflow-hidden) và vùng cuộn — trước đây menu bị cắt mất hẳn -->
+                            <div v-if="statusDrop === a.id" :style="statusDropStyle"
+                                class="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1 min-w-[170px]">
                                 <p class="px-3 py-1.5 text-[10px] text-gray-400 uppercase tracking-wide font-medium border-b border-gray-100">Đổi trạng thái</p>
-                                <button v-for="s in QUICK_STATUSES" :key="s.value"
-                                    @click="doStatusTransition(a.id, s.value)"
+                                <button v-for="s in quickStatusesFor(a)" :key="s.value"
+                                    @click="a.status !== s.value && doStatusTransition(a.id, s.value)"
                                     :class="['w-full text-left px-3 py-2 text-xs hover:bg-gray-50 flex items-center gap-2',
                                         a.status === s.value ? 'font-bold text-gray-800' : 'text-gray-600']">
                                     <span :class="['w-2 h-2 rounded-full flex-shrink-0', statusStripe(s.value)]"></span>
@@ -451,7 +451,7 @@
                             </div>
                         </div>
                         <div class="flex items-center pr-2 flex-shrink-0" @click.stop.prevent>
-                            <CallLogButton :appointment="a" @logged="applyCallLog" />
+                            <CallLogButton :appointment="a" @logged="patchAppointment" />
                         </div>
                         <div v-if="can('appointments.manage')" class="flex items-center gap-1.5 pr-3 flex-shrink-0">
                             <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký khám" @registered="loadData" />
@@ -519,7 +519,7 @@
                         </Link>
                         <div class="flex items-center justify-between px-4 py-2 border-t border-gray-100 bg-white gap-1.5 flex-wrap">
                             <span class="font-mono text-xs text-gray-400">{{ a.code }}</span>
-                            <CallLogButton :appointment="a" @logged="applyCallLog" />
+                            <CallLogButton :appointment="a" @logged="patchAppointment" />
                             <div v-if="can('appointments.manage')" class="flex items-center gap-1.5">
                                 <QuickRegisterButton :appointment="a" variant="outline" label="Đăng ký" @registered="loadData" />
                                 <button v-if="!a.moved_to" @click="openReschedule(a)"
@@ -848,8 +848,8 @@ function ensureRange() {
     loadData();
 }
 
-// Ghi nhận cuộc gọi chỉ đổi đúng một dòng — vá tại chỗ thay vì nạp lại cả bảng.
-function applyCallLog(updated) {
+// Ghi cuộc gọi / đổi trạng thái chỉ đổi đúng một dòng — vá tại chỗ thay vì nạp lại cả bảng.
+function patchAppointment(updated) {
     const i = allAppointments.value.findIndex(a => a.id === updated.id);
     if (i !== -1) allAppointments.value[i] = updated;
 }
@@ -1235,22 +1235,66 @@ function submitCreate() {
 // ── Inline status transition ────────────────────────────────────
 const QUICK_STATUSES = [
     { value: 'booked',     label: 'Đang hẹn' },
+    { value: 'confirmed',  label: 'Đã xác nhận' },
     { value: 'checked_in', label: 'Đã đến' },
     { value: 'cancelled',  label: 'Hủy hẹn' },
 ];
-const statusDrop = ref(null);
-function toggleStatusDrop(id) { statusDrop.value = statusDrop.value === id ? null : id; }
-function doStatusTransition(id, status) {
+// Menu đổi nhanh chỉ hiện trạng thái hiện tại + các bước server cho phép,
+// tránh chọn xong mới bị từ chối (vd. "Đã đến" → "Đang hẹn").
+function quickStatusesFor(a) {
+    const next = props.statuses?.find(s => s.value === a.status)?.next ?? [];
+    return QUICK_STATUSES.filter(s => s.value === a.status || next.includes(s.value));
+}
+const statusDrop      = ref(null);
+const statusDropStyle = ref({});
+// Neo menu theo vị trí nút trên màn hình; gần mép dưới thì mở lên trên.
+function toggleStatusDrop(id, e) {
+    if (statusDrop.value === id) { statusDrop.value = null; return; }
+    const r = e.currentTarget.getBoundingClientRect();
+    const openUp = window.innerHeight - r.bottom < 220;
+    statusDropStyle.value = {
+        right: `${window.innerWidth - r.right}px`,
+        ...(openUp ? { bottom: `${window.innerHeight - r.top + 4}px` } : { top: `${r.bottom + 4}px` }),
+    };
+    statusDrop.value = id;
+}
+
+// Gọi bằng fetch và vá đúng dòng: danh sách là dữ liệu nạp riêng nên Inertia
+// redirect không làm nó đổi — trước đây bấm xong trông như không có gì xảy ra.
+async function postTransition(id, status) {
+    const res = await fetch(route('schedule.appointments.transition', id), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
+        },
+        body: JSON.stringify({ status }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(json.message ?? 'Không đổi được trạng thái.');
+    patchAppointment(json.appointment);
+    return json;
+}
+async function doStatusTransition(id, status) {
     statusDrop.value = null;
-    router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true });
+    try {
+        showBanner((await postTransition(id, status)).message);
+    } catch (e) {
+        showBanner(e.message, true);
+    }
 }
 function closeStatusDrop() { statusDrop.value = null; }
 onMounted(() => {
     document.addEventListener('click', closeStatusDrop);
+    // Menu dùng position: fixed nên cuộn là phải đóng, kẻo nó lơ lửng lệch khỏi dòng.
+    document.addEventListener('scroll', closeStatusDrop, true);
     loadData();
 });
 onUnmounted(() => {
     document.removeEventListener('click', closeStatusDrop);
+    document.removeEventListener('scroll', closeStatusDrop, true);
     clearTimeout(bannerTimer);
 });
 
@@ -1262,13 +1306,17 @@ function toggleSelect(id) {
     s.has(id) ? s.delete(id) : s.add(id);
     selectedIds.value = s;
 }
-function doBulkTransition() {
+async function doBulkTransition() {
     if (!bulkStatus.value || selectedIds.value.size === 0) return;
     const ids = [...selectedIds.value];
     const status = bulkStatus.value;
     selectedIds.value = new Set();
     bulkStatus.value = '';
-    ids.forEach(id => router.post(route('schedule.appointments.transition', id), { status }, { preserveScroll: true }));
+    const results = await Promise.allSettled(ids.map(id => postTransition(id, status)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    showBanner(failed
+        ? `Đã đổi ${ids.length - failed}/${ids.length} lịch hẹn; ${failed} lịch không chuyển được sang trạng thái này.`
+        : `Đã đổi trạng thái ${ids.length} lịch hẹn.`, failed > 0);
 }
 
 const allPageSelected = computed(() =>
@@ -1289,6 +1337,7 @@ const bmSaving      = ref(false);
 const bmFailed      = ref([]);
 const bmError       = ref('');
 const moveBanner    = ref('');
+const bannerIsError = ref(false);
 let   bannerTimer   = null;
 
 const bulkMoveTargets = computed(() =>
@@ -1348,8 +1397,9 @@ async function submitBulkMove() {
     }
 }
 
-function showBanner(msg) {
+function showBanner(msg, isError = false) {
     moveBanner.value = msg;
+    bannerIsError.value = isError;
     clearTimeout(bannerTimer);
     bannerTimer = setTimeout(() => { moveBanner.value = ''; }, 5000);
 }
