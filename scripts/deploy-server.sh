@@ -1,4 +1,4 @@
-﻿#!/bin/sh
+#!/bin/sh
 # Chạy TRÊN server production. Gọi qua scripts/deploy.ps1 từ máy dev, hoặc trực tiếp:
 #   sh /var/www/DentalERP/scripts/deploy-server.sh <commit-truoc-khi-push>
 #
