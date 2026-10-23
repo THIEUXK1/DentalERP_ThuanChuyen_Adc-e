@@ -58,7 +58,14 @@
       "Read(./curl_out*.txt)",
       "Read(./.env)",
       "Read(./.env.backup)",
-      "Read(./.env.bak*)"
+      "Read(./.env.bak*)",
+      "Read(./.env.production)",
+      "Read(./storage/*.key)",
+      "Read(./**/*.pem)",
+      "Read(./**/*.ppk)",
+      "Read(./**/*.min.*)",
+      "Read(./.idea/**)",
+      "Read(./.vscode/**)"
     ]
   }
 }
