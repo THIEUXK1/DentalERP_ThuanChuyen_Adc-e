@@ -17,12 +17,17 @@
                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
                     </FormInput>
 
+                    <FormInput v-if="user" :label="isSelf ? 'Mật khẩu cũ (chỉ nhập khi đổi mật khẩu)' : 'Mật khẩu của bạn (chỉ nhập khi đổi mật khẩu)'" :error="form.errors.current_password" :required="!!form.password">
+                        <input v-model="form.current_password" type="password" autocomplete="current-password"
+                            class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
+                    </FormInput>
+
                     <FormInput :label="user ? 'Mật khẩu mới (để trống nếu không đổi)' : 'Mật khẩu'" :error="form.errors.password" :required="!user">
                         <input v-model="form.password" type="password"
                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
                     </FormInput>
 
-                    <FormInput v-if="form.password" label="Xác nhận mật khẩu" :error="form.errors.password_confirmation" required>
+                    <FormInput :label="user ? 'Nhập lại mật khẩu mới' : 'Xác nhận mật khẩu'" :error="form.errors.password_confirmation" :required="!user || !!form.password">
                         <input v-model="form.password_confirmation" type="password"
                             class="block w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:outline-none" />
                     </FormInput>
@@ -59,7 +64,8 @@
 </template>
 
 <script setup>
-import { Link, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
+import { Link, useForm, usePage } from '@inertiajs/vue3';
 import AppLayout from '@/Components/Layout/AppLayout.vue';
 import FormInput from '@/Components/Shared/FormInput.vue';
 
@@ -68,11 +74,14 @@ const props = defineProps({
     roles: Array,
 });
 
+const isSelf = computed(() => props.user?.id === usePage().props.auth?.user?.id);
+
 const form = useForm({
     name:                 props.user?.name ?? '',
     email:                props.user?.email ?? '',
     password:             '',
     password_confirmation: '',
+    current_password:     '',
     role:                 props.user?.role ?? '',
     is_active:            props.user?.is_active ?? true,
 });

@@ -18,6 +18,13 @@ class PasswordController extends Controller
         $validated = $request->validate([
             'current_password' => ['required', 'current_password'],
             'password' => ['required', Password::defaults(), 'confirmed'],
+        ], [
+            // Locale app đang là en, chưa có lang/vi — ghi thẳng thông báo tiếng Việt
+            'current_password.required' => 'Vui lòng nhập mật khẩu cũ.',
+            'current_password.current_password' => 'Mật khẩu cũ không đúng.',
+            'password.required' => 'Vui lòng nhập mật khẩu mới.',
+            'password.min' => 'Mật khẩu mới phải có ít nhất :min ký tự.',
+            'password.confirmed' => 'Hai lần nhập mật khẩu mới không khớp.',
         ]);
 
         $request->user()->update([

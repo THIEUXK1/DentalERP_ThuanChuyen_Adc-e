@@ -42,36 +42,34 @@ const closeModal = () => {
     <section class="space-y-6">
         <header>
             <h2 class="text-lg font-medium text-gray-900">
-                Delete Account
+                Xoá tài khoản
             </h2>
 
             <p class="mt-1 text-sm text-gray-600">
-                Once your account is deleted, all of its resources and data will
-                be permanently deleted. Before deleting your account, please
-                download any data or information that you wish to retain.
+                Khi xoá tài khoản, toàn bộ dữ liệu của tài khoản sẽ bị xoá vĩnh viễn.
+                Hãy tải về những thông tin cần giữ lại trước khi xoá.
             </p>
         </header>
 
-        <DangerButton @click="confirmUserDeletion">Delete Account</DangerButton>
+        <DangerButton @click="confirmUserDeletion">Xoá tài khoản</DangerButton>
 
         <Modal :show="confirmingUserDeletion" @close="closeModal">
             <div class="p-6">
                 <h2
                     class="text-lg font-medium text-gray-900"
                 >
-                    Are you sure you want to delete your account?
+                    Bạn chắc chắn muốn xoá tài khoản?
                 </h2>
 
                 <p class="mt-1 text-sm text-gray-600">
-                    Once your account is deleted, all of its resources and data
-                    will be permanently deleted. Please enter your password to
-                    confirm you would like to permanently delete your account.
+                    Khi xoá tài khoản, toàn bộ dữ liệu sẽ bị xoá vĩnh viễn.
+                    Nhập mật khẩu để xác nhận xoá tài khoản.
                 </p>
 
                 <div class="mt-6">
                     <InputLabel
                         for="password"
-                        value="Password"
+                        value="Mật khẩu"
                         class="sr-only"
                     />
 
@@ -81,7 +79,7 @@ const closeModal = () => {
                         v-model="form.password"
                         type="password"
                         class="mt-1 block w-3/4"
-                        placeholder="Password"
+                        placeholder="Mật khẩu"
                         @keyup.enter="deleteUser"
                     />
 
@@ -90,7 +88,7 @@ const closeModal = () => {
 
                 <div class="mt-6 flex justify-end">
                     <SecondaryButton @click="closeModal">
-                        Cancel
+                        Huỷ
                     </SecondaryButton>
 
                     <DangerButton
@@ -99,7 +97,7 @@ const closeModal = () => {
                         :disabled="form.processing"
                         @click="deleteUser"
                     >
-                        Delete Account
+                        Xoá tài khoản
                     </DangerButton>
                 </div>
             </div>

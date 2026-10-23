@@ -28,4 +28,19 @@ class ProfileUpdateRequest extends FormRequest
             ],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'Vui lòng nhập họ tên.',
+            'name.max' => 'Họ tên tối đa :max ký tự.',
+            'email.required' => 'Vui lòng nhập email.',
+            'email.email' => 'Email không hợp lệ.',
+            'email.lowercase' => 'Email phải viết thường.',
+            'email.unique' => 'Email này đã được dùng cho tài khoản khác.',
+        ];
+    }
 }

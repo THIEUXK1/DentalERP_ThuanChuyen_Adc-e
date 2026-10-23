@@ -97,8 +97,14 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => "required|email|unique:users,email,{$user->id}",
             'password' => 'nullable|string|min:8|confirmed',
+            // Đổi mật khẩu phải nhập mật khẩu hiện tại của người đang đăng nhập:
+            // sửa chính mình = mật khẩu cũ; sửa người khác = mật khẩu admin để xác nhận.
+            'current_password' => 'required_with:password|nullable|current_password',
             'role' => 'required|string|exists:roles,name',
             'is_active' => 'boolean',
+        ], [
+            'current_password.required_with' => 'Vui lòng nhập mật khẩu hiện tại để đổi mật khẩu.',
+            'current_password.current_password' => 'Mật khẩu hiện tại không đúng.',
         ]);
 
         $user->update(array_filter([

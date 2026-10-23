@@ -47,6 +47,9 @@ class ProfileController extends Controller
     {
         $request->validate([
             'password' => ['required', 'current_password'],
+        ], [
+            'password.required' => 'Vui lòng nhập mật khẩu.',
+            'password.current_password' => 'Mật khẩu không đúng.',
         ]);
 
         $user = $request->user();
