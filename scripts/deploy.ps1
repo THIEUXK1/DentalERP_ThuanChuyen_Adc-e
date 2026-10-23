@@ -11,11 +11,14 @@ param(
     [switch] $SkipChecks
 )
 
-$ErrorActionPreference = 'Stop'
+# KHÔNG dùng ErrorActionPreference='Stop': git/ssh ghi tiến trình ra stderr, PS 5.1 sẽ
+# coi đó là lỗi và dừng script dù lệnh chạy thành công. Kiểm $LASTEXITCODE thay vì.
+$ErrorActionPreference = 'Continue'
 $keyUnix = $Key -replace '\\', '/'   # ssh qua MSYS ăn backslash → luôn dùng forward slash
 
-function Step($m) { Write-Host "`n── $m" -ForegroundColor Cyan }
-function Die($m)  { Write-Host "`n✗ $m" -ForegroundColor Red; exit 1 }
+# Dùng ASCII: console PS 5.1 hiển thị ký tự khung/✓ thành mojibake.
+function Step($m) { Write-Host "`n-- $m" -ForegroundColor Cyan }
+function Die($m)  { Write-Host "`n[LOI] $m" -ForegroundColor Red; exit 1 }
 
 # ── 1. Tree phải sạch ───────────────────────────────────────────────
 Step '1/5 Kiểm tra working tree'
@@ -67,4 +70,4 @@ Step '5/5 Deploy trên server'
 ssh -i $keyUnix $Server "sh $AppPath/scripts/deploy-server.sh $prev"
 if ($LASTEXITCODE -ne 0) { Die "Deploy trên server báo lỗi. Khôi phục asset: ssh -i $keyUnix $Server `"rm -rf $AppPath/public/build && mv /tmp/oldbuild $AppPath/public/build`"" }
 
-Write-Host "`n✓ Xong. $head đã chạy trên production." -ForegroundColor Green
+Write-Host "`n[OK] Xong. $head da chay tren production." -ForegroundColor Green
