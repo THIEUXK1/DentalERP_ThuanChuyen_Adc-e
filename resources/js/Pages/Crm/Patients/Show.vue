@@ -352,6 +352,8 @@
                     :patientId="patient.id"
                     :attachments="attachments"
                     :attachmentTypes="attachmentTypes"
+                    @added="a => attachments.unshift(a)"
+                    @removed="id => attachments = attachments.filter(x => x.id !== id)"
                 />
             </div>
 
@@ -483,7 +485,7 @@ const tabs = computed(() => [
     { key: 'appointments', label: 'Lịch hẹn', count: appointments.value?.length ?? 0 },
     { key: 'chart',        label: 'Sơ đồ răng' },
     { key: 'clinical',     label: 'Lâm sàng', count: clinicalNotes.value?.length ?? 0 },
-    { key: 'attachments',  label: 'Tài liệu', count: attachments.value?.length ?? 0 },
+    { key: 'attachments',  label: 'Ảnh & tài liệu', count: attachments.value?.length ?? 0 },
     { key: 'consent',      label: 'Phiếu đồng ý', count: consentForms.value?.length ?? 0 },
     { key: 'timeline',     label: 'Timeline' },
 ]);

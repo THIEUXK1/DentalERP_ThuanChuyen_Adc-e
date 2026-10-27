@@ -21,6 +21,7 @@ use App\Models\PatientPayment;
 use App\Models\PendingDeletion;
 use App\Models\ScheduleRegistration;
 use App\Models\TreatmentPlan;
+use App\Services\PatientAttachmentService;
 use App\Services\PatientMergeService;
 use Carbon\Carbon;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -496,18 +497,8 @@ class PatientController extends Controller
         });
 
         // ── Phase M: Attachments ─────────────────────────────────────────────
-        $attachments = $patient->attachments()->get()->map(fn ($a) => [
-            'id' => $a->id,
-            'type' => $a->type->value,
-            'type_label' => $a->type->label(),
-            'type_color' => $a->type->color(),
-            'title' => $a->title,
-            'file_path' => $a->file_path,
-            'file_url' => asset('storage/'.$a->file_path),
-            'file_size' => $a->file_size,
-            'mime_type' => $a->mime_type,
-            'created_at' => $a->created_at->format('d/m/Y H:i'),
-        ]);
+        $attachmentService = app(PatientAttachmentService::class);
+        $attachments = $patient->attachments()->get()->map(fn ($a) => $attachmentService->toArray($a));
 
         // ── Phase M: Consent Forms ───────────────────────────────────────────
         $consentForms = $patient->consentForms()->get()->map(fn ($c) => [
