@@ -12,7 +12,7 @@ use Maatwebsite\Excel\Events\AfterSheet;
 
 /**
  * File Excel lịch hẹn cho Reports/DailySchedule — bản gọn theo yêu cầu lễ tân:
- * chỉ Họ tên, Năm sinh, SĐT, Ghi chú (bản cũ 26 cột quá rối mắt khi in/gọi điện).
+ * Họ tên, Năm sinh, SĐT, Bác sĩ, Trạng thái, Ghi chú (bản cũ 26 cột quá rối mắt khi in/gọi điện).
  * Cột "Ngày" chỉ thêm khi xuất nhiều ngày, nếu không sẽ không biết lịch thuộc ngày nào.
  */
 class DailyScheduleExport implements FromArray, WithColumnWidths, WithEvents, WithStrictNullComparison, WithTitle
@@ -49,8 +49,8 @@ class DailyScheduleExport implements FromArray, WithColumnWidths, WithEvents, Wi
     private function headers(): array
     {
         return $this->multiDay()
-            ? ['STT', 'Ngày', 'Họ và tên', 'Năm sinh', 'Số điện thoại', 'Ghi chú lịch hẹn']
-            : ['STT', 'Họ và tên', 'Năm sinh', 'Số điện thoại', 'Ghi chú lịch hẹn'];
+            ? ['STT', 'Ngày', 'Họ và tên', 'Năm sinh', 'Số điện thoại', 'Bác sĩ', 'Trạng thái', 'Ghi chú lịch hẹn']
+            : ['STT', 'Họ và tên', 'Năm sinh', 'Số điện thoại', 'Bác sĩ', 'Trạng thái', 'Ghi chú lịch hẹn'];
     }
 
     private function lastCol(): string
@@ -61,8 +61,8 @@ class DailyScheduleExport implements FromArray, WithColumnWidths, WithEvents, Wi
     public function columnWidths(): array
     {
         return $this->multiDay()
-            ? ['A' => 6, 'B' => 12, 'C' => 30, 'D' => 10, 'E' => 15, 'F' => 55]
-            : ['A' => 6, 'B' => 30, 'C' => 10, 'D' => 15, 'E' => 55];
+            ? ['A' => 6, 'B' => 12, 'C' => 28, 'D' => 10, 'E' => 14, 'F' => 22, 'G' => 15, 'H' => 45]
+            : ['A' => 6, 'B' => 28, 'C' => 10, 'D' => 14, 'E' => 22, 'F' => 15, 'G' => 45];
     }
 
     public function array(): array
@@ -79,6 +79,8 @@ class DailyScheduleExport implements FromArray, WithColumnWidths, WithEvents, Wi
                 $r['patient'],
                 $r['patient_birth_year'],
                 $r['patient_phone'],
+                $r['doctor'],
+                $r['status_label'],
                 $r['notes'],
             ], fn ($v) => $v !== false));
         }
@@ -134,10 +136,11 @@ class DailyScheduleExport implements FromArray, WithColumnWidths, WithEvents, Wi
         $first = self::ROW_DATA;
         $nameCol = $this->multiDay() ? 'C' : 'B';
         $yearCol = $this->multiDay() ? 'D' : 'C';
+        $statusCol = $this->multiDay() ? 'G' : 'F';
 
         $this->bodyStyle($sheet, $first, $lastRow, $last);
 
-        $this->center($sheet, "A{$first}:A{$lastRow}", "{$yearCol}{$first}:{$yearCol}{$lastRow}");
+        $this->center($sheet, "A{$first}:A{$lastRow}", "{$yearCol}{$first}:{$yearCol}{$lastRow}", "{$statusCol}{$first}:{$statusCol}{$lastRow}");
         if ($this->multiDay()) {
             $this->center($sheet, "B{$first}:B{$lastRow}");
         }
